@@ -1,0 +1,10 @@
+.DS_Store
+*.pdf
+*.aux
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.synctex.gz
+*.xdv
+node_modules/

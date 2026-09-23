@@ -1,0 +1,13 @@
+[
+  {
+    "title": "Research note template",
+    "question": "What structure should a future research note follow?",
+    "type": "template",
+    "typeLabel": "Structural template",
+    "status": "Framework",
+    "date": "Sep 2026",
+    "tags": ["method", "evidence", "open questions"],
+    "url": "note-template.html",
+    "disclaimer": "Not a course note"
+  }
+]

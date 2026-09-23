@@ -1,0 +1,10 @@
+# Intentionally empty. Add only sources actually read and used.
+#
+# Suggested record:
+# - id: citation-key
+#   title: ""
+#   url: ""
+#   status: queued | skimmed | read | audited
+#   supports: []
+#   limitations: []
+#   related_notes: []

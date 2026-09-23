@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A living research notebook for CS 395T: Foundations of Modern Generative AI.">
+  <title>CS 395T — Research Notebook</title>
+  <link rel="stylesheet" href="assets/styles.css">
+  <script src="assets/app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header class="site-header">
+    <a class="wordmark" href="#top" aria-label="CS 395T notebook home">
+      <span>CS 395T</span>
+      <small>Research notebook</small>
+    </a>
+    <button class="menu-button" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button>
+    <nav id="site-nav" class="site-nav" aria-label="Primary navigation">
+      <a href="#explore">Explore</a>
+      <a href="#notes">Index</a>
+      <a href="#method">Method</a>
+      <a href="method.html">Writing guide</a>
+      <a href="#about">About</a>
+    </nav>
+  </header>
+
+  <main id="main">
+    <section id="top" class="hero section-shell">
+      <div class="hero-copy">
+        <p class="eyebrow"><span class="signal-dot"></span> A living notebook, not a course transcript</p>
+        <h1>Foundations,<br><em>re-derived.</em></h1>
+        <p class="hero-deck">A place to think through modern generative AI from first principles—building intuition, tracing derivations, connecting papers, and turning confusion into research questions.</p>
+        <div class="hero-actions">
+          <a class="button button-dark" href="#explore">Browse the structure</a>
+          <a class="button button-light" href="method.html">Read the writing method</a>
+        </div>
+      </div>
+
+      <aside class="status-card" aria-label="Notebook status">
+        <div class="status-card__top">
+          <span class="status-label">CURRENT STATE</span>
+          <span class="status-number">00</span>
+        </div>
+        <p class="status-title">Framework only</p>
+        <p class="status-copy">The architecture is ready. No course notes have been published yet.</p>
+        <dl class="status-grid">
+          <div><dt>Published notes</dt><dd>0</dd></div>
+          <div><dt>Last structured</dt><dd>Sep 2026</dd></div>
+        </dl>
+      </aside>
+    </section>
+
+    <section class="thesis section-shell" aria-labelledby="thesis-title">
+      <p class="section-index">01 / THESIS</p>
+      <div>
+        <h2 id="thesis-title">The useful note begins<br>where the lecture ends.</h2>
+        <p>Course materials establish the shared surface. These notes are for the work that follows: reconstructing an argument without looking, finding the assumption that makes it go through, comparing it with another paper, and asking what would falsify the emerging idea.</p>
+      </div>
+      <p class="margin-note">Understand → reconstruct → connect → question</p>
+    </section>
+
+    <section id="explore" class="explore-section section-shell" aria-labelledby="explore-title">
+      <div class="section-heading">
+        <div>
+          <p class="section-index">02 / NOTEBOOK MAP</p>
+          <h2 id="explore-title">Four ways into the<br>same body of thought.</h2>
+        </div>
+        <p class="section-intro">Readers should be able to enter through a question, a written argument, a computational test, or a source. These are connected views—not four disconnected archives.</p>
+      </div>
+
+      <div class="surface-grid">
+        <a class="surface-card" href="structure.html#threads">
+          <span class="surface-card__number">01</span>
+          <span class="surface-card__status">0 published</span>
+          <h3>Research threads</h3>
+          <p>Maps that connect notes, experiments, papers, and unresolved tensions around a larger question.</p>
+          <strong>Follow a line of inquiry →</strong>
+        </a>
+        <a class="surface-card" href="#notes">
+          <span class="surface-card__number">02</span>
+          <span class="surface-card__status">Template only</span>
+          <h3>Research notes</h3>
+          <p>Question-centered essays that make intuition, derivation, evidence, and uncertainty inspectable.</p>
+          <strong>Browse the note index →</strong>
+        </a>
+        <a class="surface-card" href="structure.html#experiments">
+          <span class="surface-card__number">03</span>
+          <span class="surface-card__status">0 published</span>
+          <h3>Experiments</h3>
+          <p>Code, configurations, expected behavior, and interpretations—including informative failures.</p>
+          <strong>See the experiment model →</strong>
+        </a>
+        <a class="surface-card" href="structure.html#library">
+          <span class="surface-card__number">04</span>
+          <span class="surface-card__status">0 indexed</span>
+          <h3>Source library</h3>
+          <p>Citations, claim ledgers, and reading trails for material actually used—without storing course PDFs.</p>
+          <strong>See the evidence model →</strong>
+        </a>
+      </div>
+
+      <div class="research-unit" aria-labelledby="unit-title">
+        <div class="research-unit__lead">
+          <p class="section-index">THE RESEARCH UNIT</p>
+          <h3 id="unit-title">One question keeps its artifacts together.</h3>
+          <p>The text is the spine. Code tests the claim; figures carry the explanation; sources establish the evidence boundary; open questions point outward.</p>
+          <a class="text-link" href="structure.html">View the complete architecture →</a>
+        </div>
+        <ol class="unit-flow">
+          <li><span>01</span><strong>Question</strong><small>the organizing tension</small></li>
+          <li><span>02</span><strong>Note</strong><small>intuition + derivation</small></li>
+          <li><span>03</span><strong>Code</strong><small>test + reproduce</small></li>
+          <li><span>04</span><strong>Evidence</strong><small>papers + limits</small></li>
+          <li><span>05</span><strong>Opening</strong><small>what should happen next</small></li>
+        </ol>
+      </div>
+    </section>
+
+    <section id="notes" class="notes-section section-shell" aria-labelledby="notes-title">
+      <div class="section-heading">
+        <div>
+          <p class="section-index">03 / NOTE INDEX</p>
+          <h2 id="notes-title">Notes will grow by question,<br>not by lecture number.</h2>
+        </div>
+        <p class="section-intro">The index is intentionally empty until there is original work worth publishing. The template below shows the shape future notes will take.</p>
+      </div>
+
+      <form class="note-controls" aria-label="Filter notes" onsubmit="return false">
+        <label class="search-field">
+          <span class="visually-hidden">Search notes</span>
+          <span aria-hidden="true">⌕</span>
+          <input id="note-search" type="search" placeholder="Search titles, questions, or tags" autocomplete="off">
+        </label>
+        <label>
+          <span class="visually-hidden">Filter by note type</span>
+          <select id="type-filter">
+            <option value="all">All note types</option>
+            <option value="template">Template</option>
+            <option value="derivation">Derivation</option>
+            <option value="paper-connection">Paper connection</option>
+            <option value="research-question">Research question</option>
+          </select>
+        </label>
+        <p id="note-count" class="note-count" aria-live="polite">1 structural item</p>
+      </form>
+
+      <div id="note-list" class="note-list">
+        <noscript>
+          <p class="empty-state">JavaScript is needed to load the note index. The writing template remains available from the navigation above.</p>
+        </noscript>
+      </div>
+    </section>
+
+    <section id="method" class="method-section section-shell" aria-labelledby="method-title">
+      <div class="method-lead">
+        <p class="section-index section-index--light">04 / METHOD</p>
+        <h2 id="method-title">Every note earns<br>its claims.</h2>
+        <p>A note is not finished because it sounds smooth. It is finished when the reasoning can be inspected.</p>
+        <a class="text-link text-link--light" href="method.html">Open the full writing guide →</a>
+      </div>
+      <ol class="method-grid">
+        <li><span>01</span><h3>Question</h3><p>Name the tension precisely enough that an answer could be wrong.</p></li>
+        <li><span>02</span><h3>Intuition</h3><p>Build a small mental model before leaning on formal notation.</p></li>
+        <li><span>03</span><h3>Derivation</h3><p>Expose assumptions and intermediate steps, including the ones that fail.</p></li>
+        <li><span>04</span><h3>Evidence</h3><p>Separate what a source demonstrates from what you infer across sources.</p></li>
+        <li><span>05</span><h3>Connection</h3><p>Ask how the idea changes when viewed through another paper or framework.</p></li>
+        <li><span>06</span><h3>Opening</h3><p>End with a testable question, not a ceremonial conclusion.</p></li>
+      </ol>
+    </section>
+
+    <section id="about" class="about-section section-shell" aria-labelledby="about-title">
+      <div>
+        <p class="section-index">05 / ABOUT</p>
+        <h2 id="about-title">A research memory,<br>kept in public.</h2>
+      </div>
+      <div class="about-columns">
+        <div>
+          <h3>This is</h3>
+          <ul>
+            <li>an evolving record of original reasoning;</li>
+            <li>a place for careful derivations and useful diagrams;</li>
+            <li>a bridge from coursework to research questions;</li>
+            <li>a notebook allowed to preserve uncertainty.</li>
+          </ul>
+        </div>
+        <div>
+          <h3>This is not</h3>
+          <ul>
+            <li>a mirror of lecture slides or assigned PDFs;</li>
+            <li>a comprehensive guide to the course;</li>
+            <li>a collection of polished claims without evidence;</li>
+            <li>an implication that unwritten notes already exist.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="closing section-shell" aria-label="Notebook invitation">
+      <p class="eyebrow">The notebook starts empty on purpose.</p>
+      <p class="closing-quote">“Write only after the idea has changed shape in your own hands.”</p>
+      <a class="button button-dark" href="note-template.html">Inspect the note template</a>
+    </section>
+  </main>
+
+  <footer class="site-footer section-shell">
+    <div><strong>CS 395T</strong><span>Foundations of Modern Generative AI</span></div>
+    <p>Independent research notes by Kaijing Ma.</p>
+    <a href="#top">Back to top ↑</a>
+  </footer>
+</body>
+</html>

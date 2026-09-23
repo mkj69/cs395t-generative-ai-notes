@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A blank structural template for future CS 395T research notes.">
+  <title>Research Note Template — CS 395T</title>
+  <link rel="stylesheet" href="assets/styles.css">
+  <script src="assets/app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header">
+    <a class="wordmark" href="index.html"><span>CS 395T</span><small>Research notebook</small></a>
+    <button class="menu-button" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button>
+    <nav id="site-nav" class="site-nav" aria-label="Primary navigation">
+      <a href="structure.html">Structure</a>
+      <a href="index.html#notes">Index</a>
+      <a href="method.html">Writing guide</a>
+      <a href="index.html#about">About</a>
+    </nav>
+  </header>
+
+  <main id="main" class="note-shell">
+    <header class="note-hero">
+      <div class="template-banner"><strong>STRUCTURAL TEMPLATE</strong><span>This is not a published course note.</span></div>
+      <p class="eyebrow">[NOTE TYPE] · [STATUS] · [DATE]</p>
+      <h1>[A question-shaped title goes here]</h1>
+      <p class="note-abstract">[State the puzzle and why resolving it would change how you understand the topic. Do not summarize the lecture.]</p>
+      <ul class="tag-list" aria-label="Example tags"><li>[concept]</li><li>[paper connection]</li><li>[method]</li></ul>
+    </header>
+
+    <div class="note-layout">
+      <aside class="note-toc" aria-label="On this page">
+        <p class="aside-label">ON THIS PAGE</p>
+        <a href="#question">The question</a>
+        <a href="#intuition">Working intuition</a>
+        <a href="#derivation">Derivation</a>
+        <a href="#evidence">Evidence map</a>
+        <a href="#connections">Paper connections</a>
+        <a href="#questions">Open questions</a>
+      </aside>
+
+      <article class="prose note-prose">
+        <section id="question">
+          <p class="claim-label">QUESTION</p>
+          <h2>What is actually unclear?</h2>
+          <p class="placeholder">[Write the smallest version of the problem. Name what an adequate answer must explain and what would count as a counterexample.]</p>
+        </section>
+
+        <section id="intuition">
+          <p class="claim-label claim-label--intuition">INTUITION</p>
+          <h2>Build the picture before the machinery.</h2>
+          <p class="placeholder">[Describe a toy setting, analogy, or geometric picture. Then identify exactly where the analogy breaks.]</p>
+          <div class="figure-placeholder" role="img" aria-label="Placeholder for a future explanatory figure">
+            <span>FIGURE SPACE</span>
+            <p>[A future diagram should carry an argument, not merely decorate the page.]</p>
+          </div>
+        </section>
+
+        <section id="derivation">
+          <p class="claim-label claim-label--derivation">DERIVATION</p>
+          <h2>Make every assumption visible.</h2>
+          <p class="placeholder">[Define notation, derive the key step, and annotate why each transformation is valid. Preserve failed routes if they reveal a useful misconception.]</p>
+          <div class="equation-placeholder">[ mathematical derivation ]</div>
+        </section>
+
+        <section id="evidence">
+          <p class="claim-label claim-label--direct">DIRECT EVIDENCE</p>
+          <h2>What do the sources establish?</h2>
+          <p class="placeholder">[For each source: record the claim, experimental or theoretical scope, important limitation, and the exact location supporting it.]</p>
+          <div class="evidence-card">
+            <span>SOURCE LEDGER</span>
+            <dl>
+              <div><dt>Source</dt><dd>[citation]</dd></div>
+              <div><dt>Supports</dt><dd>[narrow claim]</dd></div>
+              <div><dt>Does not support</dt><dd>[tempting overreach]</dd></div>
+            </dl>
+          </div>
+        </section>
+
+        <section id="connections">
+          <p class="claim-label claim-label--synthesis">SYNTHESIS</p>
+          <h2>What changes across papers?</h2>
+          <p class="placeholder">[Compare definitions, assumptions, mechanisms, evaluation settings, or failure modes. Explain the connection rather than listing related work.]</p>
+        </section>
+
+        <section id="questions">
+          <p class="claim-label claim-label--hypothesis">HYPOTHESIS</p>
+          <h2>What should be tried next?</h2>
+          <p class="placeholder">[State a falsifiable conjecture and the smallest experiment, proof, or counterexample that could discriminate between explanations.]</p>
+          <ol class="open-question-list">
+            <li>[Open question with a concrete decision boundary]</li>
+            <li>[Possible research direction and why it might fail]</li>
+            <li>[Reading needed to resolve a specific uncertainty]</li>
+          </ol>
+        </section>
+
+        <section class="references-placeholder">
+          <p class="section-index">REFERENCES</p>
+          <p>[Only sources actually read and used belong here.]</p>
+        </section>
+      </article>
+    </div>
+  </main>
+
+  <footer class="site-footer section-shell">
+    <div><strong>CS 395T</strong><span>Research note template</span></div>
+    <p>No course content is represented on this page.</p>
+    <a href="index.html#notes">Return to index ←</a>
+  </footer>
+</body>
+</html>
