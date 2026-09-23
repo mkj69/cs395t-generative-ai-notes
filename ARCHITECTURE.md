@@ -14,7 +14,7 @@ The learning unit is a lecture reconstruction:
 
 ```text
 course-notes/lecture-XX-short-topic/
-├── note.md              # recall, derivation, correction, and uncertainty
+├── lecture-XX-short-topic.md  # recall, derivation, correction, and uncertainty
 ├── code/                # checks written by the author
 └── figures/             # explanatory figures created by the author
 ```
@@ -24,11 +24,17 @@ together:
 
 ```text
 notes/<question-slug>/
-├── note.md              # the argument and current conclusion
+├── <question-slug>.md   # the argument and current conclusion
 ├── code/                # scripts or notebooks used only by this note
 ├── figures/             # explanatory and generated figures
-└── data/README.md       # provenance; large/raw data stays external
+└── data/<question-slug>-data-guide.md
+                         # provenance; large/raw data stays external
 ```
+
+Because the repository is also a Logseq file graph, every Markdown filename
+must be unique across the entire repository. A copied template must therefore
+be renamed to its lecture or question slug; nested `note.md` and `README.md`
+files are not used.
 
 ## Five public surfaces
 

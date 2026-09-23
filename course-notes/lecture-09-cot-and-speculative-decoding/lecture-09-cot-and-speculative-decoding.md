@@ -1,10 +1,13 @@
 ---
 title: "Lecture 09 — Chain-of-Thought and Speculative Decoding"
+slug: "lecture-09"
 date: "2026-09-23"
 status: "capturing"
 type: "learning-note"
 course: "CS 395T"
 source: "https://noahgol.github.io/teaching/cs395t-f26/lecture9.pdf"
+summary: "A manual reconstruction in progress: concepts, derivations, examples, corrections, and unresolved questions."
+public: true
 tags:
   - chain-of-thought
   - STaR
@@ -117,4 +120,3 @@ authorship: "manual"
 
 - Noah Golowich. “Lecture 9: Chain-of-Thought and Speculative Decoding.”
   CS 395T, Fall 2026. <https://noahgol.github.io/teaching/cs395t-f26/lecture9.pdf>
-

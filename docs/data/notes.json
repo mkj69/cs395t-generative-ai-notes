@@ -6,7 +6,12 @@
     "typeLabel": "Learning note",
     "status": "Capturing",
     "date": "Sep 2026",
-    "tags": ["chain-of-thought", "STaR", "speculative decoding"],
+    "tags": [
+      "chain-of-thought",
+      "STaR",
+      "function composition",
+      "speculative decoding"
+    ],
     "url": "course-notes/lecture-09.html",
     "disclaimer": "Manual · in progress"
   },
@@ -17,7 +22,11 @@
     "typeLabel": "Structural template",
     "status": "Framework",
     "date": "Sep 2026",
-    "tags": ["method", "evidence", "open questions"],
+    "tags": [
+      "method",
+      "evidence",
+      "open questions"
+    ],
     "url": "note-template.html",
     "disclaimer": "Not a course note"
   }

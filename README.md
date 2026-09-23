@@ -44,21 +44,30 @@ See `ARCHITECTURE.md` for the full map.
 
 1. Read `MANUAL_NOTE_WORKFLOW.md`.
 2. Copy `course-notes/_template/` to `course-notes/lecture-XX-short-topic/`.
-3. Fill the Markdown by hand, beginning with status `capturing`.
-4. Move to `reconstructing` only after writing with the source closed.
-5. Add a public index entry only when its in-progress status is unambiguous.
+3. Rename `learning-note-template.md` to `lecture-XX-short-topic.md`; every
+   Markdown filename in the Logseq graph must be unique.
+4. Fill the Markdown by hand, beginning with status `capturing`.
+5. Move to `reconstructing` only after writing with the source closed.
+6. Add a public index entry only when its in-progress status is unambiguous.
 
 ## Add a research note
 
 1. Copy `notes/_template/` to `notes/<question-slug>/`.
-2. Replace every bracketed prompt with your own reasoning.
-3. Keep note-specific scripts, figures, and data provenance inside that folder.
-4. Add a corresponding entry to `docs/data/notes.json` only when the note is
+2. Rename `research-note-template.md` to `<question-slug>.md` and similarly
+   give any Markdown guide files unique, question-specific names.
+3. Replace every bracketed prompt with your own reasoning.
+4. Keep note-specific scripts, figures, and data provenance inside that folder.
+5. Add a corresponding entry to `docs/data/notes.json` only when the note is
    ready to appear in the public index.
-5. Create the rendered HTML page under `docs/notes/`.
+6. Create the rendered HTML page under `docs/notes/`.
 
-The site is designed for GitHub Pages and does not require a build step.
+## Publish from Logseq
 
-The current first version stays dependency-free. If executable prose and
-citations become the dominant workflow, the source layer can later move to
-Quarto without changing the conceptual structure.
+The Markdown files under `course-notes/` and `notes/` are the canonical note
+sources. After a change is pushed to `main`, GitHub Actions renders every note
+marked `public: true` into the static `docs/` site and commits only the generated
+site files. GitHub Pages continues to serve `docs/`, so the public site remains
+dependency-free at runtime.
+
+To preview the generated result locally, install `requirements-build.txt`, run
+`python scripts/build_site.py`, and serve `docs/` as shown above.

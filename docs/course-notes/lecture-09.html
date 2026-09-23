@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="A manual learning-note scaffold for CS 395T Lecture 09 on chain-of-thought and speculative decoding.">
-  <title>Lecture 09 — CS 395T Learning Note</title>
+  <meta name="description" content="A manual reconstruction in progress: concepts, derivations, examples, corrections, and unresolved questions.">
+  <title>Lecture 09 — Chain-of-Thought and Speculative Decoding — CS 395T</title>
   <link rel="stylesheet" href="../assets/styles.css">
   <script src="../assets/app.js" defer></script>
 </head>
@@ -27,110 +27,162 @@
         <strong>LEARNING NOTE · CAPTURING</strong>
         <span>Manual reconstruction in progress</span>
       </div>
-      <p class="eyebrow">LECTURE 09 · 23 SEP 2026 · NOT YET CHECKED</p>
-      <h1>Chain-of-Thought<br>and Speculative Decoding</h1>
-      <p class="note-abstract">A hand-written learning record for definitions, derivations, examples, corrections, and unresolved questions. The substantive note has intentionally not been filled in by AI.</p>
-      <ul class="tag-list" aria-label="Topics">
-        <li>chain-of-thought</li>
-        <li>STaR</li>
-        <li>function composition</li>
-        <li>speculative decoding</li>
-      </ul>
+      <p class="eyebrow">23 SEP 2026 · NOT YET CHECKED</p>
+      <h1>Lecture 09 — Chain-of-Thought and Speculative Decoding</h1>
+      <p class="note-abstract">A manual reconstruction in progress: concepts, derivations, examples, corrections, and unresolved questions.</p>
+      <ul class="tag-list" aria-label="Topics"><li>chain-of-thought</li><li>STaR</li><li>function composition</li><li>speculative decoding</li></ul>
     </header>
 
     <div class="note-layout">
       <aside class="note-toc" aria-label="On this page">
         <p class="aside-label">ON THIS PAGE</p>
-        <a href="#context">Lecture context</a>
-        <a href="#goals">Learning goals</a>
-        <a href="#cot">Chain-of-Thought</a>
-        <a href="#speculative">Speculative decoding</a>
-        <a href="#checks">Examples + code</a>
-        <a href="#unclear">Still unclear</a>
-        <a href="#parking-lot">Research parking lot</a>
+        <div class="toc">
+<ul>
+<li><a href="#lecture-context">Lecture context</a></li>
+<li><a href="#learning-goals">Learning goals</a></li>
+<li><a href="#concept-map">Concept map</a></li>
+<li><a href="#1-chain-of-thought">1. Chain-of-Thought</a><ul>
+<li><a href="#11-cot-prompting">1.1 CoT prompting</a></li>
+<li><a href="#12-star">1.2 STaR</a></li>
+<li><a href="#13-function-composition">1.3 Function composition</a></li>
+</ul>
+</li>
+<li><a href="#2-speculative-decoding">2. Speculative decoding</a><ul>
+<li><a href="#21-drafting-and-verification">2.1 Drafting and verification</a></li>
+<li><a href="#22-correctness">2.2 Correctness</a></li>
+<li><a href="#23-expected-progress-and-speedup">2.3 Expected progress and speedup</a></li>
+</ul>
+</li>
+<li><a href="#worked-examples-and-code">Worked examples and code</a></li>
+<li><a href="#what-i-can-now-explain">What I can now explain</a></li>
+<li><a href="#what-is-still-unclear">What is still unclear?</a></li>
+<li><a href="#research-parking-lot">Research parking lot</a></li>
+<li><a href="#corrections-log">Corrections log</a></li>
+<li><a href="#references">References</a></li>
+</ul>
+</div>
+
       </aside>
-
-      <article class="prose note-prose">
-        <section id="context">
-          <p class="claim-label">CONTEXT</p>
-          <h2>What is this lecture trying to explain?</h2>
-          <p class="placeholder">[After the first reading, write the lecture's purpose and dependency map by hand. Do not copy the opening paragraph.]</p>
-          <p><a href="https://noahgol.github.io/teaching/cs395t-f26/lecture9.pdf" target="_blank" rel="noreferrer">Open the source lecture PDF ↗</a></p>
-        </section>
-
-        <section id="goals">
-          <p class="claim-label claim-label--intuition">LEARNING GOALS</p>
-          <h2>What should I be able to reconstruct?</h2>
-          <ul class="checklist">
-            <li>Explain the main concepts without looking at the lecture.</li>
-            <li>Re-derive the selected equations step by step.</li>
-            <li>Build one original example for each major mechanism.</li>
-            <li>State assumptions and identify what each result does not establish.</li>
-            <li>Separate remembered understanding from source-checked facts.</li>
-          </ul>
-        </section>
-
-        <section id="cot">
-          <p class="claim-label claim-label--derivation">PART 01</p>
-          <h2>Chain-of-Thought</h2>
-          <div class="learning-prompts">
-            <article><span>01</span><h3>CoT prompting</h3><p>[RECALL] [SOURCE] [EXAMPLE] [UNCLEAR] [CORRECTION]</p></article>
-            <article><span>02</span><h3>STaR</h3><p>[RECALL] [DERIVATION] [EXAMPLE] [UNCLEAR] [CORRECTION]</p></article>
-            <article><span>03</span><h3>Function composition</h3><p>[RECALL] [DERIVATION] [EXAMPLE] [UNCLEAR] [CORRECTION]</p></article>
-          </div>
-        </section>
-
-        <section id="speculative">
-          <p class="claim-label claim-label--direct">PART 02</p>
-          <h2>Speculative decoding</h2>
-          <div class="learning-prompts">
-            <article><span>01</span><h3>Drafting and verification</h3><p>[RECALL] [ALGORITHM] [EXAMPLE] [UNCLEAR]</p></article>
-            <article><span>02</span><h3>Correctness</h3><p>[DERIVATION] [ASSUMPTIONS] [CHECK] [UNCLEAR]</p></article>
-            <article><span>03</span><h3>Expected progress and speedup</h3><p>[DERIVATION] [PARAMETERS] [NUMERICAL EXAMPLE] [UNCLEAR]</p></article>
-          </div>
-        </section>
-
-        <section id="checks">
-          <p class="claim-label claim-label--synthesis">MANUAL CHECK</p>
-          <h2>Worked examples and code</h2>
-          <p class="placeholder">[Write a prediction before calculating or running code. Preserve any mismatch between the prediction and the observed result.]</p>
-          <div class="evidence-card">
-            <span>CHECK RECORD</span>
-            <dl>
-              <div><dt>Paper example</dt><dd>[not written yet]</dd></div>
-              <div><dt>Expected result</dt><dd>[not written yet]</dd></div>
-              <div><dt>Observed result</dt><dd>[not run yet]</dd></div>
-              <div><dt>Understanding changed?</dt><dd>[not assessed yet]</dd></div>
-            </dl>
-          </div>
-        </section>
-
-        <section id="unclear">
-          <p class="claim-label claim-label--hypothesis">UNCERTAINTY</p>
-          <h2>What is still unclear?</h2>
-          <ol class="open-question-list">
-            <li>[QUESTION] Add the first unresolved step here.</li>
-          </ol>
-        </section>
-
-        <section id="parking-lot">
-          <p class="claim-label claim-label--hypothesis">PARKING LOT</p>
-          <h2>Ideas that may become research notes</h2>
-          <p class="placeholder">[Record only a short question. Do not turn the learning note into a research claim before the course material has been reconstructed.]</p>
-          <p><a href="https://github.com/mkj69/cs395t-generative-ai-notes/blob/main/MANUAL_NOTE_WORKFLOW.md" target="_blank" rel="noreferrer">Open the no-AI manual note workflow ↗</a></p>
-        </section>
-
-        <section class="references-placeholder">
-          <p class="section-index">STATUS</p>
-          <p>No substantive course explanation has been published yet. Current state: capturing.</p>
-        </section>
+      <article class="prose note-prose markdown-body">
+        <blockquote>
+<p><strong>Manual learning note.</strong> 正文尚未填写。本文将由作者在不使用 AI 生成、
+改写或补全内容的情况下手工完成。下面的提示只规定学习结构，不代表已经
+理解或发表了任何课程结论。</p>
+</blockquote>
+<h2 id="lecture-context">Lecture context</h2>
+<ul>
+<li>这节课试图解决什么问题？</li>
+<li>两个主要主题之间有什么关系？</li>
+<li><code>[SOURCE]</code>：<a href="https://noahgol.github.io/teaching/cs395t-f26/lecture9.pdf">https://noahgol.github.io/teaching/cs395t-f26/lecture9.pdf</a></li>
+</ul>
+<h2 id="learning-goals">Learning goals</h2>
+<ul>
+<li>[ ] 不看讲义解释 Chain-of-Thought 的基本建模方式。</li>
+<li>[ ] 手工重建 STaR 的训练流程及相关推导。</li>
+<li>[ ] 说明 function composition 例子中的关键依赖。</li>
+<li>[ ] 用自己的话重写 speculative decoding 算法。</li>
+<li>[ ] 重推正确性与 speedup 相关公式。</li>
+<li>[ ] 区分已经理解、仅见过和仍不清楚的内容。</li>
+</ul>
+<h2 id="concept-map">Concept map</h2>
+<p>[第一次阅读后手工绘制。]</p>
+<h2 id="1-chain-of-thought">1. Chain-of-Thought</h2>
+<h3 id="11-cot-prompting">1.1 CoT prompting</h3>
+<ul>
+<li><code>[RECALL]</code>：</li>
+<li><code>[SOURCE]</code>：</li>
+<li><code>[EXAMPLE]</code>：</li>
+<li><code>[UNCLEAR]</code>：</li>
+<li><code>[CORRECTION]</code>：</li>
+</ul>
+<h3 id="12-star">1.2 STaR</h3>
+<ul>
+<li><code>[RECALL]</code>：</li>
+<li><code>[DERIVATION]</code>：</li>
+<li><code>[EXAMPLE]</code>：</li>
+<li><code>[UNCLEAR]</code>：</li>
+<li><code>[CORRECTION]</code>：</li>
+</ul>
+<h3 id="13-function-composition">1.3 Function composition</h3>
+<ul>
+<li><code>[RECALL]</code>：</li>
+<li><code>[DERIVATION]</code>：</li>
+<li><code>[EXAMPLE]</code>：</li>
+<li><code>[UNCLEAR]</code>：</li>
+<li><code>[CORRECTION]</code>：</li>
+</ul>
+<h2 id="2-speculative-decoding">2. Speculative decoding</h2>
+<h3 id="21-drafting-and-verification">2.1 Drafting and verification</h3>
+<ul>
+<li><code>[RECALL]</code>：</li>
+<li><code>[ALGORITHM]</code>：</li>
+<li><code>[EXAMPLE]</code>：</li>
+<li><code>[UNCLEAR]</code>：</li>
+<li><code>[CORRECTION]</code>：</li>
+</ul>
+<h3 id="22-correctness">2.2 Correctness</h3>
+<ul>
+<li><code>[DERIVATION]</code>：</li>
+<li>假设：</li>
+<li>检查：</li>
+<li><code>[UNCLEAR]</code>：</li>
+</ul>
+<h3 id="23-expected-progress-and-speedup">2.3 Expected progress and speedup</h3>
+<ul>
+<li><code>[DERIVATION]</code>：</li>
+<li>参数解释：</li>
+<li>数值例子：</li>
+<li><code>[UNCLEAR]</code>：</li>
+</ul>
+<h2 id="worked-examples-and-code">Worked examples and code</h2>
+<ul>
+<li>纸上例子：</li>
+<li>运行代码前写下的预期结果：</li>
+<li>自己编写的代码：</li>
+<li>观察结果：</li>
+<li>与预期不一致之处：</li>
+</ul>
+<h2 id="what-i-can-now-explain">What I can now explain</h2>
+<p>[完成闭卷重建后再填写。]</p>
+<h2 id="what-is-still-unclear">What is still unclear?</h2>
+<ul>
+<li>[ ] <code>[QUESTION]</code></li>
+</ul>
+<h2 id="research-parking-lot">Research parking lot</h2>
+<ul>
+<li><code>[IDEA]</code>：[只停放问题；如果以后展开，建立独立 research note。]</li>
+</ul>
+<h2 id="corrections-log">Corrections log</h2>
+<table>
+<thead>
+<tr>
+<th>Date</th>
+<th>Original misunderstanding</th>
+<th>Correction</th>
+<th>Evidence</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h2 id="references">References</h2>
+<ul>
+<li>Noah Golowich. “Lecture 9: Chain-of-Thought and Speculative Decoding.”
+  CS 395T, Fall 2026. <a href="https://noahgol.github.io/teaching/cs395t-f26/lecture9.pdf">https://noahgol.github.io/teaching/cs395t-f26/lecture9.pdf</a></li>
+</ul>
       </article>
     </div>
   </main>
 
   <footer class="site-footer section-shell">
-    <div><strong>CS 395T</strong><span>Lecture 09 learning note</span></div>
-    <p>Manual reconstruction · capturing</p>
+    <div><strong>CS 395T</strong><span>Learning note</span></div>
+    <p>Markdown source · capturing</p>
     <a href="../index.html#notes">Return to index ←</a>
   </footer>
 </body>

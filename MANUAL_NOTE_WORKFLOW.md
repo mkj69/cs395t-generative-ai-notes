@@ -47,9 +47,11 @@
 
 1. 复制 `course-notes/_template/`。
 2. 将目录命名为 `lecture-XX-short-topic`。
-3. 填写标题、日期、讲义链接和状态。
-4. 将状态设为 `capturing`。
-5. 在开始学习前，不填写任何解释性正文。
+3. 将 `learning-note-template.md` 改名为
+   `lecture-XX-short-topic.md`；Logseq 中每个 Markdown 文件名必须唯一。
+4. 填写标题、日期、讲义链接和状态。
+5. 将状态设为 `capturing`。
+6. 在开始学习前，不填写任何解释性正文。
 
 ### 1. 第一遍：建立地图（材料打开）
 

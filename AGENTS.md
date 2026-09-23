@@ -23,6 +23,11 @@ This repository is a public-facing learning and research notebook for CS 395T.
 - Keep the site dependency-free unless a later feature justifies a build
   system.
 - The GitHub Pages root is `docs/`.
+- Markdown under `course-notes/` and `notes/` is canonical. Generate public
+  note HTML with `python scripts/build_site.py`; do not maintain a second copy
+  of a note's prose by hand in `docs/`.
+- Every tracked Markdown file must have a unique filename across the Logseq
+  graph. Do not add generic nested names such as `note.md` or `README.md`.
 - Keep keyboard navigation, reduced-motion preferences, and mobile layouts
   working.
 - Do not publish or push without the maintainer's explicit approval.

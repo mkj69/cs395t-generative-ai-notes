@@ -8,3 +8,13 @@
 *.synctex.gz
 *.xdv
 node_modules/
+__pycache__/
+*.pyc
+
+# Local-only Logseq working files. Public notes live in course-notes/ and notes/.
+journals/
+pages/
+logseq/bak/
+logseq/.recycle/
+logseq/version-files/
+logseq/graphs-txid.edn
