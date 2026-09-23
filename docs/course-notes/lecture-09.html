@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A manual learning-note scaffold for CS 395T Lecture 09 on chain-of-thought and speculative decoding.">
+  <title>Lecture 09 — CS 395T Learning Note</title>
+  <link rel="stylesheet" href="../assets/styles.css">
+  <script src="../assets/app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header">
+    <a class="wordmark" href="../index.html"><span>CS 395T</span><small>Learning &amp; research notebook</small></a>
+    <button class="menu-button" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button>
+    <nav id="site-nav" class="site-nav" aria-label="Primary navigation">
+      <a href="../structure.html">Structure</a>
+      <a href="../index.html#notes">Index</a>
+      <a href="../method.html">Writing guide</a>
+      <a href="../index.html#about">About</a>
+    </nav>
+  </header>
+
+  <main id="main" class="note-shell">
+    <header class="note-hero">
+      <div class="template-banner learning-banner">
+        <strong>LEARNING NOTE · CAPTURING</strong>
+        <span>Manual reconstruction in progress</span>
+      </div>
+      <p class="eyebrow">LECTURE 09 · 23 SEP 2026 · NOT YET CHECKED</p>
+      <h1>Chain-of-Thought<br>and Speculative Decoding</h1>
+      <p class="note-abstract">A hand-written learning record for definitions, derivations, examples, corrections, and unresolved questions. The substantive note has intentionally not been filled in by AI.</p>
+      <ul class="tag-list" aria-label="Topics">
+        <li>chain-of-thought</li>
+        <li>STaR</li>
+        <li>function composition</li>
+        <li>speculative decoding</li>
+      </ul>
+    </header>
+
+    <div class="note-layout">
+      <aside class="note-toc" aria-label="On this page">
+        <p class="aside-label">ON THIS PAGE</p>
+        <a href="#context">Lecture context</a>
+        <a href="#goals">Learning goals</a>
+        <a href="#cot">Chain-of-Thought</a>
+        <a href="#speculative">Speculative decoding</a>
+        <a href="#checks">Examples + code</a>
+        <a href="#unclear">Still unclear</a>
+        <a href="#parking-lot">Research parking lot</a>
+      </aside>
+
+      <article class="prose note-prose">
+        <section id="context">
+          <p class="claim-label">CONTEXT</p>
+          <h2>What is this lecture trying to explain?</h2>
+          <p class="placeholder">[After the first reading, write the lecture's purpose and dependency map by hand. Do not copy the opening paragraph.]</p>
+          <p><a href="https://noahgol.github.io/teaching/cs395t-f26/lecture9.pdf" target="_blank" rel="noreferrer">Open the source lecture PDF ↗</a></p>
+        </section>
+
+        <section id="goals">
+          <p class="claim-label claim-label--intuition">LEARNING GOALS</p>
+          <h2>What should I be able to reconstruct?</h2>
+          <ul class="checklist">
+            <li>Explain the main concepts without looking at the lecture.</li>
+            <li>Re-derive the selected equations step by step.</li>
+            <li>Build one original example for each major mechanism.</li>
+            <li>State assumptions and identify what each result does not establish.</li>
+            <li>Separate remembered understanding from source-checked facts.</li>
+          </ul>
+        </section>
+
+        <section id="cot">
+          <p class="claim-label claim-label--derivation">PART 01</p>
+          <h2>Chain-of-Thought</h2>
+          <div class="learning-prompts">
+            <article><span>01</span><h3>CoT prompting</h3><p>[RECALL] [SOURCE] [EXAMPLE] [UNCLEAR] [CORRECTION]</p></article>
+            <article><span>02</span><h3>STaR</h3><p>[RECALL] [DERIVATION] [EXAMPLE] [UNCLEAR] [CORRECTION]</p></article>
+            <article><span>03</span><h3>Function composition</h3><p>[RECALL] [DERIVATION] [EXAMPLE] [UNCLEAR] [CORRECTION]</p></article>
+          </div>
+        </section>
+
+        <section id="speculative">
+          <p class="claim-label claim-label--direct">PART 02</p>
+          <h2>Speculative decoding</h2>
+          <div class="learning-prompts">
+            <article><span>01</span><h3>Drafting and verification</h3><p>[RECALL] [ALGORITHM] [EXAMPLE] [UNCLEAR]</p></article>
+            <article><span>02</span><h3>Correctness</h3><p>[DERIVATION] [ASSUMPTIONS] [CHECK] [UNCLEAR]</p></article>
+            <article><span>03</span><h3>Expected progress and speedup</h3><p>[DERIVATION] [PARAMETERS] [NUMERICAL EXAMPLE] [UNCLEAR]</p></article>
+          </div>
+        </section>
+
+        <section id="checks">
+          <p class="claim-label claim-label--synthesis">MANUAL CHECK</p>
+          <h2>Worked examples and code</h2>
+          <p class="placeholder">[Write a prediction before calculating or running code. Preserve any mismatch between the prediction and the observed result.]</p>
+          <div class="evidence-card">
+            <span>CHECK RECORD</span>
+            <dl>
+              <div><dt>Paper example</dt><dd>[not written yet]</dd></div>
+              <div><dt>Expected result</dt><dd>[not written yet]</dd></div>
+              <div><dt>Observed result</dt><dd>[not run yet]</dd></div>
+              <div><dt>Understanding changed?</dt><dd>[not assessed yet]</dd></div>
+            </dl>
+          </div>
+        </section>
+
+        <section id="unclear">
+          <p class="claim-label claim-label--hypothesis">UNCERTAINTY</p>
+          <h2>What is still unclear?</h2>
+          <ol class="open-question-list">
+            <li>[QUESTION] Add the first unresolved step here.</li>
+          </ol>
+        </section>
+
+        <section id="parking-lot">
+          <p class="claim-label claim-label--hypothesis">PARKING LOT</p>
+          <h2>Ideas that may become research notes</h2>
+          <p class="placeholder">[Record only a short question. Do not turn the learning note into a research claim before the course material has been reconstructed.]</p>
+          <p><a href="https://github.com/mkj69/cs395t-generative-ai-notes/blob/main/MANUAL_NOTE_WORKFLOW.md" target="_blank" rel="noreferrer">Open the no-AI manual note workflow ↗</a></p>
+        </section>
+
+        <section class="references-placeholder">
+          <p class="section-index">STATUS</p>
+          <p>No substantive course explanation has been published yet. Current state: capturing.</p>
+        </section>
+      </article>
+    </div>
+  </main>
+
+  <footer class="site-footer section-shell">
+    <div><strong>CS 395T</strong><span>Lecture 09 learning note</span></div>
+    <p>Manual reconstruction · capturing</p>
+    <a href="../index.html#notes">Return to index ←</a>
+  </footer>
+</body>
+</html>

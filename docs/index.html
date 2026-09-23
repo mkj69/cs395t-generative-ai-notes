@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="A living research notebook for CS 395T: Foundations of Modern Generative AI.">
-  <title>CS 395T — Research Notebook</title>
+  <meta name="description" content="A living learning and research notebook for CS 395T: Foundations of Modern Generative AI.">
+  <title>CS 395T — Learning &amp; Research Notebook</title>
   <link rel="stylesheet" href="assets/styles.css">
   <script src="assets/app.js" defer></script>
 </head>
@@ -14,7 +14,7 @@
   <header class="site-header">
     <a class="wordmark" href="#top" aria-label="CS 395T notebook home">
       <span>CS 395T</span>
-      <small>Research notebook</small>
+      <small>Learning &amp; research notebook</small>
     </a>
     <button class="menu-button" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button>
     <nav id="site-nav" class="site-nav" aria-label="Primary navigation">
@@ -41,13 +41,13 @@
       <aside class="status-card" aria-label="Notebook status">
         <div class="status-card__top">
           <span class="status-label">CURRENT STATE</span>
-          <span class="status-number">00</span>
+          <span class="status-number">01</span>
         </div>
-        <p class="status-title">Framework only</p>
-        <p class="status-copy">The architecture is ready. No course notes have been published yet.</p>
+        <p class="status-title">Learning has begun</p>
+        <p class="status-copy">Lecture 09 now has a manual learning scaffold. Substantive content will be added through hand-written reconstruction.</p>
         <dl class="status-grid">
-          <div><dt>Published notes</dt><dd>0</dd></div>
-          <div><dt>Last structured</dt><dd>Sep 2026</dd></div>
+          <div><dt>Active learning notes</dt><dd>1</dd></div>
+          <div><dt>Reviewed notes</dt><dd>0</dd></div>
         </dl>
       </aside>
     </section>
@@ -55,10 +55,10 @@
     <section class="thesis section-shell" aria-labelledby="thesis-title">
       <p class="section-index">01 / THESIS</p>
       <div>
-        <h2 id="thesis-title">The useful note begins<br>where the lecture ends.</h2>
-        <p>Course materials establish the shared surface. These notes are for the work that follows: reconstructing an argument without looking, finding the assumption that makes it go through, comparing it with another paper, and asking what would falsify the emerging idea.</p>
+        <h2 id="thesis-title">First reconstruct.<br>Then question.</h2>
+        <p>Learning notes follow the course and preserve the work of understanding: recall, derivation, examples, errors, and correction. Research notes begin later, when that reconstruction produces a question worth pursuing on its own.</p>
       </div>
-      <p class="margin-note">Understand → reconstruct → connect → question</p>
+      <p class="margin-note">Capture → reconstruct → check → question</p>
     </section>
 
     <section id="explore" class="explore-section section-shell" aria-labelledby="explore-title">
@@ -80,9 +80,9 @@
         </a>
         <a class="surface-card" href="#notes">
           <span class="surface-card__number">02</span>
-          <span class="surface-card__status">Template only</span>
-          <h3>Research notes</h3>
-          <p>Question-centered essays that make intuition, derivation, evidence, and uncertainty inspectable.</p>
+          <span class="surface-card__status">1 learning note</span>
+          <h3>Course &amp; research notes</h3>
+          <p>Lecture-ordered learning records alongside question-centered research notes, with their purposes kept distinct.</p>
           <strong>Browse the note index →</strong>
         </a>
         <a class="surface-card" href="structure.html#experiments">
@@ -122,9 +122,9 @@
       <div class="section-heading">
         <div>
           <p class="section-index">03 / NOTE INDEX</p>
-          <h2 id="notes-title">Notes will grow by question,<br>not by lecture number.</h2>
+          <h2 id="notes-title">Learn in sequence.<br>Think across questions.</h2>
         </div>
-        <p class="section-intro">The index is intentionally empty until there is original work worth publishing. The template below shows the shape future notes will take.</p>
+        <p class="section-intro">Learning notes follow the course; research notes branch from questions. In-progress work is labeled honestly, and the research template remains available below it.</p>
       </div>
 
       <form class="note-controls" aria-label="Filter notes" onsubmit="return false">
@@ -137,28 +137,29 @@
           <span class="visually-hidden">Filter by note type</span>
           <select id="type-filter">
             <option value="all">All note types</option>
+            <option value="learning">Learning notes</option>
             <option value="template">Template</option>
             <option value="derivation">Derivation</option>
             <option value="paper-connection">Paper connection</option>
             <option value="research-question">Research question</option>
           </select>
         </label>
-        <p id="note-count" class="note-count" aria-live="polite">1 structural item</p>
+        <p id="note-count" class="note-count" aria-live="polite">2 items</p>
       </form>
 
       <div id="note-list" class="note-list">
         <noscript>
-          <p class="empty-state">JavaScript is needed to load the note index. The writing template remains available from the navigation above.</p>
+          <p class="empty-state">JavaScript is needed to load the note index. Lecture 09 and the research template remain available from their direct pages.</p>
         </noscript>
       </div>
     </section>
 
     <section id="method" class="method-section section-shell" aria-labelledby="method-title">
       <div class="method-lead">
-        <p class="section-index section-index--light">04 / METHOD</p>
-        <h2 id="method-title">Every note earns<br>its claims.</h2>
-        <p>A note is not finished because it sounds smooth. It is finished when the reasoning can be inspected.</p>
-        <a class="text-link text-link--light" href="method.html">Open the full writing guide →</a>
+        <p class="section-index section-index--light">04 / RESEARCH METHOD</p>
+        <h2 id="method-title">Research notes earn<br>their claims.</h2>
+        <p>Learning notes use manual reconstruction. Research notes go further: their assumptions, evidence, derivations, and uncertainty must be inspectable.</p>
+        <a class="text-link text-link--light" href="method.html">Open the research writing guide →</a>
       </div>
       <ol class="method-grid">
         <li><span>01</span><h3>Question</h3><p>Name the tension precisely enough that an answer could be wrong.</p></li>
@@ -173,13 +174,13 @@
     <section id="about" class="about-section section-shell" aria-labelledby="about-title">
       <div>
         <p class="section-index">05 / ABOUT</p>
-        <h2 id="about-title">A research memory,<br>kept in public.</h2>
+        <h2 id="about-title">A learning and research memory,<br>kept in public.</h2>
       </div>
       <div class="about-columns">
         <div>
           <h3>This is</h3>
           <ul>
-            <li>an evolving record of original reasoning;</li>
+            <li>an evolving record of manual learning and original reasoning;</li>
             <li>a place for careful derivations and useful diagrams;</li>
             <li>a bridge from coursework to research questions;</li>
             <li>a notebook allowed to preserve uncertainty.</li>
@@ -198,15 +199,15 @@
     </section>
 
     <section class="closing section-shell" aria-label="Notebook invitation">
-      <p class="eyebrow">The notebook starts empty on purpose.</p>
-      <p class="closing-quote">“Write only after the idea has changed shape in your own hands.”</p>
-      <a class="button button-dark" href="note-template.html">Inspect the note template</a>
+      <p class="eyebrow">The notebook starts with honest reconstruction.</p>
+      <p class="closing-quote">“Write what you can reconstruct. Mark what you cannot.”</p>
+      <a class="button button-dark" href="course-notes/lecture-09.html">Open Lecture 09</a>
     </section>
   </main>
 
   <footer class="site-footer section-shell">
     <div><strong>CS 395T</strong><span>Foundations of Modern Generative AI</span></div>
-    <p>Independent research notes by Kaijing Ma.</p>
+    <p>Independent learning and research notes by Kaijing Ma.</p>
     <a href="#top">Back to top ↑</a>
   </footer>
 </body>

@@ -1,5 +1,16 @@
 [
   {
+    "title": "Lecture 09 — Chain-of-Thought and Speculative Decoding",
+    "question": "A manual reconstruction in progress: concepts, derivations, examples, corrections, and unresolved questions.",
+    "type": "learning",
+    "typeLabel": "Learning note",
+    "status": "Capturing",
+    "date": "Sep 2026",
+    "tags": ["chain-of-thought", "STaR", "speculative decoding"],
+    "url": "course-notes/lecture-09.html",
+    "disclaimer": "Manual · in progress"
+  },
+  {
     "title": "Research note template",
     "question": "What structure should a future research note follow?",
     "type": "template",

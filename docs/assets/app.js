@@ -25,10 +25,10 @@ if (noteList && searchInput && typeFilter && noteCount) {
       return (type === 'all' || note.type === type) && haystack.includes(query);
     });
 
-    noteCount.textContent = `${visible.length} structural item${visible.length === 1 ? '' : 's'}`;
+    noteCount.textContent = `${visible.length} item${visible.length === 1 ? '' : 's'}`;
 
     if (!visible.length) {
-      noteList.innerHTML = '<p class="empty-state">Nothing matches this filter. No course notes have been published yet.</p>';
+      noteList.innerHTML = '<p class="empty-state">Nothing matches this filter.</p>';
       return;
     }
 

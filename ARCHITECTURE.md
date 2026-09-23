@@ -2,11 +2,25 @@
 
 ## The central decision
 
-Do not organize the public notebook by lecture number, and do not split all
-Markdown, Python, figures, and references into unrelated format silos.
+Use two note systems without mixing their purposes.
 
-The primary unit is a **research question**. Its prose and supporting artifacts
-stay close together:
+- **Learning notes** follow lecture order and record manual reconstruction.
+- **Research notes** follow questions and preserve original inquiry.
+
+Do not split Markdown, Python, figures, and references into unrelated format
+silos inside either kind of note.
+
+The learning unit is a lecture reconstruction:
+
+```text
+course-notes/lecture-XX-short-topic/
+├── note.md              # recall, derivation, correction, and uncertainty
+├── code/                # checks written by the author
+└── figures/             # explanatory figures created by the author
+```
+
+The research unit is a question. Its prose and supporting artifacts stay close
+together:
 
 ```text
 notes/<question-slug>/
@@ -16,22 +30,26 @@ notes/<question-slug>/
 └── data/README.md       # provenance; large/raw data stays external
 ```
 
-## Four public surfaces
+## Five public surfaces
 
-1. **Research threads** connect several notes and experiments around a larger
+1. **Learning notes** follow the course while separating recall, source facts,
+   derivation, correction, and unresolved questions.
+2. **Research threads** connect several notes and experiments around a larger
    question. A thread is a map, not another essay.
-2. **Research notes** develop one question through intuition, derivation,
+3. **Research notes** develop one question through intuition, derivation,
    evidence, connections, and open problems.
-3. **Experiments** make a claim reproducible. They record code, configuration,
+4. **Experiments** make a claim reproducible. They record code, configuration,
    environment, expected output, and interpretation—including negative
    results.
-4. **Source library** records papers and other materials actually used. It
+5. **Source library** records papers and other materials actually used. It
    stores citations, claim ledgers, and reading trails, but not downloaded PDFs.
 
 ## Repository map
 
 ```text
 cs395t-generative-ai-notes/
+├── course-notes/          # lecture-ordered manual reconstruction
+│   └── _template/
 ├── notes/                 # question-centered research units
 │   └── _template/
 ├── research/              # cross-note threads and open-question index
@@ -44,6 +62,8 @@ cs395t-generative-ai-notes/
 
 ## When code belongs where
 
+- Put a lecture-specific check in `course-notes/<lecture>/code/` and record the
+  expected result before running it.
 - Put code in `notes/<slug>/code/` when it exists to explain or test that one
   note.
 - Put a self-contained investigation in `experiments/<slug>/` when it has its
@@ -63,9 +83,15 @@ cs395t-generative-ai-notes/
 ## Publishing flow
 
 ```text
-seed question
+lecture source
     ↓
-private reconstruction + local experiment
+manual capture + closed-source reconstruction
+    ↓
+checked learning note
+    ↓
+question worth pursuing
+    ↓
+seed research note + local experiment
     ↓
 evidence and citation check
     ↓
@@ -74,5 +100,6 @@ reviewed research note
 public index + relevant research thread
 ```
 
-The website should make these states visible. An empty or developing item must
+The website should make these states visible. A `capturing` or `reconstructing`
+learning note must never look checked, and an empty research template must
 never look like a finished course note.

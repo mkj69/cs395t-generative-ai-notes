@@ -350,6 +350,7 @@ button, input, select { font: inherit; }
 .checklist li::before { content: "□"; position: absolute; left: 0; color: var(--accent); }
 .note-hero h1 { max-width: 970px; margin: 2rem 0 0; font-family: var(--serif); font-size: clamp(3.4rem, 7vw, 6.4rem); font-weight: 500; letter-spacing: -0.055em; line-height: 0.95; }
 .template-banner { display: flex; justify-content: space-between; gap: 1rem; margin-bottom: 5rem; border: 1px solid var(--accent); background: var(--accent-soft); padding: 0.8rem 1rem; color: #4036a5; font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; }
+.learning-banner { border-color: #4e765d; background: rgba(78, 118, 93, 0.08); color: #365f45; }
 .note-abstract { max-width: 780px; margin: 2rem 0 0; color: var(--muted); font-family: var(--serif); font-size: 1.35rem; }
 .note-toc { display: flex; flex-direction: column; gap: 0.5rem; }
 .note-toc a { color: var(--muted); font-size: 0.82rem; text-decoration: none; }
@@ -373,6 +374,11 @@ button, input, select { font: inherit; }
 .evidence-card dd { margin: 0; font-family: var(--serif); }
 .open-question-list { padding-left: 1.4rem; color: var(--muted); font-family: var(--serif); font-size: 1.1rem; }
 .open-question-list li { padding: 0.5rem 0; }
+.learning-prompts { display: grid; gap: 1px; margin-top: 2rem; border: 1px solid var(--line); background: var(--line); }
+.learning-prompts article { display: grid; grid-template-columns: 46px minmax(170px, 0.65fr) minmax(0, 1fr); gap: 1rem; align-items: center; background: var(--paper-bright); padding: 1rem; }
+.learning-prompts span { color: var(--accent); font-family: var(--mono); font-size: 0.68rem; }
+.learning-prompts h3 { margin: 0; font-family: var(--serif); font-size: 1.2rem; font-weight: 500; }
+.learning-prompts p { margin: 0; color: var(--muted); font-family: var(--mono); font-size: 0.68rem; line-height: 1.6; }
 .references-placeholder { color: var(--muted); }
 .structure-hero { max-width: 1120px; }
 .architecture-map { margin-bottom: 8rem; border: 1px solid var(--line); background: var(--paper-bright); padding: 2rem; }
@@ -466,6 +472,8 @@ button, input, select { font: inherit; }
   .note-hero { padding-block: 5rem 3rem; }
   .template-banner { flex-direction: column; margin-bottom: 3rem; }
   .evidence-card dl div { grid-template-columns: 1fr; gap: 0.25rem; }
+  .learning-prompts article { grid-template-columns: 34px 1fr; }
+  .learning-prompts p { grid-column: 2; }
   .site-footer { grid-template-columns: 1fr; gap: 0.6rem; padding-block: 2rem; }
 }
 

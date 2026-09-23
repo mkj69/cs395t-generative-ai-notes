@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="How the CS 395T research notebook connects prose, code, evidence, and open questions.">
+  <meta name="description" content="How the CS 395T learning and research notebook connects reconstruction, prose, code, evidence, and open questions.">
   <title>Notebook Structure — CS 395T</title>
   <link rel="stylesheet" href="assets/styles.css">
   <script src="assets/app.js" defer></script>
@@ -11,7 +11,7 @@
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
   <header class="site-header">
-    <a class="wordmark" href="index.html"><span>CS 395T</span><small>Research notebook</small></a>
+    <a class="wordmark" href="index.html"><span>CS 395T</span><small>Learning &amp; research notebook</small></a>
     <button class="menu-button" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button>
     <nav id="site-nav" class="site-nav" aria-label="Primary navigation">
       <a aria-current="page" href="structure.html">Structure</a>
@@ -25,14 +25,14 @@
     <header class="article-hero structure-hero">
       <p class="eyebrow"><span class="signal-dot"></span> Information architecture</p>
       <h1>Text, code, and evidence—<br><em>kept in conversation.</em></h1>
-      <p>The site is organized around research questions rather than lecture dates or file formats. A reader can change views without losing the intellectual thread.</p>
+      <p>Learning notes follow the course; research notes follow questions. Both keep prose, code, evidence, and uncertainty close instead of separating them into format silos.</p>
     </header>
 
     <section class="architecture-map" aria-labelledby="architecture-title">
       <div class="architecture-map__root">
         <span>ROOT</span>
-        <h2 id="architecture-title">A research question</h2>
-        <p>The smallest tension worth preserving.</p>
+        <h2 id="architecture-title">A notebook unit</h2>
+        <p>A lecture reconstruction or a research question.</p>
       </div>
       <div class="architecture-map__branches">
         <article><span>01</span><h3>Written note</h3><p>Intuition, assumptions, derivation, and current understanding.</p></article>
@@ -43,20 +43,24 @@
     </section>
 
     <div class="structure-sections">
+      <section id="learning-notes" class="structure-section">
+        <p class="section-index">01 / LEARNING NOTES</p>
+        <div><h2>Follow the course. Reconstruct by hand.</h2><p>A learning note records recall, derivation, original examples, errors, corrections, and unresolved questions. It may use a lecture number, but its prose cannot be a transcription or generated summary.</p><p class="framework-note">Current state: Lecture 09 capturing; substantive content not yet written.</p></div>
+      </section>
       <section id="threads" class="structure-section">
-        <p class="section-index">01 / RESEARCH THREADS</p>
+        <p class="section-index">02 / RESEARCH THREADS</p>
         <div><h2>Maps, not mega-essays.</h2><p>A thread gives a high-level route through several research units. It records how the central question changes, which evidence creates a branch, and where an experiment challenges the current story.</p><p class="framework-note">Current state: structure defined; no research thread published.</p></div>
       </section>
       <section id="notes-model" class="structure-section">
-        <p class="section-index">02 / RESEARCH NOTES</p>
+        <p class="section-index">03 / RESEARCH NOTES</p>
         <div><h2>One note, one real question.</h2><p>Each note carries its own prose, note-specific code, figures, and data provenance. The page can expose code alongside the claim it tests rather than sending the reader into a detached code dump.</p><p class="framework-note">Current state: one blank template; no substantive note published.</p></div>
       </section>
       <section id="experiments" class="structure-section">
-        <p class="section-index">03 / EXPERIMENTS</p>
+        <p class="section-index">04 / EXPERIMENTS</p>
         <div><h2>Reproducibility before spectacle.</h2><p>An experiment gets a question, environment, configuration, expected behavior, result record, and interpretation. Negative outcomes stay visible when they change the reasoning.</p><p class="framework-note">Current state: experiment contract defined; no result published.</p></div>
       </section>
       <section id="library" class="structure-section">
-        <p class="section-index">04 / SOURCE LIBRARY</p>
+        <p class="section-index">05 / SOURCE LIBRARY</p>
         <div><h2>A claim index, not a PDF drawer.</h2><p>The library stores bibliographic records, reading notes, and narrow claim ledgers. Original files remain outside the public repository; stable links and provenance connect readers to the source.</p><p class="framework-note">Current state: empty bibliography; no paper is represented as read.</p></div>
       </section>
     </div>
@@ -70,7 +74,7 @@
 
   <footer class="site-footer section-shell">
     <div><strong>CS 395T</strong><span>Notebook architecture</span></div>
-    <p>Framework status: no course notes published.</p>
+    <p>One manual learning note is in progress.</p>
     <a href="index.html">Return home ←</a>
   </footer>
 </body>
