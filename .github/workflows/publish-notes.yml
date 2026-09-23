@@ -27,6 +27,11 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Sync with current main
+        run: |
+          git fetch origin main
+          git merge --ff-only origin/main
+
       - name: Set up Python
         uses: actions/setup-python@v7
         with:

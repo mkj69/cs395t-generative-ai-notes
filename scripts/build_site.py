@@ -20,19 +20,61 @@ INDEX_PATH = DOCS / "data" / "notes.json"
 PUBLIC_TYPES = {"learning-note", "research-note"}
 
 
+def normalize_logseq_body(body: str) -> str:
+    """Restore Markdown structure after Logseq serializes it as an outline."""
+    normalized: list[str] = []
+    structural_block = re.compile(r"(?:#{1,6}\s|>\s?|`{3}|~{3}|---\s*$)")
+
+    for line in body.splitlines(keepends=True):
+        newline = "\n" if line.endswith("\n") else ""
+        content = line.rstrip("\r\n")
+
+        if content == "-":
+            content = ""
+        elif content.startswith("- "):
+            block = content[2:]
+            if structural_block.match(block):
+                if block.startswith("#") and normalized and normalized[-1].strip():
+                    normalized.append("\n")
+                content = block
+        elif content.startswith("  "):
+            # Logseq indents continuation lines beneath their owning block.
+            content = content[2:]
+
+        normalized.append(content + newline)
+
+    return "".join(normalized)
+
+
 def split_front_matter(path: Path) -> tuple[dict[str, Any], str]:
     raw = path.read_text(encoding="utf-8")
-    if not raw.startswith("---\n"):
+    logseq_outline = raw.startswith("- ---\n")
+
+    if logseq_outline:
+        lines = raw.splitlines(keepends=True)
+        end_line = next(
+            (index for index, line in enumerate(lines[1:], start=1) if line.strip() == "---"),
+            None,
+        )
+        if end_line is None:
+            raise ValueError(f"Unclosed YAML front matter: {path.relative_to(ROOT)}")
+        front_matter = "".join(
+            line[2:] if line.startswith("  ") else line for line in lines[1:end_line]
+        )
+        body = normalize_logseq_body("".join(lines[end_line + 1 :]))
+    elif raw.startswith("---\n"):
+        end = raw.find("\n---\n", 4)
+        if end == -1:
+            raise ValueError(f"Unclosed YAML front matter: {path.relative_to(ROOT)}")
+        front_matter = raw[4:end]
+        body = raw[end + 5 :]
+    else:
         return {}, raw
 
-    end = raw.find("\n---\n", 4)
-    if end == -1:
-        raise ValueError(f"Unclosed YAML front matter: {path.relative_to(ROOT)}")
-
-    metadata = yaml.safe_load(raw[4:end]) or {}
+    metadata = yaml.safe_load(front_matter) or {}
     if not isinstance(metadata, dict):
         raise ValueError(f"Front matter must be a mapping: {path.relative_to(ROOT)}")
-    return metadata, raw[end + 5 :]
+    return metadata, body
 
 
 def plain(value: Any) -> str:
