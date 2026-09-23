@@ -105,7 +105,6 @@ button, input, select { font: inherit; }
   gap: clamp(3rem, 8vw, 7rem);
   padding-block: 6rem;
 }
-.hero--focused { grid-template-columns: minmax(0, 1fr); }
 .eyebrow,
 .section-index,
 .status-label,
