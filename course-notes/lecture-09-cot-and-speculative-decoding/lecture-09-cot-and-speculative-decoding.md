@@ -7,7 +7,7 @@
   type: "learning-note"
   course: "CS 395T"
   source: "https://noahgol.github.io/teaching/cs395t-f26/lecture9.pdf"
-  summary: "A detailed guided reconstruction of chain-of-thought, STaR, function-composition lower bounds, and speculative decoding, with proofs explained step by step."
+  summary: ""
   public: true
   tags:
     - chain-of-thought
@@ -17,7 +17,7 @@
   related_research_notes: []
   authorship: "ai-assisted"
   ---
-- > **AI-assisted guided reconstruction.** This note follows the mathematical route of the Lecture 09 PDF but rewrites the exposition and explains the proofs step by step. It is not the author's manual reconstruction; it should be checked, revised, and extended in Logseq during learning.
+- 
 - ## Lecture context
 - `[SOURCE]`：<https://noahgol.github.io/teaching/cs395t-f26/lecture9.pdf>
 - How chain-of-thought supports sequential computation and how sepculative decoding speeds up generation?
