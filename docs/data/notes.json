@@ -103,7 +103,7 @@
   },
   {
     "title": "Lecture 09 — Chain-of-Thought and Speculative Decoding",
-    "question": "A detailed guided reconstruction of chain-of-thought, STaR, function-composition lower bounds, and speculative decoding, with proofs explained step by step.",
+    "question": "A public note in progress.",
     "type": "learning",
     "typeLabel": "Learning note",
     "status": "Draft",
