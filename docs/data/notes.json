@@ -1,7 +1,7 @@
 [
   {
     "title": "Lecture 09 — Chain-of-Thought and Speculative Decoding",
-    "question": "A first-pass study note on sequential computation through chain-of-thought and distribution-preserving acceleration through speculative decoding.",
+    "question": "A detailed guided reconstruction of chain-of-thought, STaR, function-composition lower bounds, and speculative decoding, with proofs explained step by step.",
     "type": "learning",
     "typeLabel": "Learning note",
     "status": "Draft",
