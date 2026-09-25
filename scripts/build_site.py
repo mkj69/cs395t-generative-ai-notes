@@ -110,6 +110,42 @@ def make_markdown() -> Markdown:
     )
 
 
+def protect_math(markdown_text: str) -> tuple[str, list[tuple[str, str, str]]]:
+    """Hide TeX from Markdown emphasis parsing, then restore it as MathJax input."""
+    tokens: list[tuple[str, str, str]] = []
+
+    def stash_display(match: re.Match[str]) -> str:
+        token = f"MATHDISPLAYTOKEN{len(tokens):05d}"
+        tex = match.group(1).strip()
+        tokens.append((token, "display", tex))
+        return f"\n\n{token}\n\n"
+
+    protected = re.sub(r"\$\$(.*?)\$\$", stash_display, markdown_text, flags=re.DOTALL)
+
+    def stash_inline(match: re.Match[str]) -> str:
+        token = f"MATHINLINETOKEN{len(tokens):05d}"
+        tex = match.group(1).strip()
+        tokens.append((token, "inline", tex))
+        return token
+
+    protected = re.sub(r"(?<!\\)\$(?!\$)([^\n$]+?)(?<!\\)\$", stash_inline, protected)
+    return protected, tokens
+
+
+def restore_math(rendered_html: str, tokens: list[tuple[str, str, str]]) -> str:
+    """Replace protected TeX tokens with delimiters recognized by MathJax."""
+    restored = rendered_html
+    for token, mode, tex in tokens:
+        escaped_tex = html.escape(tex)
+        if mode == "display":
+            math_html = f'<div class="math-display">\\[{escaped_tex}\\]</div>'
+            restored = restored.replace(f"<p>{token}</p>", math_html)
+        else:
+            math_html = f'<span class="math-inline">\\({escaped_tex}\\)</span>'
+        restored = restored.replace(token, math_html)
+    return restored
+
+
 def discover_notes() -> list[tuple[Path, dict[str, Any], str]]:
     notes: list[tuple[Path, dict[str, Any], str]] = []
     for source_root in (ROOT / "course-notes", ROOT / "notes"):
@@ -162,7 +198,8 @@ def render_note(path: Path, metadata: dict[str, Any], body: str) -> dict[str, An
         disclaimer = "Research · reviewed" if status == "checked" else "Research · in progress"
 
     md = make_markdown()
-    article_html = md.convert(body)
+    protected_body, math_tokens = protect_math(body)
+    article_html = restore_math(md.convert(protected_body), math_tokens)
     toc_html = md.toc
     tags_html = "".join(f"<li>{plain(tag)}</li>" for tag in tags)
     page = f"""<!doctype html>
@@ -173,6 +210,15 @@ def render_note(path: Path, metadata: dict[str, Any], body: str) -> dict[str, An
   <meta name="description" content="{plain(summary)}">
   <title>{plain(title)} — CS 395T</title>
   <link rel="stylesheet" href="../assets/styles.css">
+  <script>
+    window.MathJax = {{
+      tex: {{
+        processEscapes: true
+      }},
+      svg: {{ fontCache: 'global' }}
+    }};
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js" defer></script>
   <script src="../assets/app.js" defer></script>
 </head>
 <body>

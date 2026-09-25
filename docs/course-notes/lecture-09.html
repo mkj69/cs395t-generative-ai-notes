@@ -6,6 +6,15 @@
   <meta name="description" content="A detailed guided reconstruction of chain-of-thought, STaR, function-composition lower bounds, and speculative decoding, with proofs explained step by step.">
   <title>Lecture 09 — Chain-of-Thought and Speculative Decoding — CS 395T</title>
   <link rel="stylesheet" href="../assets/styles.css">
+  <script>
+    window.MathJax = {
+      tex: {
+        processEscapes: true
+      },
+      svg: { fontCache: 'global' }
+    };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js" defer></script>
   <script src="../assets/app.js" defer></script>
 </head>
 <body>
@@ -107,8 +116,8 @@
 <h2 id="1-chain-of-thought-as-sequential-computation">1. Chain-of-thought as sequential computation</h2>
 <h3 id="11-prompting-with-intermediate-steps">1.1 Prompting with intermediate steps</h3>
 <ul>
-<li><code>[SOURCE]</code> Let <code>x</code> be a question, <code>r</code> a generated rationale, and <code>y</code> the answer. The joint continuation factorizes as <code>p_theta(r, y | x) = p_theta(r | x) p_theta(y | x, r)</code>.</li>
-<li><code>[EXPLANATION]</code> Each factor is itself a product of next-token probabilities. The model first assigns probability to every token of <code>r</code>, then assigns probability to every answer token conditioned on both <code>x</code> and the generated <code>r</code>.</li>
+<li><code>[SOURCE]</code> Let <span class="math-inline">\(x\)</span> be a question, <span class="math-inline">\(r\)</span> a generated rationale, and <span class="math-inline">\(y\)</span> the answer. The joint continuation factorizes as <span class="math-inline">\(p_\theta(r,y\mid x)=p_\theta(r\mid x)\,p_\theta(y\mid x,r)\)</span>.</li>
+<li><code>[EXPLANATION]</code> Each factor is itself a product of next-token probabilities. The model first assigns probability to every token of <span class="math-inline">\(r\)</span>, then assigns probability to every answer token conditioned on both <span class="math-inline">\(x\)</span> and the generated <span class="math-inline">\(r\)</span>.</li>
 <li><code>[SOURCE]</code> Few-shot CoT prompting places several question-rationale-answer demonstrations before a new question. The model parameters remain fixed; only the context changes. Standard few-shot prompting typically supplies question-answer pairs without the intermediate rationale.</li>
 <li><code>[INTUITION]</code> The rationale is not merely an explanation attached after the answer. Once emitted, it becomes part of the context, so later tokens can reuse intermediate values produced earlier.</li>
 <li><code>[SYNTHESIS]</code> The autoregressive sequence acts like a small external state: write an intermediate result, attend to it, and continue the computation with the same model.</li>
@@ -116,7 +125,7 @@
 </ul>
 <h4 id="a-small-computation-example">A small computation example</h4>
 <ul>
-<li><code>[EXAMPLE]</code> Suppose a problem requires computing <code>(8 + 4) / 3</code> and then subtracting <code>1</code>. A direct answer token must somehow encode the whole composition at once. A rationale can instead write <code>8 + 4 = 12</code>, place <code>12</code> in the context, then compute <code>12 / 3 = 4</code>, and finally output <code>4 - 1 = 3</code>.</li>
+<li><code>[EXAMPLE]</code> Suppose a problem requires computing <span class="math-inline">\((8+4)/3\)</span> and then subtracting <span class="math-inline">\(1\)</span>. A direct answer token must somehow encode the whole composition at once. A rationale can instead write <span class="math-inline">\(8+4=12\)</span>, place <span class="math-inline">\(12\)</span> in the context, then compute <span class="math-inline">\(12/3=4\)</span>, and finally output <span class="math-inline">\(4-1=3\)</span>.</li>
 <li><code>[EXPLANATION]</code> The important point is not the arithmetic difficulty. The example isolates a dependency: the second operation needs the value created by the first. Autoregressive generation turns that newly created value into an input for the next step.</li>
 </ul>
 <h3 id="12-star-learning-from-successful-rationales">1.2 STaR: learning from successful rationales</h3>
@@ -131,376 +140,356 @@
 </ul>
 <h4 id="rationalization-step-by-step">Rationalization, step by step</h4>
 <ul>
-<li><code>[SOURCE]</code> If the first generation for <code>x_i</code> ends with the wrong answer, ordinary filtering produces no example for that question.</li>
-<li><code>[SOURCE]</code> STaR then appends the known answer <code>y_i</code> as a hint and asks the model to generate another rationale-answer sequence.</li>
-<li><code>[SOURCE]</code> If the hinted generation now ends at <code>y_i</code>, its rationale <code>r_i^rat</code> is retained.</li>
-<li><code>[EXPLANATION]</code> During fine-tuning, the answer hint is removed from the input. The training pair is therefore question <code>x_i</code> -&gt; rationale <code>r_i^rat</code> followed by answer <code>y_i</code>.</li>
+<li><code>[SOURCE]</code> If the first generation for <span class="math-inline">\(x_i\)</span> ends with the wrong answer, ordinary filtering produces no example for that question.</li>
+<li><code>[SOURCE]</code> STaR then appends the known answer <span class="math-inline">\(y_i\)</span> as a hint and asks the model to generate another rationale-answer sequence.</li>
+<li><code>[SOURCE]</code> If the hinted generation now ends at <span class="math-inline">\(y_i\)</span>, its rationale <span class="math-inline">\(r_i^{\mathrm{rat}}\)</span> is retained.</li>
+<li><code>[EXPLANATION]</code> During fine-tuning, the answer hint is removed from the input. The training pair is therefore question <span class="math-inline">\(x_i \to\)</span> rationale <span class="math-inline">\(r_i^{\mathrm{rat}}\)</span> followed by answer <span class="math-inline">\(y_i\)</span>.</li>
 <li><code>[LIMIT]</code> The generated rationale depended on information that will not be available at test time. Rationalization can expand coverage, but it introduces a distribution mismatch that the clean policy-gradient story does not include.</li>
 </ul>
 <h4 id="policy-gradient-view">Policy-gradient view</h4>
 <ul>
-<li><code>[SOURCE]</code> Treat the generated rationale and answer as a sampled action sequence and reward exact answer correctness. For examples <code>(x_i, y_i)</code>, write <code>J(theta) = sum_i E[1{y_hat_i = y_i}]</code>.</li>
-<li><code>[DERIVATION · Step 1]</code> For one training question, expand the expectation over every possible generated rationale <code>r</code> and answer <code>y</code>:</li>
+<li><code>[SOURCE]</code> Treat the generated rationale and answer as a sampled action sequence and reward exact answer correctness. For examples <span class="math-inline">\((x_i,y_i)\)</span>, write <span class="math-inline">\(J(\theta)=\sum_i\mathbb{E}[\mathbf{1}\{\hat y_i=y_i\}]\)</span>.</li>
+<li><code>[DERIVATION · Step 1]</code> For one training question, expand the expectation over every possible generated rationale <span class="math-inline">\(r\)</span> and answer <span class="math-inline">\(y\)</span>:</li>
 </ul>
-<pre><code class="language-text">J_i(theta) = sum_{r,y} p_theta(r,y | x_i) 1{y = y_i}.
-</code></pre>
+<div class="math-display">\[J_i(\theta)=\sum_{r,y}p_\theta(r,y\mid x_i)\,\mathbf{1}\{y=y_i\}.\]</div>
 <ul>
 <li><code>[EXPLANATION]</code> The indicator is the reward. It is one only when the sampled final answer equals the label.</li>
 <li><code>[DERIVATION · Step 2]</code> Differentiate term by term:</li>
 </ul>
-<pre><code class="language-text">grad J_i(theta)
-  = sum_{r,y} 1{y = y_i} grad p_theta(r,y | x_i).
-</code></pre>
+<div class="math-display">\[\nabla_\theta J_i(\theta)
+=\sum_{r,y}\mathbf{1}\{y=y_i\}\,\nabla_\theta p_\theta(r,y\mid x_i).\]</div>
 <ul>
-<li><code>[DERIVATION · Step 3]</code> Use the log-derivative identity <code>grad p = p grad log p</code>:</li>
+<li><code>[DERIVATION · Step 3]</code> Use the log-derivative identity <span class="math-inline">\(\nabla_\theta p_\theta=p_\theta\nabla_\theta\log p_\theta\)</span>:</li>
 </ul>
-<pre><code class="language-text">grad J_i(theta)
-  = sum_{r,y} p_theta(r,y | x_i) 1{y = y_i}
-      grad log p_theta(r,y | x_i).
-</code></pre>
+<div class="math-display">\[\nabla_\theta J_i(\theta)
+=\sum_{r,y}p_\theta(r,y\mid x_i)\,\mathbf{1}\{y=y_i\}
+\nabla_\theta\log p_\theta(r,y\mid x_i).\]</div>
 <ul>
 <li><code>[DERIVATION · Step 4]</code> Recognize the weighted sum as an expectation under the current model:</li>
 </ul>
-<pre><code class="language-text">grad J(theta)
-  = sum_i E_{(r_hat,y_hat) ~ p_theta(.|x_i)}[
-      1{y_hat = y_i} grad log p_theta(r_hat,y_hat | x_i)
-    ].
-</code></pre>
+<div class="math-display">\[\nabla_\theta J(\theta)
+=\sum_i\mathbb{E}_{(\hat r,\hat y)\sim p_\theta(\cdot\mid x_i)}
+\left[\mathbf{1}\{\hat y=y_i\}\,\nabla_\theta\log p_\theta(\hat r,\hat y\mid x_i)\right].\]</div>
 <ul>
 <li><code>[EXPLANATION]</code> A failed sample receives reward zero and contributes no update. A successful sample contributes the log-likelihood gradient of its full rationale and answer. Filtering successful samples and training on them therefore points in the same qualitative direction as this estimator.</li>
 <li><code>[LIMIT]</code> This is an interpretation rather than an exact equivalence. The clean estimator assumes on-policy samples, whereas STaR uses greedy generations and several supervised updates on a retained dataset.</li>
 </ul>
 <h3 id="13-why-dependent-lookups-are-difficult-in-one-layer">1.3 Why dependent lookups are difficult in one layer</h3>
 <ul>
-<li><code>[SOURCE]</code> Consider arbitrary tables <code>g, f : [n] -&gt; [n]</code> and a query <code>a</code>. Computing <code>f(g(a))</code> needs two dependent lookups: first discover <code>g(a)</code>, then use that result as the key for <code>f</code>.</li>
-<li><code>[INTUITION]</code> In one attention layer, all heads form their queries from the original representations in parallel. A head cannot receive <code>g(a)</code> from another head and then change its own query within that same layer.</li>
+<li><code>[SOURCE]</code> Consider arbitrary tables <span class="math-inline">\(g,f:[n]\to[n]\)</span> and a query <span class="math-inline">\(a\)</span>. Computing <span class="math-inline">\(f(g(a))\)</span> needs two dependent lookups: first discover <span class="math-inline">\(g(a)\)</span>, then use that result as the key for <span class="math-inline">\(f\)</span>.</li>
+<li><code>[INTUITION]</code> In one attention layer, all heads form their queries from the original representations in parallel. A head cannot receive <span class="math-inline">\(g(a)\)</span> from another head and then change its own query within that same layer.</li>
 </ul>
 <h4 id="transformer-layer-model">Transformer-layer model</h4>
 <ul>
-<li><code>[SOURCE]</code> Put the input representations into <code>X = [x_1, ..., x_N]</code>, with every <code>x_j</code> in <code>R^d</code>. For attention head <code>h</code>, define</li>
+<li><code>[SOURCE]</code> Put the input representations into <span class="math-inline">\(X=[x_1,\ldots,x_N]\)</span>, with every <span class="math-inline">\(x_j\in\mathbb{R}^d\)</span>. For attention head <span class="math-inline">\(h\)</span>, define</li>
 </ul>
-<pre><code class="language-text">q_i^(h) = W_Q^(h) x_i,
-k_j^(h) = W_K^(h) x_j,
-v_j^(h) = W_V^(h) x_j.
-</code></pre>
+<div class="math-display">\[\begin{aligned}
+q_i^{(h)}&amp;=W_Q^{(h)}x_i,\\
+k_j^{(h)}&amp;=W_K^{(h)}x_j,\\
+v_j^{(h)}&amp;=W_V^{(h)}x_j.
+\end{aligned}\]</div>
 <ul>
-<li><code>[SOURCE]</code> At output position <code>i</code>, head <code>h</code> forms</li>
+<li><code>[SOURCE]</code> At output position <span class="math-inline">\(i\)</span>, head <span class="math-inline">\(h\)</span> forms</li>
 </ul>
-<pre><code class="language-text">y_i^(h) = sum_j A_ji^(h) v_j^(h),
-
-A_ji^(h) = exp(&lt;q_i^(h), k_j^(h)&gt; / sqrt(d))
-           / sum_u exp(&lt;q_i^(h), k_u^(h)&gt; / sqrt(d)).
-</code></pre>
+<div class="math-display">\[\begin{aligned}
+y_i^{(h)}&amp;=\sum_j A_{ji}^{(h)}v_j^{(h)},\\[4pt]
+A_{ji}^{(h)}&amp;=
+\frac{\exp\!\left(\langle q_i^{(h)},k_j^{(h)}\rangle/\sqrt d\right)}
+{\sum_u\exp\!\left(\langle q_i^{(h)},k_u^{(h)}\rangle/\sqrt d\right)}.
+\end{aligned}\]</div>
 <ul>
 <li><code>[EXPLANATION]</code> The softmax numerator scores one token against the query. The denominator normalizes across every input position. The head output is therefore a weighted average of value vectors.</li>
-<li><code>[SOURCE]</code> A position-wise map <code>Phi</code> combines the <code>H</code> head outputs, and a local decoder maps the result to the predicted answer.</li>
-<li><code>[SOURCE]</code> The lower-bound model is generous about local computation: <code>Phi</code> may include an output projection, MLP, normalization, or even more general position-wise processing. A residual connection can be represented by also giving <code>Phi</code> the local input.</li>
-<li><code>[SOURCE]</code> Embeddings, position information, and other preprocessing may be placed inside each <code>x_j</code>, provided that preprocessing is local to position <code>j</code>. What is excluded is the result of an earlier attention layer.</li>
-<li><code>[SOURCE]</code> Every scalar has finite precision <code>b</code> bits. This lets us count how many bits a head can communicate.</li>
+<li><code>[SOURCE]</code> A position-wise map <span class="math-inline">\(\Phi\)</span> combines the <span class="math-inline">\(H\)</span> head outputs, and a local decoder maps the result to the predicted answer.</li>
+<li><code>[SOURCE]</code> The lower-bound model is generous about local computation: <span class="math-inline">\(\Phi\)</span> may include an output projection, MLP, normalization, or even more general position-wise processing. A residual connection can be represented by also giving <span class="math-inline">\(\Phi\)</span> the local input.</li>
+<li><code>[SOURCE]</code> Embeddings, position information, and other preprocessing may be placed inside each <span class="math-inline">\(x_j\)</span>, provided that preprocessing is local to position <span class="math-inline">\(j\)</span>. What is excluded is the result of an earlier attention layer.</li>
+<li><code>[SOURCE]</code> Every scalar has finite precision <span class="math-inline">\(b\)</span> bits. This lets us count how many bits a head can communicate.</li>
 </ul>
 <h4 id="function-composition-input">Function-composition input</h4>
 <ul>
-<li><code>[SOURCE]</code> The prompt uses a fixed layout: some positions encode the table of <code>f</code>, some encode <code>g</code>, and a query block encodes <code>a</code>. The designated output position must return <code>f(g(a))</code>.</li>
-<li><code>[EXPLANATION]</code> The layout and model parameters do not adapt to the sampled tables. The <code>f</code> tokens depend only on <code>f</code>, the <code>g</code> tokens only on <code>g</code>, and the query tokens only on <code>a</code>.</li>
-<li><code>[EXAMPLE]</code> If <code>g(person)</code> returns that person's parent and <code>f(person)</code> returns that person's occupation, a query about the occupation of Alice's parent first needs the identity <code>g(Alice)</code> and then the value <code>f(g(Alice))</code>.</li>
+<li><code>[SOURCE]</code> The prompt uses a fixed layout: some positions encode the table of <span class="math-inline">\(f\)</span>, some encode <span class="math-inline">\(g\)</span>, and a query block encodes <span class="math-inline">\(a\)</span>. The designated output position must return <span class="math-inline">\(f(g(a))\)</span>.</li>
+<li><code>[EXPLANATION]</code> The layout and model parameters do not adapt to the sampled tables. The <span class="math-inline">\(f\)</span> tokens depend only on <span class="math-inline">\(f\)</span>, the <span class="math-inline">\(g\)</span> tokens only on <span class="math-inline">\(g\)</span>, and the query tokens only on <span class="math-inline">\(a\)</span>.</li>
+<li><code>[EXAMPLE]</code> If <span class="math-inline">\(g(\mathrm{person})\)</span> returns that person's parent and <span class="math-inline">\(f(\mathrm{person})\)</span> returns that person's occupation, a query about the occupation of Alice's parent first needs the identity <span class="math-inline">\(g(\mathrm{Alice})\)</span> and then the value <span class="math-inline">\(f(g(\mathrm{Alice}))\)</span>.</li>
 </ul>
 <h4 id="single-layer-composition-lower-bound-theorem-11">Single-layer composition lower bound (Theorem 1.1)</h4>
 <ul>
-<li><code>[THEOREM]</code> With <code>H</code> heads, hidden dimension <code>d</code>, and <code>b</code> bits per scalar, define <code>B = H(d + 1)b</code>. When <code>B &lt; n log_2 n</code>, set <code>R = n log_2 n - B &gt; 0</code>. For independent uniformly random tables <code>f</code> and <code>g</code>, every fixed query <code>a</code> has error probability at least <code>R / (3 n log_2 n)</code>. Averaging gives the same bound for an independent uniform query.</li>
+<li><code>[THEOREM]</code> With <span class="math-inline">\(H\)</span> heads, hidden dimension <span class="math-inline">\(d\)</span>, and <span class="math-inline">\(b\)</span> bits per scalar, define <span class="math-inline">\(B=H(d+1)b\)</span>. When <span class="math-inline">\(B&lt;n\log_2 n\)</span>, set <span class="math-inline">\(R=n\log_2 n-B&gt;0\)</span>. For independent uniformly random tables <span class="math-inline">\(f\)</span> and <span class="math-inline">\(g\)</span>, every fixed query <span class="math-inline">\(a\)</span> has error probability at least <span class="math-inline">\(R/(3n\log_2 n)\)</span>. Averaging gives the same bound for an independent uniform query.</li>
 </ul>
 <h4 id="entropy-notation-needed-for-the-proof">Entropy notation needed for the proof</h4>
 <ul>
 <li><code>[SOURCE]</code> All logarithms in this lower-bound argument use base two, so entropy is measured in bits.</li>
-<li><code>[DEFINITION]</code> For a discrete random variable <code>U</code>, <code>H(U) = -sum_u P(U=u) log P(U=u)</code>.</li>
-<li><code>[DEFINITION]</code> Conditional mutual information is <code>I(U;V | W) = H(U | W) - H(U | V,W)</code>.</li>
-<li><code>[DEFINITION]</code> Binary entropy is <code>h_2(delta) = -delta log delta - (1-delta) log(1-delta)</code>.</li>
+<li><code>[DEFINITION]</code> For a discrete random variable <span class="math-inline">\(U\)</span>, <span class="math-inline">\(H(U)=-\sum_u\Pr(U=u)\log\Pr(U=u)\)</span>.</li>
+<li><code>[DEFINITION]</code> Conditional mutual information is <span class="math-inline">\(I(U;V\mid W)=H(U\mid W)-H(U\mid V,W)\)</span>.</li>
+<li><code>[DEFINITION]</code> Binary entropy is <span class="math-inline">\(h_2(\delta)=-\delta\log\delta-(1-\delta)\log(1-\delta)\)</span>.</li>
 </ul>
 <h4 id="fanos-inequality-lemma-12">Fano's inequality (Lemma 1.2)</h4>
 <ul>
-<li><code>[THEOREM]</code> Let <code>Y</code> take values in <code>[n]</code>, let <code>Z</code> be an observation, and let <code>Y_hat = psi(Z)</code>. If <code>delta = P(Y_hat != Y)</code>, then</li>
+<li><code>[THEOREM]</code> Let <span class="math-inline">\(Y\)</span> take values in <span class="math-inline">\([n]\)</span>, let <span class="math-inline">\(Z\)</span> be an observation, and let <span class="math-inline">\(\widehat Y=\psi(Z)\)</span>. If <span class="math-inline">\(\delta=\Pr(\widehat Y\ne Y)\)</span>, then</li>
 </ul>
-<pre><code class="language-text">H(Y | Z) &lt;= h_2(delta) + delta log(n - 1).
-</code></pre>
+<div class="math-display">\[H(Y\mid Z)\le h_2(\delta)+\delta\log(n-1).\]</div>
 <ul>
-<li><code>[DERIVATION · Step 1]</code> Define the error flag <code>E = 1{Y_hat != Y}</code>. Once <code>(Y,Z)</code> is known, <code>Y_hat = psi(Z)</code> is known, so <code>E</code> is determined. Therefore <code>H(E | Y,Z) = 0</code>.</li>
-<li><code>[DERIVATION · Step 2]</code> Add <code>E</code> without changing the conditional uncertainty:</li>
+<li><code>[DERIVATION · Step 1]</code> Define the error flag <span class="math-inline">\(E=\mathbf{1}\{\widehat Y\ne Y\}\)</span>. Once <span class="math-inline">\((Y,Z)\)</span> is known, <span class="math-inline">\(\widehat Y=\psi(Z)\)</span> is known, so <span class="math-inline">\(E\)</span> is determined. Therefore <span class="math-inline">\(H(E\mid Y,Z)=0\)</span>.</li>
+<li><code>[DERIVATION · Step 2]</code> Add <span class="math-inline">\(E\)</span> without changing the conditional uncertainty:</li>
 </ul>
-<pre><code class="language-text">H(Y | Z) = H(E,Y | Z).
-</code></pre>
+<div class="math-display">\[H(Y\mid Z)=H(E,Y\mid Z).\]</div>
 <ul>
-<li><code>[EXPLANATION]</code> The chain rule normally gives <code>H(E,Y|Z) = H(Y|Z) + H(E|Y,Z)</code>. The final term is zero by Step 1.</li>
+<li><code>[EXPLANATION]</code> The chain rule normally gives <span class="math-inline">\(H(E,Y\mid Z)=H(Y\mid Z)+H(E\mid Y,Z)\)</span>. The final term is zero by Step 1.</li>
 <li><code>[DERIVATION · Step 3]</code> Apply the chain rule in the other order:</li>
 </ul>
-<pre><code class="language-text">H(E,Y | Z) = H(E | Z) + H(Y | E,Z).
-</code></pre>
+<div class="math-display">\[H(E,Y\mid Z)=H(E\mid Z)+H(Y\mid E,Z).\]</div>
 <ul>
-<li><code>[DERIVATION · Step 4]</code> Conditioning cannot increase entropy, so <code>H(E | Z) &lt;= H(E) = h_2(delta)</code>.</li>
-<li><code>[DERIVATION · Step 5]</code> When <code>E=0</code>, the observation determines <code>Y</code> because <code>Y = Y_hat</code>. When <code>E=1</code>, <code>Y</code> can be any label except <code>Y_hat</code>, leaving at most <code>n-1</code> possibilities. Hence</li>
+<li><code>[DERIVATION · Step 4]</code> Conditioning cannot increase entropy, so <span class="math-inline">\(H(E\mid Z)\le H(E)=h_2(\delta)\)</span>.</li>
+<li><code>[DERIVATION · Step 5]</code> When <span class="math-inline">\(E=0\)</span>, the observation determines <span class="math-inline">\(Y\)</span> because <span class="math-inline">\(Y=\widehat Y\)</span>. When <span class="math-inline">\(E=1\)</span>, <span class="math-inline">\(Y\)</span> can be any label except <span class="math-inline">\(\widehat Y\)</span>, leaving at most <span class="math-inline">\(n-1\)</span> possibilities. Hence</li>
 </ul>
-<pre><code class="language-text">H(Y | E,Z) &lt;= delta log(n - 1).
-</code></pre>
+<div class="math-display">\[H(Y\mid E,Z)\le\delta\log(n-1).\]</div>
 <ul>
 <li><code>[CONCLUSION]</code> Adding the two bounds proves Fano's inequality.</li>
 </ul>
 <h4 id="indexing-communication-lemma-lemma-13">Indexing communication lemma (Lemma 1.3)</h4>
 <ul>
-<li><code>[SETUP]</code> Faye knows a uniformly random table <code>F = (F_1,...,F_n)</code> in <code>[n]^n</code>. She sends a <code>B</code>-bit message <code>M</code> before Xavier receives an independent uniform index <code>J</code>. Xavier must estimate <code>F_J</code> from <code>(M,J)</code>.</li>
-<li><code>[THEOREM]</code> If <code>B &lt; n log n</code> and <code>R = n log n - B</code>, every such protocol has error at least <code>R / (3 n log n)</code>.</li>
-<li><code>[DERIVATION · Step 1]</code> Because <code>J</code> is uniform and independent,</li>
+<li><code>[SETUP]</code> Faye knows a uniformly random table <span class="math-inline">\(F=(F_1,\ldots,F_n)\in[n]^n\)</span>. She sends a <span class="math-inline">\(B\)</span>-bit message <span class="math-inline">\(M\)</span> before Xavier receives an independent uniform index <span class="math-inline">\(J\)</span>. Xavier must estimate <span class="math-inline">\(F_J\)</span> from <span class="math-inline">\((M,J)\)</span>.</li>
+<li><code>[THEOREM]</code> If <span class="math-inline">\(B&lt;n\log n\)</span> and <span class="math-inline">\(R=n\log n-B\)</span>, every such protocol has error at least <span class="math-inline">\(R/(3n\log n)\)</span>.</li>
+<li><code>[DERIVATION · Step 1]</code> Because <span class="math-inline">\(J\)</span> is uniform and independent,</li>
 </ul>
-<pre><code class="language-text">I(M; F_J | J) = (1/n) sum_{j=1}^n I(M; F_j).
-</code></pre>
+<div class="math-display">\[I(M;F_J\mid J)=\frac1n\sum_{j=1}^n I(M;F_j).\]</div>
 <ul>
-<li><code>[DERIVATION · Step 2]</code> The coordinates of <code>F</code> are independent, so <code>H(F_j) = H(F_j | F_&lt;j)</code>. Also, adding <code>F_&lt;j</code> to the conditioning can only reduce the remaining entropy of <code>F_j</code>. Thus</li>
+<li><code>[DERIVATION · Step 2]</code> The coordinates of <span class="math-inline">\(F\)</span> are independent, so <span class="math-inline">\(H(F_j)=H(F_j\mid F_{&lt;j})\)</span>. Also, adding <span class="math-inline">\(F_{&lt;j}\)</span> to the conditioning can only reduce the remaining entropy of <span class="math-inline">\(F_j\)</span>. Thus</li>
 </ul>
-<pre><code class="language-text">I(M;F_j) &lt;= I(M;F_j | F_&lt;j).
-</code></pre>
+<div class="math-display">\[I(M;F_j)\le I(M;F_j\mid F_{&lt;j}).\]</div>
 <ul>
 <li><code>[DERIVATION · Step 3]</code> Sum the preceding terms and use the mutual-information chain rule:</li>
 </ul>
-<pre><code class="language-text">I(M;F_J | J)
-  &lt;= (1/n) sum_j I(M;F_j | F_&lt;j)
-   = (1/n) I(M;F)
-  &lt;= H(M)/n
-  &lt;= B/n.
-</code></pre>
+<div class="math-display">\[\begin{aligned}
+I(M;F_J\mid J)
+&amp;\le \frac1n\sum_j I(M;F_j\mid F_{&lt;j})\\
+&amp;=\frac1n I(M;F)\\
+&amp;\le \frac{H(M)}n\\
+&amp;\le \frac Bn.
+\end{aligned}\]</div>
 <ul>
-<li><code>[EXPLANATION]</code> A <code>B</code>-bit message has at most <code>2^B</code> values, so its entropy cannot exceed <code>B</code>.</li>
-<li><code>[DERIVATION · Step 4]</code> Before seeing <code>M</code>, the requested value is uniform on <code>[n]</code>, hence <code>H(F_J | J) = log n</code>. After seeing the message,</li>
+<li><code>[EXPLANATION]</code> A <span class="math-inline">\(B\)</span>-bit message has at most <span class="math-inline">\(2^B\)</span> values, so its entropy cannot exceed <span class="math-inline">\(B\)</span>.</li>
+<li><code>[DERIVATION · Step 4]</code> Before seeing <span class="math-inline">\(M\)</span>, the requested value is uniform on <span class="math-inline">\([n]\)</span>, hence <span class="math-inline">\(H(F_J\mid J)=\log n\)</span>. After seeing the message,</li>
 </ul>
-<pre><code class="language-text">H(F_J | M,J)
-  = H(F_J | J) - I(M;F_J | J)
-  &gt;= log n - B/n
-   = R/n.
-</code></pre>
+<div class="math-display">\[\begin{aligned}
+H(F_J\mid M,J)
+&amp;=H(F_J\mid J)-I(M;F_J\mid J)\\
+&amp;\ge \log n-\frac Bn\\
+&amp;=\frac Rn.
+\end{aligned}\]</div>
 <ul>
 <li><code>[DERIVATION · Step 5]</code> Apply Fano to Xavier's estimate:</li>
 </ul>
-<pre><code class="language-text">R/n &lt;= h_2(delta) + delta log(n - 1).
-</code></pre>
+<div class="math-display">\[\frac Rn\le h_2(\delta)+\delta\log(n-1).\]</div>
 <h4 id="turning-fanos-bound-into-the-stated-linear-bound">Turning Fano's bound into the stated linear bound</h4>
 <ul>
-<li><code>[CASE 1]</code> Suppose <code>delta &gt;= 3/(4n)</code>. Use <code>h_2(u) &lt;= u log(e/u)</code>:</li>
+<li><code>[CASE 1]</code> Suppose <span class="math-inline">\(\delta\ge 3/(4n)\)</span>. Use <span class="math-inline">\(h_2(u)\le u\log(e/u)\)</span>:</li>
 </ul>
-<pre><code class="language-text">R/n &lt;= delta log(e(n-1)/delta) &lt;= 3 delta log n.
-</code></pre>
+<div class="math-display">\[\frac Rn\le\delta\log\!\left(\frac{e(n-1)}\delta\right)\le3\delta\log n.\]</div>
 <ul>
-<li><code>[EXPLANATION]</code> The last comparison follows from <code>e(n-1)/delta &lt;= (4e/3)n(n-1) &lt;= n^3</code> for <code>n &gt;= 2</code>. Rearranging yields <code>delta &gt;= R/(3n log n)</code>.</li>
-<li><code>[CASE 2]</code> Suppose <code>delta &lt; 3/(4n)</code>. Each message <code>m</code> determines a full predicted table <code>F_hat(m)</code> by collecting Xavier's answers for all possible indices. Since there are at most <code>2^B</code> messages, at most <code>2^B</code> of the <code>n^n</code> possible tables can be recovered perfectly.</li>
+<li><code>[EXPLANATION]</code> The last comparison follows from <span class="math-inline">\(e(n-1)/\delta\le(4e/3)n(n-1)\le n^3\)</span> for <span class="math-inline">\(n\ge2\)</span>. Rearranging yields <span class="math-inline">\(\delta\ge R/(3n\log n)\)</span>.</li>
+<li><code>[CASE 2]</code> Suppose <span class="math-inline">\(\delta&lt;3/(4n)\)</span>. Each message <span class="math-inline">\(m\)</span> determines a full predicted table <span class="math-inline">\(\widehat F(m)\)</span> by collecting Xavier's answers for all possible indices. Since there are at most <span class="math-inline">\(2^B\)</span> messages, at most <span class="math-inline">\(2^B\)</span> of the <span class="math-inline">\(n^n\)</span> possible tables can be recovered perfectly.</li>
 <li><code>[DERIVATION]</code> A wrong table differs in at least one coordinate. Averaging over the uniform requested coordinate gives</li>
 </ul>
-<pre><code class="language-text">n delta &gt;= P(F != F_hat(M))
-        &gt;= 1 - 2^B / n^n
-         = 1 - 2^(-R).
-</code></pre>
+<div class="math-display">\[\begin{aligned}
+n\delta
+&amp;\ge \Pr(F\ne\widehat F(M))\\
+&amp;\ge 1-\frac{2^B}{n^n}\\
+&amp;=1-2^{-R}.
+\end{aligned}\]</div>
 <ul>
-<li><code>[DERIVATION]</code> The assumption <code>n delta &lt; 3/4</code> forces <code>R &lt; 2</code>. On <code>0 &lt;= R &lt;= 2</code>, concavity gives <code>1 - 2^(-R) &gt;= 3R/8</code>. Therefore</li>
+<li><code>[DERIVATION]</code> The assumption <span class="math-inline">\(n\delta&lt;3/4\)</span> forces <span class="math-inline">\(R&lt;2\)</span>. On <span class="math-inline">\(0\le R\le2\)</span>, concavity gives <span class="math-inline">\(1-2^{-R}\ge3R/8\)</span>. Therefore</li>
 </ul>
-<pre><code class="language-text">delta &gt;= 3R/(8n) &gt;= R/(3n log n).
-</code></pre>
+<div class="math-display">\[\delta\ge\frac{3R}{8n}\ge\frac{R}{3n\log n}.\]</div>
 <ul>
-<li><code>[SOURCE]</code> Extra side information does not help if it is independent of <code>F</code> after conditioning on <code>J</code>. Randomized protocols obey the same bound by fixing the random coins, applying the deterministic result, and averaging.</li>
+<li><code>[SOURCE]</code> Extra side information does not help if it is independent of <span class="math-inline">\(F\)</span> after conditioning on <span class="math-inline">\(J\)</span>. Randomized protocols obey the same bound by fixing the random coins, applying the deterministic result, and averaging.</li>
 </ul>
 <h4 id="reducing-one-attention-layer-to-indexing">Reducing one attention layer to indexing</h4>
 <ul>
-<li><code>[DERIVATION · Step 1]</code> Partition the prompt positions into <code>I_f</code>, <code>I_g</code>, and <code>I_a</code>: the table of <code>f</code>, the table of <code>g</code>, and the query block. Let <code>t</code> be the output position.</li>
-<li><code>[DERIVATION · Step 2]</code> At position <code>t</code>, every query vector <code>q_t^(h)</code> depends only on the fixed query template and <code>a</code>. It does not depend on the table values or on the unknown intermediate index <code>g(a)</code>.</li>
-<li><code>[DERIVATION · Step 3]</code> For head <code>h</code>, define unnormalized attention weight <code>w_j^(h) = exp(&lt;q_t^(h),k_j^(h)&gt;/sqrt(d))</code>. The holder of <code>f</code> computes</li>
+<li><code>[DERIVATION · Step 1]</code> Partition the prompt positions into <span class="math-inline">\(I_f\)</span>, <span class="math-inline">\(I_g\)</span>, and <span class="math-inline">\(I_a\)</span>: the table of <span class="math-inline">\(f\)</span>, the table of <span class="math-inline">\(g\)</span>, and the query block. Let <span class="math-inline">\(t\)</span> be the output position.</li>
+<li><code>[DERIVATION · Step 2]</code> At position <span class="math-inline">\(t\)</span>, every query vector <span class="math-inline">\(q_t^{(h)}\)</span> depends only on the fixed query template and <span class="math-inline">\(a\)</span>. It does not depend on the table values or on the unknown intermediate index <span class="math-inline">\(g(a)\)</span>.</li>
+<li><code>[DERIVATION · Step 3]</code> For head <span class="math-inline">\(h\)</span>, define unnormalized attention weight <span class="math-inline">\(w_j^{(h)}=\exp(\langle q_t^{(h)},k_j^{(h)}\rangle/\sqrt d)\)</span>. The holder of <span class="math-inline">\(f\)</span> computes</li>
 </ul>
-<pre><code class="language-text">S_f^(h) = sum_{j in I_f} w_j^(h) v_j^(h)   in R^d,
-Z_f^(h) = sum_{j in I_f} w_j^(h)           in R.
-</code></pre>
+<div class="math-display">\[\begin{aligned}
+S_f^{(h)}&amp;=\sum_{j\in I_f}w_j^{(h)}v_j^{(h)}\in\mathbb{R}^d,\\
+Z_f^{(h)}&amp;=\sum_{j\in I_f}w_j^{(h)}\in\mathbb{R}.
+\end{aligned}\]</div>
 <ul>
-<li><code>[EXPLANATION]</code> <code>S_f^(h)</code> is the part of the softmax numerator contributed by <code>f</code> tokens; <code>Z_f^(h)</code> is their part of the denominator.</li>
-<li><code>[DERIVATION · Step 4]</code> Sending one <code>d</code>-dimensional vector and one scalar for each of <code>H</code> heads costs <code>H(d+1)b = B</code> bits at <code>b</code>-bit precision.</li>
-<li><code>[DERIVATION · Step 5]</code> The receiver already knows <code>g</code>, <code>a</code>, the layout, and the model. It computes corresponding pairs <code>(S_g,Z_g)</code> and <code>(S_a,Z_a)</code> and reconstructs every head exactly:</li>
+<li><code>[EXPLANATION]</code> <span class="math-inline">\(S_f^{(h)}\)</span> is the part of the softmax numerator contributed by <span class="math-inline">\(f\)</span> tokens; <span class="math-inline">\(Z_f^{(h)}\)</span> is their part of the denominator.</li>
+<li><code>[DERIVATION · Step 4]</code> Sending one <span class="math-inline">\(d\)</span>-dimensional vector and one scalar for each of <span class="math-inline">\(H\)</span> heads costs <span class="math-inline">\(H(d+1)b=B\)</span> bits at <span class="math-inline">\(b\)</span>-bit precision.</li>
+<li><code>[DERIVATION · Step 5]</code> The receiver already knows <span class="math-inline">\(g\)</span>, <span class="math-inline">\(a\)</span>, the layout, and the model. It computes corresponding pairs <span class="math-inline">\((S_g,Z_g)\)</span> and <span class="math-inline">\((S_a,Z_a)\)</span> and reconstructs every head exactly:</li>
 </ul>
-<pre><code class="language-text">y_t^(h) = (S_f^(h) + S_g^(h) + S_a^(h))
-          / (Z_f^(h) + Z_g^(h) + Z_a^(h)).
-</code></pre>
+<div class="math-display">\[y_t^{(h)}=
+\frac{S_f^{(h)}+S_g^{(h)}+S_a^{(h)}}
+     {Z_f^{(h)}+Z_g^{(h)}+Z_a^{(h)}}.\]</div>
 <ul>
-<li><code>[DERIVATION · Step 6]</code> The receiver applies the same local map <code>Phi</code> and answer decoder as the original transformer, so the communication protocol reproduces the layer's prediction.</li>
-<li><code>[DERIVATION · Step 7]</code> For uniform <code>g</code>, <code>J = g(a)</code> is uniform and independent of <code>f</code>. The rest of <code>g</code> remains independent of <code>f</code> after conditioning on <code>J</code>, so the indexing lemma applies with message length <code>B</code>.</li>
-<li><code>[CONCLUSION]</code> The layer's error is at least <code>R/(3n log n)</code>. The core obstruction is simultaneity: all heads query the original state, so no head can use another head's newly discovered <code>g(a)</code> to form a second lookup in the same layer.</li>
+<li><code>[DERIVATION · Step 6]</code> The receiver applies the same local map <span class="math-inline">\(\Phi\)</span> and answer decoder as the original transformer, so the communication protocol reproduces the layer's prediction.</li>
+<li><code>[DERIVATION · Step 7]</code> For uniform <span class="math-inline">\(g\)</span>, <span class="math-inline">\(J=g(a)\)</span> is uniform and independent of <span class="math-inline">\(f\)</span>. The rest of <span class="math-inline">\(g\)</span> remains independent of <span class="math-inline">\(f\)</span> after conditioning on <span class="math-inline">\(J\)</span>, so the indexing lemma applies with message length <span class="math-inline">\(B\)</span>.</li>
+<li><code>[CONCLUSION]</code> The layer's error is at least <span class="math-inline">\(R/(3n\log n)\)</span>. The core obstruction is simultaneity: all heads query the original state, so no head can use another head's newly discovered <span class="math-inline">\(g(a)\)</span> to form a second lookup in the same layer.</li>
 </ul>
 <h4 id="iterated-composition-and-cot-theorem-14">Iterated composition and CoT (Theorem 1.4)</h4>
 <ul>
-<li><code>[SOURCE]</code> For functions <code>f_1,...,f_K</code>, set <code>z_0 = a</code> and recursively define <code>z_j = f_j(z_{j-1})</code>. The desired answer is <code>z_K</code>.</li>
-<li><code>[SOURCE]</code> The lecture states, without proving, that sufficiently general iterated composition has a worst-case lower bound of <code>Omega(sqrt(n / (H d b)))</code> CoT steps in this finite-precision model. The underlying argument uses pointer-chasing communication complexity.</li>
-<li><code>[LIMIT]</code> The number of composed functions is allowed to grow with problem size. The theorem does not assert this many steps for every fixed value of <code>K</code>.</li>
-<li><code>[DERIVATION]</code> A constructive upper bound is more direct: write <code>z_1 = f_1(a)</code>, append it, then compute and append <code>z_2 = f_2(z_1)</code>, continuing until <code>z_K</code>. This uses one sequential lookup per function.</li>
+<li><code>[SOURCE]</code> For functions <span class="math-inline">\(f_1,\ldots,f_K\)</span>, set <span class="math-inline">\(z_0=a\)</span> and recursively define <span class="math-inline">\(z_j=f_j(z_{j-1})\)</span>. The desired answer is <span class="math-inline">\(z_K\)</span>.</li>
+<li><code>[SOURCE]</code> The lecture states, without proving, that sufficiently general iterated composition has a worst-case lower bound of <span class="math-inline">\(\Omega\!\left(\sqrt{n/(Hdb)}\right)\)</span> CoT steps in this finite-precision model. The underlying argument uses pointer-chasing communication complexity.</li>
+<li><code>[LIMIT]</code> The number of composed functions is allowed to grow with problem size. The theorem does not assert this many steps for every fixed value of <span class="math-inline">\(K\)</span>.</li>
+<li><code>[DERIVATION]</code> A constructive upper bound is more direct: write <span class="math-inline">\(z_1=f_1(a)\)</span>, append it, then compute and append <span class="math-inline">\(z_2=f_2(z_1)\)</span>, continuing until <span class="math-inline">\(z_K\)</span>. This uses one sequential lookup per function.</li>
 <li><code>[SOURCE]</code> One way to realize an exact lookup is to encode every table key by a distinct binary sign vector. The matching key has a strictly larger inner product with the query than every nonmatching key.</li>
-<li><code>[DERIVATION]</code> Scale the attention scores until the matching row receives weight greater than <code>1/2</code>. If the table values are binary encoded, thresholding each output coordinate at <code>1/2</code> recovers the selected value exactly.</li>
-<li><code>[EXPLANATION]</code> A token that records both the current value and the current stage tells the local map which function table to query next. This makes <code>K</code> sequential steps sufficient under enough precision.</li>
+<li><code>[DERIVATION]</code> Scale the attention scores until the matching row receives weight greater than <span class="math-inline">\(1/2\)</span>. If the table values are binary encoded, thresholding each output coordinate at <span class="math-inline">\(1/2\)</span> recovers the selected value exactly.</li>
+<li><code>[EXPLANATION]</code> A token that records both the current value and the current stage tells the local map which function table to query next. This makes <span class="math-inline">\(K\)</span> sequential steps sufficient under enough precision.</li>
 <li><code>[SYNTHESIS]</code> This result does not claim that every real reasoning task needs a long visible rationale. It supplies a clean case in which sequentially generated state expands the available computation beyond one parallel layer.</li>
 </ul>
 <h2 id="2-speculative-decoding">2. Speculative decoding</h2>
 <h3 id="21-draft-verify-accept-correct">2.1 Draft, verify, accept, correct</h3>
 <ul>
-<li><code>[SOURCE]</code> Let <code>p</code> be the expensive target model and <code>q</code> a cheaper draft model. From prefix <code>s</code>, the draft model proposes <code>gamma</code> tokens sequentially. The target model then evaluates the corresponding draft prefixes together in one causally masked forward pass.</li>
-<li><code>[DEFINITION]</code> If the draft tokens are <code>v_tilde_1,...,v_tilde_gamma</code>, define</li>
+<li><code>[SOURCE]</code> Let <span class="math-inline">\(p\)</span> be the expensive target model and <span class="math-inline">\(q\)</span> a cheaper draft model. From prefix <span class="math-inline">\(s\)</span>, the draft model proposes <span class="math-inline">\(\gamma\)</span> tokens sequentially. The target model then evaluates the corresponding draft prefixes together in one causally masked forward pass.</li>
+<li><code>[DEFINITION]</code> If the draft tokens are <span class="math-inline">\(\tilde v_1,\ldots,\tilde v_\gamma\)</span>, define</li>
 </ul>
-<pre><code class="language-text">q_i(.) = q(. | s v_tilde_1 ... v_tilde_{i-1}),
-p_i(.) = p(. | s v_tilde_1 ... v_tilde_{i-1}).
-</code></pre>
+<div class="math-display">\[\begin{aligned}
+q_i(\cdot)&amp;=q(\cdot\mid s\tilde v_1\cdots\tilde v_{i-1}),\\
+p_i(\cdot)&amp;=p(\cdot\mid s\tilde v_1\cdots\tilde v_{i-1}).
+\end{aligned}\]</div>
 <ul>
-<li><code>[SOURCE]</code> The target also evaluates <code>p_{gamma+1}</code> at the prefix containing the entire draft. A causal mask lets one target forward pass produce all <code>gamma+1</code> next-token distributions once the proposed block is known.</li>
+<li><code>[SOURCE]</code> The target also evaluates <span class="math-inline">\(p_{\gamma+1}\)</span> at the prefix containing the entire draft. A causal mask lets one target forward pass produce all <span class="math-inline">\(\gamma+1\)</span> next-token distributions once the proposed block is known.</li>
 </ul>
 <h4 id="one-complete-speculative-iteration">One complete speculative iteration</h4>
 <ul>
-<li><code>[ALGORITHM · Draft]</code> For <code>i = 1,...,gamma</code>, sample <code>v_tilde_i ~ q_i</code>. These draft steps remain sequential because proposal <code>i</code> conditions on earlier proposals.</li>
-<li><code>[ALGORITHM · Verify]</code> Evaluate <code>p_1,...,p_{gamma+1}</code> together with the target model.</li>
-<li><code>[ALGORITHM · Test]</code> At position <code>i</code>, draw a fresh <code>U_i ~ Uniform[0,1]</code>. Accept <code>v_tilde_i</code> when</li>
+<li><code>[ALGORITHM · Draft]</code> For <span class="math-inline">\(i=1,\ldots,\gamma\)</span>, sample <span class="math-inline">\(\tilde v_i\sim q_i\)</span>. These draft steps remain sequential because proposal <span class="math-inline">\(i\)</span> conditions on earlier proposals.</li>
+<li><code>[ALGORITHM · Verify]</code> Evaluate <span class="math-inline">\(p_1,\ldots,p_{\gamma+1}\)</span> together with the target model.</li>
+<li><code>[ALGORITHM · Test]</code> At position <span class="math-inline">\(i\)</span>, draw a fresh <span class="math-inline">\(U_i\sim\operatorname{Uniform}[0,1]\)</span>. Accept <span class="math-inline">\(\tilde v_i\)</span> when</li>
 </ul>
-<pre><code class="language-text">U_i &lt;= min(1, p_i(v_tilde_i) / q_i(v_tilde_i)).
-</code></pre>
+<div class="math-display">\[U_i\le\min\!\left(1,\frac{p_i(\tilde v_i)}{q_i(\tilde v_i)}\right).\]</div>
 <ul>
 <li><code>[ALGORITHM · Correct]</code> At the first rejection, form</li>
 </ul>
-<pre><code class="language-text">r_i(v) = [p_i(v) - q_i(v)]_+
-         / sum_u [p_i(u) - q_i(u)]_+.
-</code></pre>
+<div class="math-display">\[r_i(v)=\frac{[p_i(v)-q_i(v)]_+}{\sum_u[p_i(u)-q_i(u)]_+}.\]</div>
 <ul>
-<li><code>[ALGORITHM · Return after rejection]</code> Sample <code>w ~ r_i</code>, emit the earlier accepted drafts followed by <code>w</code>, and discard every later draft token.</li>
-<li><code>[ALGORITHM]</code> If all <code>gamma</code> proposals are accepted, sample one bonus token directly from the target distribution. An iteration therefore emits between one and <code>gamma + 1</code> tokens.</li>
+<li><code>[ALGORITHM · Return after rejection]</code> Sample <span class="math-inline">\(w\sim r_i\)</span>, emit the earlier accepted drafts followed by <span class="math-inline">\(w\)</span>, and discard every later draft token.</li>
+<li><code>[ALGORITHM]</code> If all <span class="math-inline">\(\gamma\)</span> proposals are accepted, sample one bonus token directly from the target distribution. An iteration therefore emits between one and <span class="math-inline">\(\gamma+1\)</span> tokens.</li>
 <li><code>[INTUITION]</code> The draft model guesses a short future and the target checks that future in parallel. Agreement creates progress; disagreement invokes an exact correction rather than an approximate fallback.</li>
 </ul>
 <h3 id="22-why-the-sampler-is-exact">2.2 Why the sampler is exact</h3>
 <h4 id="one-token-correctness-lemma-lemma-21">One-token correctness lemma (Lemma 2.1)</h4>
 <ul>
-<li><code>[SETUP]</code> Ignore prefixes temporarily and consider two distributions <code>p</code> and <code>q</code> on the same finite vocabulary. Propose <code>V ~ q</code>, accept with probability <code>min(1,p(V)/q(V))</code>, and on rejection draw from the residual distribution.</li>
-<li><code>[DERIVATION · Step 1]</code> The probability that value <code>v</code> is both proposed and accepted is</li>
+<li><code>[SETUP]</code> Ignore prefixes temporarily and consider two distributions <span class="math-inline">\(p\)</span> and <span class="math-inline">\(q\)</span> on the same finite vocabulary. Propose <span class="math-inline">\(V\sim q\)</span>, accept with probability <span class="math-inline">\(\min(1,p(V)/q(V))\)</span>, and on rejection draw from the residual distribution.</li>
+<li><code>[DERIVATION · Step 1]</code> The probability that value <span class="math-inline">\(v\)</span> is both proposed and accepted is</li>
 </ul>
-<pre><code class="language-text">q(v) min(1, p(v)/q(v)) = min(p(v), q(v)).
-</code></pre>
+<div class="math-display">\[q(v)\min\!\left(1,\frac{p(v)}{q(v)}\right)=\min(p(v),q(v)).\]</div>
 <ul>
-<li><code>[EXPLANATION]</code> If <code>p(v) &gt;= q(v)</code>, every proposal of <code>v</code> is accepted and contributes <code>q(v)</code>. If <code>p(v) &lt; q(v)</code>, only the fraction <code>p(v)/q(v)</code> is accepted and contributes <code>p(v)</code>. If <code>q(v)=0</code>, <code>v</code> is never proposed, so the ratio is never evaluated on that event.</li>
+<li><code>[EXPLANATION]</code> If <span class="math-inline">\(p(v)\ge q(v)\)</span>, every proposal of <span class="math-inline">\(v\)</span> is accepted and contributes <span class="math-inline">\(q(v)\)</span>. If <span class="math-inline">\(p(v)&lt;q(v)\)</span>, only the fraction <span class="math-inline">\(p(v)/q(v)\)</span> is accepted and contributes <span class="math-inline">\(p(v)\)</span>. If <span class="math-inline">\(q(v)=0\)</span>, <span class="math-inline">\(v\)</span> is never proposed, so the ratio is never evaluated on that event.</li>
 <li><code>[DERIVATION · Step 2]</code> Sum the accepted mass:</li>
 </ul>
-<pre><code class="language-text">beta = sum_v min(p(v),q(v)).
-</code></pre>
+<div class="math-display">\[\beta=\sum_v\min(p(v),q(v)).\]</div>
 <ul>
-<li><code>[DERIVATION · Step 3]</code> Use <code>min(a,b) = (a+b-|a-b|)/2</code> and the fact that both distributions sum to one:</li>
+<li><code>[DERIVATION · Step 3]</code> Use <span class="math-inline">\(\min(a,b)=(a+b-|a-b|)/2\)</span> and the fact that both distributions sum to one:</li>
 </ul>
-<pre><code class="language-text">beta = 1 - (1/2) sum_v |p(v)-q(v)|
-     = 1 - TV(p,q).
-</code></pre>
+<div class="math-display">\[\begin{aligned}
+\beta&amp;=1-\frac12\sum_v|p(v)-q(v)|\\
+&amp;=1-\operatorname{TV}(p,q).
+\end{aligned}\]</div>
 <ul>
-<li><code>[EXPLANATION]</code> The rejection probability is therefore <code>1-beta = TV(p,q)</code>. A better draft model overlaps more strongly with the target and is rejected less often.</li>
+<li><code>[EXPLANATION]</code> The rejection probability is therefore <span class="math-inline">\(1-\beta=\operatorname{TV}(p,q)\)</span>. A better draft model overlaps more strongly with the target and is rejected less often.</li>
 <li><code>[DERIVATION · Step 4]</code> The total positive difference equals the missing target mass:</li>
 </ul>
-<pre><code class="language-text">sum_v [p(v)-q(v)]_+ = 1 - beta.
-</code></pre>
+<div class="math-display">\[\sum_v[p(v)-q(v)]_+=1-\beta.\]</div>
 <ul>
-<li><code>[EXPLANATION]</code> The positive and negative differences between two normalized distributions have equal total magnitude. The positive part is precisely the mass target <code>p</code> has that was not supplied by accepted proposals.</li>
+<li><code>[EXPLANATION]</code> The positive and negative differences between two normalized distributions have equal total magnitude. The positive part is precisely the mass target <span class="math-inline">\(p\)</span> has that was not supplied by accepted proposals.</li>
 <li><code>[DERIVATION · Step 5]</code> Normalize that missing mass:</li>
 </ul>
-<pre><code class="language-text">r(v) = [p(v)-q(v)]_+ / (1-beta).
-</code></pre>
+<div class="math-display">\[r(v)=\frac{[p(v)-q(v)]_+}{1-\beta}.\]</div>
 <ul>
-<li><code>[DERIVATION · Step 6]</code> Add the two mutually exclusive ways to output <code>v</code>:</li>
+<li><code>[DERIVATION · Step 6]</code> Add the two mutually exclusive ways to output <span class="math-inline">\(v\)</span>:</li>
 </ul>
-<pre><code class="language-text">P(output=v)
-  = P(accept v) + P(reject) P(correction=v | reject)
-  = min(p(v),q(v)) + (1-beta) r(v)
-  = min(p(v),q(v)) + [p(v)-q(v)]_+
-  = p(v).
-</code></pre>
+<div class="math-display">\[\begin{aligned}
+\Pr(\text{output}=v)
+&amp;=\Pr(\text{accept }v)+\Pr(\text{reject})\Pr(\text{correction}=v\mid\text{reject})\\
+&amp;=\min(p(v),q(v))+(1-\beta)r(v)\\
+&amp;=\min(p(v),q(v))+[p(v)-q(v)]_+\\
+&amp;=p(v).
+\end{aligned}\]</div>
 <ul>
-<li><code>[EDGE CASE]</code> If <code>beta=1</code>, then <code>p=q</code>. Rejection has probability zero, so the residual distribution is never needed. Whenever rejection can occur, <code>1-beta&gt;0</code>, which makes the denominator valid.</li>
+<li><code>[EDGE CASE]</code> If <span class="math-inline">\(\beta=1\)</span>, then <span class="math-inline">\(p=q\)</span>. Rejection has probability zero, so the residual distribution is never needed. Whenever rejection can occur, <span class="math-inline">\(1-\beta&gt;0\)</span>, which makes the denominator valid.</li>
 </ul>
 <h4 id="sequence-level-correctness-proposition-22">Sequence-level correctness (Proposition 2.2)</h4>
 <ul>
-<li><code>[THEOREM]</code> Repeated speculative decoding produces exactly the target autoregressive law. For target length <code>T</code>, the probability of tokens <code>(v_1,...,v_T)</code> after prompt <code>s_0</code> is</li>
+<li><code>[THEOREM]</code> Repeated speculative decoding produces exactly the target autoregressive law. For target length <span class="math-inline">\(T\)</span>, the probability of tokens <span class="math-inline">\((v_1,\ldots,v_T)\)</span> after prompt <span class="math-inline">\(s_0\)</span> is</li>
 </ul>
-<pre><code class="language-text">product_{t=1}^T p(v_t | s_0 v_1 ... v_{t-1}).
-</code></pre>
+<div class="math-display">\[\prod_{t=1}^T p(v_t\mid s_0v_1\cdots v_{t-1}).\]</div>
 <ul>
 <li><code>[DERIVATION · Step 1]</code> Condition on any emitted prefix and on any internal state compatible with that prefix: which drafts were sampled, which earlier proposals passed, and whether the next position is a correction or bonus position.</li>
-<li><code>[DERIVATION · Step 2]</code> At a reached draft position, the next proposal is still distributed as the local <code>q</code>, and its acceptance uniform is fresh. The one-token lemma says the next emitted token has the local target distribution <code>p</code>.</li>
+<li><code>[DERIVATION · Step 2]</code> At a reached draft position, the next proposal is still distributed as the local <span class="math-inline">\(q\)</span>, and its acceptance uniform is fresh. The one-token lemma says the next emitted token has the local target distribution <span class="math-inline">\(p\)</span>.</li>
 <li><code>[DERIVATION · Step 3]</code> At a bonus position, the algorithm samples directly from the same local target distribution.</li>
-<li><code>[DERIVATION · Step 4]</code> Every compatible internal state therefore gives the same conditional law <code>p</code> for the next emitted token. Averaging over internal states does not change that law.</li>
+<li><code>[DERIVATION · Step 4]</code> Every compatible internal state therefore gives the same conditional law <span class="math-inline">\(p\)</span> for the next emitted token. Averaging over internal states does not change that law.</li>
 <li><code>[DERIVATION · Step 5]</code> Induct over output positions. Each conditional probability is the appropriate target next-token probability; multiplying them gives the target sequence probability.</li>
 <li><code>[LIMIT]</code> Draft tokens after the first rejection must be discarded because their precomputed target distributions condition on the rejected token, which is absent from the corrected output prefix.</li>
 </ul>
 <h3 id="23-expected-progress-and-speedup">2.3 Expected progress and speedup</h3>
 <h4 id="prefix-dependent-acceptance">Prefix-dependent acceptance</h4>
 <ul>
-<li><code>[DEFINITION]</code> At prefix <code>s</code>, define the overlap</li>
+<li><code>[DEFINITION]</code> At prefix <span class="math-inline">\(s\)</span>, define the overlap</li>
 </ul>
-<pre><code class="language-text">beta(s) = sum_v min(p(v | s), q(v | s)).
-</code></pre>
+<div class="math-display">\[\beta(s)=\sum_v\min\bigl(p(v\mid s),q(v\mid s)\bigr).\]</div>
 <ul>
-<li><code>[EXPLANATION]</code> By the one-token lemma, <code>beta(s)</code> is exactly the probability that a draft proposal at prefix <code>s</code> is accepted.</li>
-<li><code>[DEFINITION]</code> Let <code>A_i</code> be the event that proposal <code>i</code> passes. Let <code>R_i = A_1 cap ... cap A_{i-1}</code> be the event that position <code>i</code> is reached, with <code>R_1</code> always true. Let <code>S_i</code> be the random draft prefix present at that position.</li>
+<li><code>[EXPLANATION]</code> By the one-token lemma, <span class="math-inline">\(\beta(s)\)</span> is exactly the probability that a draft proposal at prefix <span class="math-inline">\(s\)</span> is accepted.</li>
+<li><code>[DEFINITION]</code> Let <span class="math-inline">\(A_i\)</span> be the event that proposal <span class="math-inline">\(i\)</span> passes. Let <span class="math-inline">\(R_i=A_1\cap\cdots\cap A_{i-1}\)</span> be the event that position <span class="math-inline">\(i\)</span> is reached, with <span class="math-inline">\(R_1\)</span> always true. Let <span class="math-inline">\(S_i\)</span> be the random draft prefix present at that position.</li>
 <li><code>[ASSUMPTION]</code> For the runtime calculation, suppose every reached position has the same conditional mean overlap:</li>
 </ul>
-<pre><code class="language-text">E[beta(S_i) | R_i] = alpha.
-</code></pre>
+<div class="math-display">\[\mathbb{E}[\beta(S_i)\mid R_i]=\alpha.\]</div>
 <ul>
-<li><code>[DERIVATION]</code> Conditional on <code>S_i</code>, the probability of passing is <code>beta(S_i)</code>. Taking the conditional expectation over reached prefixes gives <code>P(A_i | R_i) = alpha</code>.</li>
+<li><code>[DERIVATION]</code> Conditional on <span class="math-inline">\(S_i\)</span>, the probability of passing is <span class="math-inline">\(\beta(S_i)\)</span>. Taking the conditional expectation over reached prefixes gives <span class="math-inline">\(\Pr(A_i\mid R_i)=\alpha\)</span>.</li>
 </ul>
 <h4 id="expected-tokens-per-iteration">Expected tokens per iteration</h4>
 <ul>
-<li><code>[DEFINITION]</code> Let <code>L</code> be the number of consecutive accepted drafts, so <code>L</code> ranges from <code>0</code> to <code>gamma</code>. Let <code>N = L+1</code> be the number of emitted tokens, including either a correction token or the all-accepted bonus token.</li>
-<li><code>[DERIVATION · Step 1]</code> Reaching at least <code>j</code> acceptances means that the first <code>j</code> acceptance events all occurred:</li>
+<li><code>[DEFINITION]</code> Let <span class="math-inline">\(L\)</span> be the number of consecutive accepted drafts, so <span class="math-inline">\(L\)</span> ranges from <span class="math-inline">\(0\)</span> to <span class="math-inline">\(\gamma\)</span>. Let <span class="math-inline">\(N=L+1\)</span> be the number of emitted tokens, including either a correction token or the all-accepted bonus token.</li>
+<li><code>[DERIVATION · Step 1]</code> Reaching at least <span class="math-inline">\(j\)</span> acceptances means that the first <span class="math-inline">\(j\)</span> acceptance events all occurred:</li>
 </ul>
-<pre><code class="language-text">P(L &gt;= j) = P(A_1 cap ... cap A_j).
-</code></pre>
+<div class="math-display">\[\Pr(L\ge j)=\Pr(A_1\cap\cdots\cap A_j).\]</div>
 <ul>
-<li><code>[DERIVATION · Step 2]</code> Repeated conditioning uses <code>P(A_i | R_i)=alpha</code> at every reached position:</li>
+<li><code>[DERIVATION · Step 2]</code> Repeated conditioning uses <span class="math-inline">\(\Pr(A_i\mid R_i)=\alpha\)</span> at every reached position:</li>
 </ul>
-<pre><code class="language-text">P(L &gt;= j) = alpha^j,     0 &lt;= j &lt;= gamma.
-</code></pre>
+<div class="math-display">\[\Pr(L\ge j)=\alpha^j,\qquad 0\le j\le\gamma.\]</div>
 <ul>
 <li><code>[EXPLANATION]</code> This does not require the acceptance events to be independent. The constant conditional mean assumption is sufficient.</li>
-<li><code>[DERIVATION · Step 3]</code> For an integer-valued variable <code>N</code> in <code>{1,...,gamma+1}</code>, use the tail-sum identity</li>
+<li><code>[DERIVATION · Step 3]</code> For an integer-valued variable <span class="math-inline">\(N\in\{1,\ldots,\gamma+1\}\)</span>, use the tail-sum identity</li>
 </ul>
-<pre><code class="language-text">N = sum_{k=1}^{gamma+1} 1{N &gt;= k}.
-</code></pre>
+<div class="math-display">\[N=\sum_{k=1}^{\gamma+1}\mathbf{1}\{N\ge k\}.\]</div>
 <ul>
 <li><code>[DERIVATION · Step 4]</code> Take expectations and substitute the tail probabilities:</li>
 </ul>
-<pre><code class="language-text">E[N] = sum_{j=0}^{gamma} P(L &gt;= j)
-     = sum_{j=0}^{gamma} alpha^j
-     = (1 - alpha^(gamma+1)) / (1-alpha),   alpha &lt; 1.
-</code></pre>
+<div class="math-display">\[\begin{aligned}
+\mathbb{E}[N]
+&amp;=\sum_{j=0}^{\gamma}\Pr(L\ge j)\\
+&amp;=\sum_{j=0}^{\gamma}\alpha^j\\
+&amp;=\frac{1-\alpha^{\gamma+1}}{1-\alpha},\qquad \alpha&lt;1.
+\end{aligned}\]</div>
 <ul>
-<li><code>[EDGE CASE]</code> If <code>alpha=1</code>, every proposal is accepted and <code>E[N]=gamma+1</code>.</li>
+<li><code>[EDGE CASE]</code> If <span class="math-inline">\(\alpha=1\)</span>, every proposal is accepted and <span class="math-inline">\(\mathbb{E}[N]=\gamma+1\)</span>.</li>
 </ul>
 <h4 id="cost-model">Cost model</h4>
 <ul>
-<li><code>[DEFINITION]</code> Let <code>T_p</code> be the wall-clock time for one ordinary target-model step and <code>T_q</code> the time for one draft-model step. Define relative draft cost <code>c = T_q/T_p</code>.</li>
-<li><code>[ASSUMPTION]</code> With sufficient parallel hardware, verifying the whole draft and computing the bonus distribution takes approximately one target-step time <code>T_p</code>.</li>
-<li><code>[DERIVATION]</code> The draft still requires <code>gamma</code> sequential calls. Hence one iteration costs</li>
+<li><code>[DEFINITION]</code> Let <span class="math-inline">\(T_p\)</span> be the wall-clock time for one ordinary target-model step and <span class="math-inline">\(T_q\)</span> the time for one draft-model step. Define relative draft cost <span class="math-inline">\(c=T_q/T_p\)</span>.</li>
+<li><code>[ASSUMPTION]</code> With sufficient parallel hardware, verifying the whole draft and computing the bonus distribution takes approximately one target-step time <span class="math-inline">\(T_p\)</span>.</li>
+<li><code>[DERIVATION]</code> The draft still requires <span class="math-inline">\(\gamma\)</span> sequential calls. Hence one iteration costs</li>
 </ul>
-<pre><code class="language-text">gamma T_q + T_p = (1 + gamma c) T_p.
-</code></pre>
+<div class="math-display">\[\gamma T_q+T_p=(1+\gamma c)T_p.\]</div>
 <h4 id="wall-clock-speedup-theorem-theorem-23">Wall-clock speedup theorem (Theorem 2.3)</h4>
 <ul>
-<li><code>[DERIVATION · Step 1]</code> Baseline decoding spends <code>T_p</code> per output token.</li>
-<li><code>[DERIVATION · Step 2]</code> Speculative decoding spends <code>(1+gamma c)T_p</code> per iteration and emits <code>E[N]</code> tokens on average, so its long-run time per token is</li>
+<li><code>[DERIVATION · Step 1]</code> Baseline decoding spends <span class="math-inline">\(T_p\)</span> per output token.</li>
+<li><code>[DERIVATION · Step 2]</code> Speculative decoding spends <span class="math-inline">\((1+\gamma c)T_p\)</span> per iteration and emits <span class="math-inline">\(\mathbb{E}[N]\)</span> tokens on average, so its long-run time per token is</li>
 </ul>
-<pre><code class="language-text">(1+gamma c)T_p / E[N].
-</code></pre>
+<div class="math-display">\[\frac{(1+\gamma c)T_p}{\mathbb{E}[N]}.\]</div>
 <ul>
 <li><code>[DERIVATION · Step 3]</code> Divide baseline time per token by speculative time per token:</li>
 </ul>
-<pre><code class="language-text">Speedup = E[N] / (1+gamma c)
-        = (1-alpha^(gamma+1))
-          / ((1-alpha)(1+gamma c)).
-</code></pre>
+<div class="math-display">\[\operatorname{Speedup}
+=\frac{\mathbb{E}[N]}{1+\gamma c}
+=\frac{1-\alpha^{\gamma+1}}{(1-\alpha)(1+\gamma c)}.\]</div>
 <ul>
-<li><code>[EDGE CASE]</code> At <code>alpha=1</code>, the expression is understood by continuity and becomes <code>(gamma+1)/(1+gamma c)</code>.</li>
-<li><code>[EXPLANATION]</code> The theorem compares total time with total progress over many complete iterations. It does not average the random per-iteration ratio <code>(1+gamma c)T_p/N</code>, which would answer a different question.</li>
-<li><code>[EXAMPLE]</code> If <code>alpha=0.8</code>, <code>gamma=4</code>, and <code>c=0.1</code>, then</li>
+<li><code>[EDGE CASE]</code> At <span class="math-inline">\(\alpha=1\)</span>, the expression is understood by continuity and becomes <span class="math-inline">\((\gamma+1)/(1+\gamma c)\)</span>.</li>
+<li><code>[EXPLANATION]</code> The theorem compares total time with total progress over many complete iterations. It does not average the random per-iteration ratio <span class="math-inline">\((1+\gamma c)T_p/N\)</span>, which would answer a different question.</li>
+<li><code>[EXAMPLE]</code> If <span class="math-inline">\(\alpha=0.8\)</span>, <span class="math-inline">\(\gamma=4\)</span>, and <span class="math-inline">\(c=0.1\)</span>, then</li>
 </ul>
-<pre><code class="language-text">E[N] = 1 + 0.8 + 0.8^2 + 0.8^3 + 0.8^4
-     = 3.3616,
-
-Speedup = 3.3616 / 1.4
-        ≈ 2.40x.
-</code></pre>
+<div class="math-display">\[\begin{aligned}
+\mathbb{E}[N]&amp;=1+0.8+0.8^2+0.8^3+0.8^4=3.3616,\\
+\operatorname{Speedup}&amp;=\frac{3.3616}{1.4}\approx2.40\times.
+\end{aligned}\]</div>
 <ul>
 <li><code>[LIMIT]</code> This is not a hardware-independent promise. The model neglects acceptance-test overhead, memory traffic, batching effects, and a final truncated iteration. Verification performs arithmetic at every drafted position even when wall-clock time is parallelized.</li>
 </ul>
@@ -510,63 +499,59 @@ Speedup = 3.3616 / 1.4
 </ul>
 <h4 id="hamming-distance-entropy-lemma-lemma-a1">Hamming-distance entropy lemma (Lemma A.1)</h4>
 <ul>
-<li><code>[THEOREM]</code> Let <code>U</code> be uniform on a nonempty set <code>S subseteq [n]^n</code>. For any fixed vector <code>z in [n]^n</code>,</li>
+<li><code>[THEOREM]</code> Let <span class="math-inline">\(U\)</span> be uniform on a nonempty set <span class="math-inline">\(S\subseteq[n]^n\)</span>. For any fixed vector <span class="math-inline">\(z\in[n]^n\)</span>,</li>
 </ul>
-<pre><code class="language-text">log |S| &lt;= 3 log n E[d_H(U,z)].
-</code></pre>
+<div class="math-display">\[\log|S|\le3\log n\,\mathbb{E}[d_H(U,z)].\]</div>
 <ul>
-<li><code>[DEFINITION]</code> <code>d_H(U,z)</code> counts the coordinates where <code>U</code> and <code>z</code> differ. Write <code>s=|S|</code> and <code>D=E[d_H(U,z)]</code>.</li>
-<li><code>[CASE s=1]</code> The left side is zero, so the inequality follows from <code>D&gt;=0</code>.</li>
-<li><code>[CASE s=2 or 3]</code> At most one element of <code>S</code> can equal <code>z</code>; therefore <code>D &gt;= (s-1)/s</code>. Directly checking <code>s=2,3</code> gives <code>log s &lt;= 3(s-1)/s &lt;= 3D log n</code>.</li>
-<li><code>[CASE s&gt;=4 · Step 1]</code> The same observation gives <code>D &gt;= (s-1)/s &gt;= 3/4</code>.</li>
-<li><code>[CASE s&gt;=4 · Step 2]</code> Let <code>e_j = P(U_j != z_j)</code>. To describe coordinate <code>U_j</code>, first record whether it equals <code>z_j</code>; if not, record one of at most <code>n-1</code> alternatives. Therefore</li>
+<li><code>[DEFINITION]</code> <span class="math-inline">\(d_H(U,z)\)</span> counts the coordinates where <span class="math-inline">\(U\)</span> and <span class="math-inline">\(z\)</span> differ. Write <span class="math-inline">\(s=|S|\)</span> and <span class="math-inline">\(D=\mathbb{E}[d_H(U,z)]\)</span>.</li>
+<li><code>[CASE]</code> When <span class="math-inline">\(s=1\)</span>, the left side is zero, so the inequality follows from <span class="math-inline">\(D\ge0\)</span>.</li>
+<li><code>[CASE]</code> When <span class="math-inline">\(s=2\)</span> or <span class="math-inline">\(s=3\)</span>, at most one element of <span class="math-inline">\(S\)</span> can equal <span class="math-inline">\(z\)</span>; therefore <span class="math-inline">\(D\ge(s-1)/s\)</span>. Directly checking <span class="math-inline">\(s=2,3\)</span> gives <span class="math-inline">\(\log s\le3(s-1)/s\le3D\log n\)</span>.</li>
+<li><code>[CASE · Step 1]</code> For <span class="math-inline">\(s\ge4\)</span>, the same observation gives <span class="math-inline">\(D\ge(s-1)/s\ge3/4\)</span>.</li>
+<li><code>[CASE · Step 2]</code> Continue with <span class="math-inline">\(s\ge4\)</span>. Let <span class="math-inline">\(e_j=\Pr(U_j\ne z_j)\)</span>. To describe coordinate <span class="math-inline">\(U_j\)</span>, first record whether it equals <span class="math-inline">\(z_j\)</span>; if not, record one of at most <span class="math-inline">\(n-1\)</span> alternatives. Therefore</li>
 </ul>
-<pre><code class="language-text">H(U_j) &lt;= h_2(e_j) + e_j log(n-1).
-</code></pre>
+<div class="math-display">\[H(U_j)\le h_2(e_j)+e_j\log(n-1).\]</div>
 <ul>
-<li><code>[CASE s&gt;=4 · Step 3]</code> Because <code>U</code> is uniform on <code>S</code>, <code>H(U)=log s</code>. Entropy subadditivity and concavity of <code>h_2</code> yield</li>
+<li><code>[CASE · Step 3]</code> Because <span class="math-inline">\(U\)</span> is uniform on <span class="math-inline">\(S\)</span>, <span class="math-inline">\(H(U)=\log s\)</span>. Entropy subadditivity and concavity of <span class="math-inline">\(h_2\)</span> yield</li>
 </ul>
-<pre><code class="language-text">log s = H(U)
-      &lt;= sum_j H(U_j)
-      &lt;= n h_2(D/n) + D log(n-1).
-</code></pre>
+<div class="math-display">\[\begin{aligned}
+\log s=H(U)
+&amp;\le\sum_jH(U_j)\\
+&amp;\le n\,h_2(D/n)+D\log(n-1).
+\end{aligned}\]</div>
 <ul>
-<li><code>[EXPLANATION]</code> The equality <code>sum_j e_j = D</code> converts coordinate-wise error probabilities into expected Hamming distance. Jensen's inequality moves their average inside the concave binary entropy function.</li>
-<li><code>[CASE s&gt;=4 · Step 4]</code> Apply <code>h_2(u) &lt;= u log(e/u)</code>:</li>
+<li><code>[EXPLANATION]</code> The equality <span class="math-inline">\(\sum_j e_j=D\)</span> converts coordinate-wise error probabilities into expected Hamming distance. Jensen's inequality moves their average inside the concave binary entropy function.</li>
+<li><code>[CASE · Step 4]</code> Apply <span class="math-inline">\(h_2(u)\le u\log(e/u)\)</span>:</li>
 </ul>
-<pre><code class="language-text">log s &lt;= D log(e n(n-1)/D).
-</code></pre>
+<div class="math-display">\[\log s\le D\log\!\left(\frac{en(n-1)}D\right).\]</div>
 <ul>
-<li><code>[CASE s&gt;=4 · Step 5]</code> Since <code>D&gt;=3/4</code> and <code>n&gt;=2</code>, the logarithm's argument is at most <code>n^3</code>, giving <code>log s &lt;= 3D log n</code>.</li>
+<li><code>[CASE · Step 5]</code> Since <span class="math-inline">\(D\ge3/4\)</span> and <span class="math-inline">\(n\ge2\)</span>, the logarithm's argument is at most <span class="math-inline">\(n^3\)</span>, giving <span class="math-inline">\(\log s\le3D\log n\)</span>.</li>
 </ul>
 <h4 id="apply-the-lemma-to-the-message-classes">Apply the lemma to the message classes</h4>
 <ul>
-<li><code>[DERIVATION · Step 1]</code> For a fixed message value <code>m</code>, let <code>S_m</code> be the set of tables producing that message. Conditional on <code>M=m</code>, the random table <code>F</code> is uniform on <code>S_m</code>.</li>
-<li><code>[DERIVATION · Step 2]</code> Let <code>z_m(j)</code> be a most likely value of coordinate <code>F_j</code> under this conditional distribution. This coordinate-wise choice minimizes the probability of error for a uniformly requested index.</li>
+<li><code>[DERIVATION · Step 1]</code> For a fixed message value <span class="math-inline">\(m\)</span>, let <span class="math-inline">\(S_m\)</span> be the set of tables producing that message. Conditional on <span class="math-inline">\(M=m\)</span>, the random table <span class="math-inline">\(F\)</span> is uniform on <span class="math-inline">\(S_m\)</span>.</li>
+<li><code>[DERIVATION · Step 2]</code> Let <span class="math-inline">\(z_m(j)\)</span> be a most likely value of coordinate <span class="math-inline">\(F_j\)</span> under this conditional distribution. This coordinate-wise choice minimizes the probability of error for a uniformly requested index.</li>
 <li><code>[DERIVATION · Step 3]</code> The conditional error is</li>
 </ul>
-<pre><code class="language-text">delta_m = (1/n) E[d_H(F,z_m) | M=m].
-</code></pre>
+<div class="math-display">\[\delta_m=\frac1n\mathbb{E}[d_H(F,z_m)\mid M=m].\]</div>
 <ul>
 <li><code>[DERIVATION · Step 4]</code> Apply the Hamming-distance lemma inside each message class:</li>
 </ul>
-<pre><code class="language-text">H(F | M=m) = log |S_m| &lt;= 3 n log n delta_m.
-</code></pre>
+<div class="math-display">\[H(F\mid M=m)=\log|S_m|\le3n\log n\,\delta_m.\]</div>
 <ul>
-<li><code>[DERIVATION · Step 5]</code> Because <code>M</code> is determined by <code>F</code>,</li>
+<li><code>[DERIVATION · Step 5]</code> Because <span class="math-inline">\(M\)</span> is determined by <span class="math-inline">\(F\)</span>,</li>
 </ul>
-<pre><code class="language-text">H(F | M) = H(F) - H(M)
-         &gt;= n log n - B
-          = R.
-</code></pre>
+<div class="math-display">\[\begin{aligned}
+H(F\mid M)&amp;=H(F)-H(M)\\
+&amp;\ge n\log n-B\\
+&amp;=R.
+\end{aligned}\]</div>
 <ul>
 <li><code>[CONCLUSION]</code> Average the per-message upper bound and compare it with the lower bound:</li>
 </ul>
-<pre><code class="language-text">R &lt;= H(F|M) &lt;= 3 n log n delta.
-</code></pre>
+<div class="math-display">\[R\le H(F\mid M)\le3n\log n\,\delta.\]</div>
 <ul>
-<li><code>[CONCLUSION]</code> Therefore <code>delta &gt;= R/(3n log n)</code>.</li>
-<li><code>[SOURCE]</code> As in the first proof, conditionally independent side information does not change the distribution of <code>F</code> given <code>(M,J)</code>, and randomized protocols are handled by fixing and averaging over their coins.</li>
+<li><code>[CONCLUSION]</code> Therefore <span class="math-inline">\(\delta\ge R/(3n\log n)\)</span>.</li>
+<li><code>[SOURCE]</code> As in the first proof, conditionally independent side information does not change the distribution of <span class="math-inline">\(F\)</span> given <span class="math-inline">\((M,J)\)</span>, and randomized protocols are handled by fixing and averaging over their coins.</li>
 </ul>
 <h2 id="3-connecting-the-two-halves">3. Connecting the two halves</h2>
 <ul>
@@ -585,10 +570,10 @@ Speedup = 3.3616 / 1.4
 <h2 id="5-questions-for-manual-reconstruction">5. Questions for manual reconstruction</h2>
 <ul>
 <li>[ ] Derive the STaR score-function gradient without looking at the lecture PDF.</li>
-<li>[ ] Explain why one attention head cannot use another head's newly discovered <code>g(a)</code> in the same layer.</li>
-<li>[ ] Reconstruct the one-token speculative sampling proof from the overlap mass <code>min(p, q)</code>.</li>
-<li>[ ] Re-derive the tail-sum formula for <code>E[N]</code> and identify every runtime assumption.</li>
-<li>[ ] Test how predicted speedup changes as <code>gamma</code>, <code>alpha</code>, and <code>c</code> vary.</li>
+<li>[ ] Explain why one attention head cannot use another head's newly discovered <span class="math-inline">\(g(a)\)</span> in the same layer.</li>
+<li>[ ] Reconstruct the one-token speculative sampling proof from the overlap mass <span class="math-inline">\(\min(p,q)\)</span>.</li>
+<li>[ ] Re-derive the tail-sum formula for <span class="math-inline">\(\mathbb{E}[N]\)</span> and identify every runtime assumption.</li>
+<li>[ ] Test how predicted speedup changes as <span class="math-inline">\(\gamma\)</span>, <span class="math-inline">\(\alpha\)</span>, and <span class="math-inline">\(c\)</span> vary.</li>
 </ul>
 <h2 id="6-open-questions">6. Open questions</h2>
 <ul>
