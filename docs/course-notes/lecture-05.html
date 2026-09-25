@@ -1,0 +1,396 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A first reconstruction of sparse expert routing, load balancing, empirical power laws, compute-optimal parameter-data allocation, and a linear-regression scaling-law example.">
+  <title>Lecture 05 — Mixture-of-Experts and Scaling Laws — CS 395T</title>
+  <link rel="stylesheet" href="../assets/styles.css">
+  <script>
+    window.MathJax = {
+      tex: {
+        processEscapes: true
+      },
+      svg: { fontCache: 'global' }
+    };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js" defer></script>
+  <script src="../assets/app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header">
+    <a class="wordmark" href="../index.html"><span>CS 395T</span><small>Learning &amp; research notebook</small></a>
+    <button class="menu-button" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button>
+    <nav id="site-nav" class="site-nav" aria-label="Primary navigation">
+      <a href="../structure.html">Structure</a>
+      <a href="../index.html#notes">Index</a>
+      <a href="../method.html">Writing guide</a>
+      <a href="../index.html#about">About</a>
+    </nav>
+  </header>
+
+  <main id="main" class="note-shell">
+    <header class="note-hero">
+      <div class="template-banner learning-banner">
+        <strong>LEARNING NOTE · DRAFT</strong>
+        <span>Work in progress</span>
+      </div>
+      <p class="eyebrow">25 SEP 2026 · DRAFT</p>
+      <h1>Lecture 05 — Mixture-of-Experts and Scaling Laws</h1>
+      <p class="note-abstract">A first reconstruction of sparse expert routing, load balancing, empirical power laws, compute-optimal parameter-data allocation, and a linear-regression scaling-law example.</p>
+      <ul class="tag-list" aria-label="Topics"><li>mixture of experts</li><li>routing</li><li>load balancing</li><li>scaling laws</li><li>compute optimality</li></ul>
+    </header>
+
+    <div class="note-layout">
+      <aside class="note-toc" aria-label="On this page">
+        <p class="aside-label">ON THIS PAGE</p>
+        <div class="toc">
+<ul>
+<li><a href="#lecture-context">Lecture context</a></li>
+<li><a href="#reading-map">Reading map</a></li>
+<li><a href="#1-mixture-of-experts-layers">1. Mixture-of-experts layers</a><ul>
+<li><a href="#11-replacing-the-dense-mlp">1.1 Replacing the dense MLP</a></li>
+<li><a href="#12-capacity-versus-active-computation">1.2 Capacity versus active computation</a></li>
+</ul>
+</li>
+<li><a href="#2-load-balancing">2. Load balancing</a><ul>
+<li><a href="#21-hard-assignments-and-soft-probability">2.1 Hard assignments and soft probability</a></li>
+<li><a href="#22-uniform-load-when-hard-and-soft-loads-agree">2.2 Uniform load when hard and soft loads agree</a></li>
+<li><a href="#23-router-logit-gradient">2.3 Router-logit gradient</a></li>
+</ul>
+</li>
+<li><a href="#3-why-power-laws-appear">3. Why power laws appear</a><ul>
+<li><a href="#31-mean-estimation">3.1 Mean estimation</a></li>
+<li><a href="#32-approximation-on-a-grid">3.2 Approximation on a grid</a></li>
+</ul>
+</li>
+<li><a href="#4-compute-optimal-parameters-and-data">4. Compute-optimal parameters and data</a><ul>
+<li><a href="#41-loss-model">4.1 Loss model</a></li>
+<li><a href="#42-deriving-the-optimal-allocation">4.2 Deriving the optimal allocation</a></li>
+<li><a href="#43-three-empirical-routes">4.3 Three empirical routes</a></li>
+</ul>
+</li>
+<li><a href="#5-a-linear-regression-scaling-law">5. A linear-regression scaling law</a><ul>
+<li><a href="#51-spectrum-driven-setup">5.1 Spectrum-driven setup</a></li>
+<li><a href="#52-parameter-exponent">5.2 Parameter exponent</a></li>
+<li><a href="#53-data-exponent">5.3 Data exponent</a></li>
+</ul>
+</li>
+<li><a href="#6-minimal-takeaways">6. Minimal takeaways</a></li>
+<li><a href="#7-questions-for-manual-reconstruction">7. Questions for manual reconstruction</a></li>
+<li><a href="#8-open-questions">8. Open questions</a></li>
+<li><a href="#references">References</a></li>
+</ul>
+</div>
+
+      </aside>
+      <article class="prose note-prose markdown-body">
+        <blockquote>
+<p><strong>AI-assisted first draft.</strong> This note follows the mathematical route of Lecture 05 and makes the main router gradients and scaling-law derivations explicit. It is a study scaffold, not the author's finished interpretation.</p>
+</blockquote>
+<h2 id="lecture-context">Lecture context</h2>
+<ul>
+<li><code>[DIRECT]</code> Source: <a href="https://noahgol.github.io/teaching/cs395t-f26/lecture5.pdf">https://noahgol.github.io/teaching/cs395t-f26/lecture5.pdf</a></li>
+<li><code>[SYNTHESIS]</code> The lecture studies two ways to scale a model. Mixture-of-experts increases parameter capacity without activating every parameter on every token. Scaling laws describe how parameters and data should grow together under a compute budget.</li>
+</ul>
+<h2 id="reading-map">Reading map</h2>
+<table>
+<thead>
+<tr>
+<th>Part</th>
+<th>Mechanism</th>
+<th>Central tradeoff</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>MoE routing</td>
+<td>top-<span class="math-inline">\(K\)</span> expert selection</td>
+<td>total capacity versus active compute</td>
+</tr>
+<tr>
+<td>Load balancing</td>
+<td>auxiliary router loss</td>
+<td>specialization versus collapse</td>
+</tr>
+<tr>
+<td>Empirical scaling</td>
+<td>power-law loss model</td>
+<td>parameters versus data</td>
+</tr>
+<tr>
+<td>Compute allocation</td>
+<td><span class="math-inline">\(C\approx6PD\)</span></td>
+<td>which model and dataset size minimize loss?</td>
+</tr>
+<tr>
+<td>Linear-regression example</td>
+<td>covariance spectrum</td>
+<td>where do scaling exponents come from?</td>
+</tr>
+</tbody>
+</table>
+<h2 id="1-mixture-of-experts-layers">1. Mixture-of-experts layers</h2>
+<h3 id="11-replacing-the-dense-mlp">1.1 Replacing the dense MLP</h3>
+<ul>
+<li><code>[DIRECT]</code> After attention and normalization, let the token representation entering the MLP be <span class="math-inline">\(\widetilde u_t^{(r)}\in\mathbb{R}^d\)</span>. An MoE layer has <span class="math-inline">\(N\)</span> expert MLPs</li>
+</ul>
+<div class="math-display">\[\operatorname{MLP}_{r,1},\ldots,\operatorname{MLP}_{r,N}:\mathbb{R}^d\to\mathbb{R}^d.\]</div>
+<ul>
+<li><code>[DIRECT]</code> The router logits and probabilities are</li>
+</ul>
+<div class="math-display">\[z_t^{(r)}=W_R^{(r)}\widetilde u_t^{(r)},
+\qquad
+p_{i,t}^{(r)}=
+\frac{e^{z_{i,t}^{(r)}}}{\sum_{j=1}^{N}e^{z_{j,t}^{(r)}}}.\]</div>
+<ul>
+<li><code>[DIRECT]</code> If <span class="math-inline">\(S_t^{(r)}\)</span> contains the indices of the top <span class="math-inline">\(K\)</span> probabilities, the sparse gate is</li>
+</ul>
+<div class="math-display">\[g_{i,t}^{(r)}=p_{i,t}^{(r)}\mathbf 1\{i\in S_t^{(r)}\}.\]</div>
+<ul>
+<li><code>[DIRECT]</code> The residual update is</li>
+</ul>
+<div class="math-display">\[x_t^{(r)}
+=u_t^{(r)}+
+\sum_{i\in S_t^{(r)}}g_{i,t}^{(r)}
+\operatorname{MLP}_{r,i}(\widetilde u_t^{(r)}).\]</div>
+<ul>
+<li><code>[CHECK]</code> In the lecture's base convention, selected probabilities are not renormalized after top-<span class="math-inline">\(K\)</span> selection. Some architectures divide by their selected sum instead.</li>
+</ul>
+<h3 id="12-capacity-versus-active-computation">1.2 Capacity versus active computation</h3>
+<ul>
+<li><code>[DIRECT]</code> For SwiGLU experts of width <span class="math-inline">\(d_{\mathrm{ff}}\)</span>, expert weights contribute roughly</li>
+</ul>
+<div class="math-display">\[3Ndd_{\mathrm{ff}}\]</div>
+<p>parameters, while one token activates only</p>
+<div class="math-display">\[3Kdd_{\mathrm{ff}}\]</div>
+<p>of them in expert matrix multiplications.
+- <code>[SYNTHESIS]</code> <span class="math-inline">\(K/N\)</span> is the active expert fraction. MoE decouples stored capacity from per-token expert compute, although routing, communication, and memory traffic remain real costs.
+- <code>[DIRECT]</code> Shared experts, when present, process every token. If there are <span class="math-inline">\(N_s\)</span> shared experts, each token evaluates <span class="math-inline">\(K+N_s\)</span> experts even though the router chooses only among the <span class="math-inline">\(N\)</span> routed experts.</p>
+<h2 id="2-load-balancing">2. Load balancing</h2>
+<h3 id="21-hard-assignments-and-soft-probability">2.1 Hard assignments and soft probability</h3>
+<ul>
+<li><code>[DIRECT]</code> For top-1 routing over a batch of <span class="math-inline">\(B\)</span> tokens, define</li>
+</ul>
+<div class="math-display">\[f_i=\frac1B\sum_{t=1}^{B}\mathbf 1\{a_t=i\},
+\qquad
+P_i=\frac1B\sum_{t=1}^{B}p_{i,t},\]</div>
+<p>where <span class="math-inline">\(a_t=\arg\max_i p_{i,t}\)</span>.
+- <code>[DIRECT]</code> The Switch auxiliary loss is</p>
+<div class="math-display">\[\mathcal L_{\mathrm{bal}}
+=\alpha N\sum_{i=1}^{N}f_iP_i.\]</div>
+<ul>
+<li><code>[SYNTHESIS]</code> <span class="math-inline">\(f_i\)</span> measures actual discrete traffic; <span class="math-inline">\(P_i\)</span> measures the router's soft preference. They need not agree: probabilities <span class="math-inline">\(0.51\)</span> and <span class="math-inline">\(0.99\)</span> create the same top-1 decision.</li>
+</ul>
+<h3 id="22-uniform-load-when-hard-and-soft-loads-agree">2.2 Uniform load when hard and soft loads agree</h3>
+<ul>
+<li><code>[DIRECT]</code> If <span class="math-inline">\(P_i=f_i\)</span>, then</li>
+</ul>
+<div class="math-display">\[\mathcal L_{\mathrm{bal}}
+=\alpha N\sum_i f_i^2.\]</div>
+<ul>
+<li><code>[DERIVATION]</code> Since <span class="math-inline">\(\sum_i f_i=1\)</span>,</li>
+</ul>
+<div class="math-display">\[\sum_{i=1}^{N}\left(f_i-\frac1N\right)^2
+=\sum_i f_i^2-\frac1N.\]</div>
+<ul>
+<li><code>[DERIVATION]</code> Therefore</li>
+</ul>
+<div class="math-display">\[\mathcal L_{\mathrm{bal}}
+=\alpha+alpha N
+\sum_{i=1}^{N}\left(f_i-\frac1N\right)^2
+\ge\alpha.\]</div>
+<ul>
+<li><code>[CONCLUSION]</code> Equality holds exactly at <span class="math-inline">\(f_i=P_i=1/N\)</span>. This proof does <strong>not</strong> say the unconstrained loss over arbitrary independent <span class="math-inline">\((f,P)\)</span> has the same minimum; it uses <span class="math-inline">\(P=f\)</span>.</li>
+</ul>
+<h3 id="23-router-logit-gradient">2.3 Router-logit gradient</h3>
+<ul>
+<li><code>[DIRECT]</code> Hard assignments are treated as constants during backpropagation. For one token,</li>
+</ul>
+<div class="math-display">\[\frac{\partial\mathcal L_{\mathrm{bal}}}{\partial p_{i,t}}
+=\frac{\alpha N}{B}f_i.\]</div>
+<ul>
+<li><code>[DERIVATION]</code> Softmax has Jacobian</li>
+</ul>
+<div class="math-display">\[\frac{\partial p_{i,t}}{\partial z_{j,t}}
+=p_{i,t}(\mathbf 1\{i=j\}-p_{j,t}).\]</div>
+<ul>
+<li><code>[DIRECT]</code> Define the probability-weighted average load</li>
+</ul>
+<div class="math-display">\[\mu_t=\sum_{i=1}^{N}f_ip_{i,t}.\]</div>
+<ul>
+<li><code>[DERIVATION]</code> Applying the chain rule and collecting the <span class="math-inline">\(j\)</span> terms gives</li>
+</ul>
+<div class="math-display">\[\frac{\partial\mathcal L_{\mathrm{bal}}}{\partial z_{j,t}}
+=\frac{\alpha N}{B}p_{j,t}(f_j-\mu_t).\]</div>
+<ul>
+<li><code>[SYNTHESIS]</code> Gradient descent lowers the logit of an expert whose load is above the token's soft average and raises the logit of one below that average.</li>
+<li><code>[DERIVATION]</code> Moving probability mass <span class="math-inline">\(\delta\)</span> from a more-loaded expert <span class="math-inline">\(i\)</span> to a less-loaded expert <span class="math-inline">\(j\)</span> changes the loss by</li>
+</ul>
+<div class="math-display">\[\Delta\mathcal L_{\mathrm{bal}}
+=\frac{\alpha N}{B}\delta(f_j-f_i)&lt;0.\]</div>
+<ul>
+<li><code>[DIRECT]</code> For top-<span class="math-inline">\(K\)</span>, normalize the hard load by <span class="math-inline">\(BK\)</span>:</li>
+</ul>
+<div class="math-display">\[f_i^{(K)}=\frac1{BK}\sum_t\mathbf 1\{i\in S_t\}.\]</div>
+<p>The same fixed-routing gradient formula holds with <span class="math-inline">\(f_i^{(K)}\)</span> replacing <span class="math-inline">\(f_i\)</span>.</p>
+<h2 id="3-why-power-laws-appear">3. Why power laws appear</h2>
+<h3 id="31-mean-estimation">3.1 Mean estimation</h3>
+<ul>
+<li><code>[EXAMPLE]</code> For <span class="math-inline">\(x_i\overset{\mathrm{iid}}\sim\mathcal N(\mu,\sigma^2)\)</span> and <span class="math-inline">\(\widehat\mu=n^{-1}\sum_i x_i\)</span>,</li>
+</ul>
+<div class="math-display">\[\mathbb E[(\widehat\mu-\mu)^2]
+=\operatorname{Var}(\widehat\mu)
+=\frac{\sigma^2}{n}.\]</div>
+<ul>
+<li><code>[SYNTHESIS]</code> Mean squared error follows an <span class="math-inline">\(n^{-1}\)</span> power law, while root mean squared error follows <span class="math-inline">\(n^{-1/2}\)</span>.</li>
+</ul>
+<h3 id="32-approximation-on-a-grid">3.2 Approximation on a grid</h3>
+<ul>
+<li><code>[DIRECT]</code> Partition <span class="math-inline">\([0,1]^d\)</span> into cubes of side length <span class="math-inline">\(s\)</span>, so the number of cells is <span class="math-inline">\(P=s^{-d}\)</span>.</li>
+<li><code>[DERIVATION]</code> For a <span class="math-inline">\(K\)</span>-Lipschitz function, replacing each cell by its center value gives pointwise error <span class="math-inline">\(O(s)\)</span> and integrated squared error</li>
+</ul>
+<div class="math-display">\[L(P)=O(s^2)=O(P^{-2/d}).\]</div>
+<ul>
+<li><code>[DERIVATION]</code> If bounded second derivatives permit a local affine approximation, the remainder is <span class="math-inline">\(O(s^2)\)</span>, so squared error becomes</li>
+</ul>
+<div class="math-display">\[L(P)=O(s^4)=O(P^{-4/d}).\]</div>
+<ul>
+<li><code>[SYNTHESIS]</code> The exponent reflects both local approximation order and effective dimension. These are upper-bound intuitions, not a universal explanation of neural scaling.</li>
+</ul>
+<h2 id="4-compute-optimal-parameters-and-data">4. Compute-optimal parameters and data</h2>
+<h3 id="41-loss-model">4.1 Loss model</h3>
+<ul>
+<li><code>[DIRECT]</code> Let <span class="math-inline">\(P\)</span> be dense-model parameter count and <span class="math-inline">\(D\)</span> the number of training tokens. The Hoffmann et al. model is</li>
+</ul>
+<div class="math-display">\[L(D,P)=E+\frac{A}{P^\alpha}+\frac{B}{D^\beta},
+\qquad
+A,B,\alpha,\beta&gt;0.\]</div>
+<ul>
+<li><code>[SYNTHESIS]</code> <span class="math-inline">\(E\)</span> models irreducible conditional entropy, <span class="math-inline">\(AP^{-\alpha}\)</span> model-class approximation error, and <span class="math-inline">\(BD^{-\beta}\)</span> finite-data plus finite-training error.</li>
+<li><code>[DIRECT]</code> Dense training compute is approximated by</li>
+</ul>
+<div class="math-display">\[C\approx6PD.\]</div>
+<h3 id="42-deriving-the-optimal-allocation">4.2 Deriving the optimal allocation</h3>
+<ul>
+<li><code>[DERIVATION · Step 1]</code> On the compute boundary, substitute</li>
+</ul>
+<div class="math-display">\[D=\frac{C}{6P}.\]</div>
+<ul>
+<li><code>[DERIVATION · Step 2]</code> The variable part of loss becomes</li>
+</ul>
+<div class="math-display">\[\ell(P)=AP^{-\alpha}+B\left(\frac{6P}{C}\right)^\beta.\]</div>
+<ul>
+<li><code>[DERIVATION · Step 3]</code> Differentiate and set the derivative to zero:</li>
+</ul>
+<div class="math-display">\[-\alpha AP^{-\alpha-1}
++\beta B\left(\frac6C\right)^\beta P^{\beta-1}=0.\]</div>
+<ul>
+<li><code>[DERIVATION · Step 4]</code> Multiplying by <span class="math-inline">\(P\)</span> reveals the balance condition</li>
+</ul>
+<div class="math-display">\[\alpha AP^{-\alpha}=\beta BD^{-\beta}.\]</div>
+<ul>
+<li><code>[DIRECT]</code> Solving gives</li>
+</ul>
+<div class="math-display">\[P_{\mathrm{opt}}(C)
+=G\left(\frac C6\right)^{\beta/(\alpha+\beta)},
+\qquad
+D_{\mathrm{opt}}(C)
+=G^{-1}\left(\frac C6\right)^{\alpha/(\alpha+\beta)},\]</div>
+<p>where</p>
+<div class="math-display">\[G=\left(\frac{\alpha A}{\beta B}\right)^{1/(\alpha+\beta)}.\]</div>
+<ul>
+<li><code>[CONCLUSION]</code> If <span class="math-inline">\(\alpha=\beta\)</span>, both parameters and tokens grow as <span class="math-inline">\(C^{1/2}\)</span>. The empirical methods discussed in the lecture estimate exponents close to one half for each.</li>
+</ul>
+<h3 id="43-three-empirical-routes">4.3 Three empirical routes</h3>
+<ul>
+<li><code>[DIRECT]</code> The lecture distinguishes:
+1. the lower envelope of loss-versus-compute training curves;
+2. IsoFLOP profiles that vary model size while holding compute fixed; and
+3. a joint parametric fit of <span class="math-inline">\((E,A,B,\alpha,\beta)\)</span>.</li>
+<li><code>[SYNTHESIS]</code> Agreement between these routes is stronger evidence than a single extrapolation because the fitting geometries differ.</li>
+</ul>
+<h2 id="5-a-linear-regression-scaling-law">5. A linear-regression scaling law</h2>
+<h3 id="51-spectrum-driven-setup">5.1 Spectrum-driven setup</h3>
+<ul>
+<li><code>[DIRECT]</code> Assume diagonal covariance eigenvalues</li>
+</ul>
+<div class="math-display">\[\lambda_j\asymp j^{-a},
+\qquad a&gt;1,\]</div>
+<p>and use a <span class="math-inline">\(P\)</span>-parameter random sketch with one-pass SGD on <span class="math-inline">\(D\)</span> examples.
+- <code>[DIRECT]</code> The theorem in the lecture gives excess risk of order</p>
+<div class="math-display">\[P^{-(a-1)}+(\gamma D_{\mathrm{eff}})^{-(a-1)/a},\]</div>
+<p>up to constants and the schedule's logarithmic factor.</p>
+<h3 id="52-parameter-exponent">5.2 Parameter exponent</h3>
+<ul>
+<li><code>[DERIVATION]</code> If a <span class="math-inline">\(P\)</span>-dimensional model captures roughly the first <span class="math-inline">\(P\)</span> covariance directions, the remaining expected error is the spectral tail</li>
+</ul>
+<div class="math-display">\[\sum_{j&gt;P}\lambda_j
+\asymp
+\int_P^\infty u^{-a}\,du
+\asymp P^{-(a-1)}.\]</div>
+<ul>
+<li><code>[CONCLUSION]</code> The parameter exponent is <span class="math-inline">\(a-1\)</span>.</li>
+</ul>
+<h3 id="53-data-exponent">5.3 Data exponent</h3>
+<ul>
+<li><code>[DIRECT]</code> In the coordinate idealization, the expected coefficient error contracts by approximately</li>
+</ul>
+<div class="math-display">\[\prod_{t=1}^{D}(1-\gamma_t\lambda_i)
+\approx
+\exp(-\Theta(\gamma D_{\mathrm{eff}}\lambda_i)).\]</div>
+<ul>
+<li><code>[DERIVATION]</code> A direction is substantially learned when</li>
+</ul>
+<div class="math-display">\[\gamma D_{\mathrm{eff}}\lambda_i\gtrsim1.\]</div>
+<p>With <span class="math-inline">\(\lambda_i\asymp i^{-a}\)</span>, the number of learned directions is</p>
+<div class="math-display">\[k\asymp(\gamma D_{\mathrm{eff}})^{1/a}.\]</div>
+<ul>
+<li><code>[DERIVATION]</code> The unresolved spectral tail is therefore</li>
+</ul>
+<div class="math-display">\[\sum_{j&gt;k}\lambda_j
+\asymp k^{-(a-1)}
+\asymp(\gamma D_{\mathrm{eff}})^{-(a-1)/a}.\]</div>
+<ul>
+<li><code>[SYNTHESIS]</code> The covariance spectrum controls both exponents. Parameters limit how many directions the model can represent; training data and step sizes limit how many of those directions optimization can actually learn.</li>
+<li><code>[CHECK]</code> The lecture also bounds SGD variance under its geometric step-size schedule. Reconstruct Appendix A and the variance sum before treating the theorem as fully proved.</li>
+</ul>
+<h2 id="6-minimal-takeaways">6. Minimal takeaways</h2>
+<ul>
+<li>MoE increases stored capacity by routing each token through only a small active expert subset.</li>
+<li>A balancing loss couples hard traffic with soft probabilities and supplies a differentiable anti-collapse signal.</li>
+<li>Power-law exponents can arise from estimation variance, approximation dimension, or spectral decay.</li>
+<li>Under <span class="math-inline">\(C\approx6PD\)</span>, compute-optimal parameters and tokens balance their marginal loss reductions.</li>
+<li>Scaling-law fits describe an empirical regime; extrapolation depends on architecture, data, optimization, and the validity of the fitted model.</li>
+</ul>
+<h2 id="7-questions-for-manual-reconstruction">7. Questions for manual reconstruction</h2>
+<ul>
+<li>[ ] For a top-2 router, compute the selected gates both with and without renormalization.</li>
+<li>[ ] Re-derive the load-balancing logit gradient from the softmax Jacobian.</li>
+<li>[ ] Explain why the proof of uniform load assumes <span class="math-inline">\(P=f\)</span>.</li>
+<li>[ ] Derive <span class="math-inline">\(P_{\mathrm{opt}}(C)\)</span> and <span class="math-inline">\(D_{\mathrm{opt}}(C)\)</span> without looking above.</li>
+<li>[ ] Explain the parameter and data exponents in the linear-regression example using a spectral cutoff picture.</li>
+</ul>
+<h2 id="8-open-questions">8. Open questions</h2>
+<ul>
+<li><code>[CHECK]</code> How do capacity limits, dropped tokens, and cross-device communication change the simple active-compute picture?</li>
+<li><code>[CHECK]</code> How should <span class="math-inline">\(C\approx6PD\)</span> be modified for sparse MoE models and long contexts?</li>
+<li><code>[HYPOTHESIS]</code> Expert specialization may alter the effective approximation exponent rather than merely the constant in front of a dense scaling law. This is a question, not a lecture conclusion.</li>
+</ul>
+<h2 id="references">References</h2>
+<ul>
+<li><code>[DIRECT]</code> Noah Golowich. <em>CS 395T — Lecture 5: Mixture-of-Experts and Scaling Laws.</em> <a href="https://noahgol.github.io/teaching/cs395t-f26/lecture5.pdf">https://noahgol.github.io/teaching/cs395t-f26/lecture5.pdf</a></li>
+<li><code>[DIRECT]</code> The central reading pointers are Switch Transformers for routing and load balance, Hoffmann et al. for compute-optimal language-model scaling, and Lin et al. for the linear-regression theorem. They have not been independently reconstructed here.</li>
+</ul>
+      </article>
+    </div>
+  </main>
+
+  <footer class="site-footer section-shell">
+    <div><strong>CS 395T</strong><span>Learning note</span></div>
+    <p>Markdown source · draft</p>
+    <a href="../index.html#notes">Return to index ←</a>
+  </footer>
+</body>
+</html>

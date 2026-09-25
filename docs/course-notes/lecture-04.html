@@ -1,0 +1,421 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A first reconstruction of attention FLOPs, linear attention as a recurrent computation, state space duality, Mamba-2, and conditional barriers to subquadratic attention alternatives.">
+  <title>Lecture 04 — Linear Attention and State Space Models — CS 395T</title>
+  <link rel="stylesheet" href="../assets/styles.css">
+  <script>
+    window.MathJax = {
+      tex: {
+        processEscapes: true
+      },
+      svg: { fontCache: 'global' }
+    };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js" defer></script>
+  <script src="../assets/app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header">
+    <a class="wordmark" href="../index.html"><span>CS 395T</span><small>Learning &amp; research notebook</small></a>
+    <button class="menu-button" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button>
+    <nav id="site-nav" class="site-nav" aria-label="Primary navigation">
+      <a href="../structure.html">Structure</a>
+      <a href="../index.html#notes">Index</a>
+      <a href="../method.html">Writing guide</a>
+      <a href="../index.html#about">About</a>
+    </nav>
+  </header>
+
+  <main id="main" class="note-shell">
+    <header class="note-hero">
+      <div class="template-banner learning-banner">
+        <strong>LEARNING NOTE · DRAFT</strong>
+        <span>Work in progress</span>
+      </div>
+      <p class="eyebrow">25 SEP 2026 · DRAFT</p>
+      <h1>Lecture 04 — Linear Attention and State Space Models</h1>
+      <p class="note-abstract">A first reconstruction of attention FLOPs, linear attention as a recurrent computation, state space duality, Mamba-2, and conditional barriers to subquadratic attention alternatives.</p>
+      <ul class="tag-list" aria-label="Topics"><li>linear attention</li><li>state space models</li><li>Mamba-2</li><li>semiseparable matrices</li><li>fine-grained complexity</li></ul>
+    </header>
+
+    <div class="note-layout">
+      <aside class="note-toc" aria-label="On this page">
+        <p class="aside-label">ON THIS PAGE</p>
+        <div class="toc">
+<ul>
+<li><a href="#lecture-context">Lecture context</a></li>
+<li><a href="#reading-map">Reading map</a></li>
+<li><a href="#1-flop-accounting">1. FLOP accounting</a><ul>
+<li><a href="#11-one-layer-leading-terms">1.1 One-layer leading terms</a></li>
+<li><a href="#12-prefill-versus-generation">1.2 Prefill versus generation</a></li>
+</ul>
+</li>
+<li><a href="#2-linear-attention">2. Linear attention</a><ul>
+<li><a href="#21-replacing-softmax-by-a-feature-kernel">2.1 Replacing softmax by a feature kernel</a></li>
+<li><a href="#22-associativity-removes-the-pairwise-matrix">2.2 Associativity removes the pairwise matrix</a></li>
+<li><a href="#23-causal-linear-attention-is-an-rnn">2.3 Causal linear attention is an RNN</a></li>
+</ul>
+</li>
+<li><a href="#3-state-space-models">3. State space models</a><ul>
+<li><a href="#31-general-recurrence">3.1 General recurrence</a></li>
+<li><a href="#32-unrolling-the-recurrence">3.2 Unrolling the recurrence</a></li>
+<li><a href="#33-why-semiseparable-structure-appears">3.3 Why semiseparable structure appears</a></li>
+<li><a href="#34-two-computation-modes">3.4 Two computation modes</a></li>
+</ul>
+</li>
+<li><a href="#4-mamba-2-and-structured-state-space-duality">4. Mamba-2 and structured state space duality</a><ul>
+<li><a href="#41-scalar-identity-transitions">4.1 Scalar-identity transitions</a></li>
+<li><a href="#42-block-level-picture">4.2 Block-level picture</a></li>
+</ul>
+</li>
+<li><a href="#5-conditional-barriers-to-subquadratic-alternatives">5. Conditional barriers to subquadratic alternatives</a><ul>
+<li><a href="#51-orthogonal-vectors-and-document-similarity">5.1 Orthogonal Vectors and document similarity</a></li>
+<li><a href="#52-why-one-ordinary-attention-head-can-detect-ov">5.2 Why one ordinary attention head can detect OV</a></li>
+</ul>
+</li>
+<li><a href="#6-minimal-takeaways">6. Minimal takeaways</a></li>
+<li><a href="#7-questions-for-manual-reconstruction">7. Questions for manual reconstruction</a></li>
+<li><a href="#8-open-questions">8. Open questions</a></li>
+<li><a href="#references">References</a></li>
+</ul>
+</div>
+
+      </aside>
+      <article class="prose note-prose markdown-body">
+        <blockquote>
+<p><strong>AI-assisted first draft.</strong> This note reconstructs the route of the Lecture 04 PDF and adds explicit algebra, proof outlines, and examples. It should be checked and rewritten during manual study. <code>[DIRECT]</code> marks lecture content; <code>[DERIVATION]</code>, <code>[SYNTHESIS]</code>, and <code>[EXAMPLE]</code> are explanatory additions.</p>
+</blockquote>
+<h2 id="lecture-context">Lecture context</h2>
+<ul>
+<li><code>[DIRECT]</code> Source: <a href="https://noahgol.github.io/teaching/cs395t-f26/lecture4.pdf">https://noahgol.github.io/teaching/cs395t-f26/lecture4.pdf</a></li>
+<li><code>[SYNTHESIS]</code> The lecture asks whether we can preserve useful sequence mixing while avoiding the <span class="math-inline">\(T^2\)</span> pairwise cost of ordinary attention. Linear attention, recurrent state space models, and Mamba-2 offer structured alternatives; fine-grained lower bounds clarify what such structure may sacrifice.</li>
+</ul>
+<h2 id="reading-map">Reading map</h2>
+<table>
+<thead>
+<tr>
+<th>Part</th>
+<th>Central object</th>
+<th>Main question</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>FLOP accounting</td>
+<td><span class="math-inline">\(T,d,H,d_{\mathrm{ff}}\)</span></td>
+<td>Where does Transformer compute go?</td>
+</tr>
+<tr>
+<td>Linear attention</td>
+<td>feature map <span class="math-inline">\(\phi\)</span></td>
+<td>Can associativity remove the <span class="math-inline">\(T\times T\)</span> matrix?</td>
+</tr>
+<tr>
+<td>State space models</td>
+<td>recurrent state <span class="math-inline">\(H_t\)</span></td>
+<td>Which causal matrices admit a small recurrent state?</td>
+</tr>
+<tr>
+<td>Mamba-2 / SSD</td>
+<td>scalar transition <span class="math-inline">\(a_tI\)</span></td>
+<td>How do recurrence and masked matrix multiplication become dual views?</td>
+</tr>
+<tr>
+<td>Conditional barriers</td>
+<td>Orthogonal Vectors</td>
+<td>Why can exact global pairwise interactions resist truly subquadratic algorithms?</td>
+</tr>
+</tbody>
+</table>
+<h2 id="1-flop-accounting">1. FLOP accounting</h2>
+<ul>
+<li><code>[DIRECT]</code> Let <span class="math-inline">\(P_M\)</span> be the number of key-query pairs allowed by a mask <span class="math-inline">\(M\)</span>:</li>
+</ul>
+<div class="math-display">\[P_M=\left|\{(j,i)\in[T]^2:M_{ji}=1\}\right|.\]</div>
+<ul>
+<li><code>[DIRECT]</code> Thus <span class="math-inline">\(P_M=T^2\)</span> for unmasked attention and <span class="math-inline">\(P_M=T(T+1)/2\)</span> for a causal mask, provided the implementation actually skips the forbidden triangle.</li>
+</ul>
+<h3 id="11-one-layer-leading-terms">1.1 One-layer leading terms</h3>
+<table>
+<thead>
+<tr>
+<th>Operation</th>
+<th style="text-align: right;">Leading FLOPs</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Query, key, value projections</td>
+<td style="text-align: right;"><span class="math-inline">\(6Td^2\)</span></td>
+</tr>
+<tr>
+<td>Attention scores</td>
+<td style="text-align: right;"><span class="math-inline">\(2P_Md\)</span></td>
+</tr>
+<tr>
+<td>Weighted value sums</td>
+<td style="text-align: right;"><span class="math-inline">\(2P_Md\)</span></td>
+</tr>
+<tr>
+<td>Attention output projection</td>
+<td style="text-align: right;"><span class="math-inline">\(2Td^2\)</span></td>
+</tr>
+<tr>
+<td>Two-matrix MLP</td>
+<td style="text-align: right;"><span class="math-inline">\(4Tdd_{\mathrm{ff}}\)</span></td>
+</tr>
+<tr>
+<td>SwiGLU MLP</td>
+<td style="text-align: right;"><span class="math-inline">\(6Tdd_{\mathrm{ff}}\)</span></td>
+</tr>
+<tr>
+<td>- <code>[DERIVATION]</code> For unmasked attention, the leading layer cost is</td>
+<td style="text-align: right;"></td>
+</tr>
+</tbody>
+</table>
+<div class="math-display">\[8Td^2+4T^2d+O(T^2H+Td).\]</div>
+<ul>
+<li><code>[DERIVATION]</code> Efficient triangular causal attention replaces <span class="math-inline">\(4T^2d\)</span> by</li>
+</ul>
+<div class="math-display">\[2T(T+1)d,\]</div>
+<p>but a dense implementation that still materializes every score pays the unmasked cost.
+- <code>[DIRECT]</code> With <span class="math-inline">\(d_{\mathrm{ff}}=4d\)</span>, the ordinary MLP costs <span class="math-inline">\(16Td^2\)</span>. A parameter-matched SwiGLU using <span class="math-inline">\(d_{\mathrm{ff}}\approx 8d/3\)</span> has the same leading count.</p>
+<h3 id="12-prefill-versus-generation">1.2 Prefill versus generation</h3>
+<ul>
+<li><code>[DIRECT]</code> A full-sequence pass computes all required positions together. During autoregressive generation, a key-value cache stores earlier keys and values, so the new token attends to a length-<span class="math-inline">\(t\)</span> prefix in <span class="math-inline">\(\Theta(td)\)</span> work per layer rather than recomputing the full <span class="math-inline">\(t^2\)</span> score matrix.</li>
+<li><code>[DERIVATION]</code> Generating <span class="math-inline">\(T\)</span> new tokens still sums the growing prefix costs:</li>
+</ul>
+<div class="math-display">\[\sum_{t=1}^{T}\Theta(td)=\Theta(T^2d).\]</div>
+<ul>
+<li><code>[SYNTHESIS]</code> KV caching removes repeated computation, but it does not remove the need for each new query to interact with an increasingly long history.</li>
+</ul>
+<h2 id="2-linear-attention">2. Linear attention</h2>
+<h3 id="21-replacing-softmax-by-a-feature-kernel">2.1 Replacing softmax by a feature kernel</h3>
+<ul>
+<li><code>[DIRECT]</code> The exponential dot-product kernel has the formal feature expansion</li>
+</ul>
+<div class="math-display">\[e^{\langle q,k\rangle}
+=\sum_{a=0}^{\infty}\frac{\langle q,k\rangle^a}{a!}
+=\langle\phi_\infty(q),\phi_\infty(k)\rangle.\]</div>
+<ul>
+<li><code>[DIRECT]</code> Linear attention instead chooses a finite feature map <span class="math-inline">\(\phi:\mathbb{R}^m\to\mathbb{R}^r\)</span>. With</li>
+</ul>
+<div class="math-display">\[q_t=W_Qx_t,\qquad k_t=W_Kx_t,\qquad v_t=W_Vx_t,\]</div>
+<p>its unnormalized output is</p>
+<div class="math-display">\[y_t=\sum_{s=1}^{T}\langle\phi(q_t),\phi(k_s)\rangle v_s.\]</div>
+<ul>
+<li><code>[CHECK]</code> Unlike softmax attention, these coefficients are not automatically nonnegative and need not sum to one.</li>
+</ul>
+<h3 id="22-associativity-removes-the-pairwise-matrix">2.2 Associativity removes the pairwise matrix</h3>
+<ul>
+<li><code>[DIRECT]</code> Collect the columns as</li>
+</ul>
+<div class="math-display">\[\Phi_Q=[\phi(q_1),\ldots,\phi(q_T)]\in\mathbb{R}^{r\times T},
+\quad
+\Phi_K=[\phi(k_1),\ldots,\phi(k_T)]\in\mathbb{R}^{r\times T},\]</div>
+<p>and <span class="math-inline">\(V=[v_1,\ldots,v_T]\in\mathbb{R}^{d\times T}\)</span>. Then</p>
+<div class="math-display">\[Y=V\Phi_K^\top\Phi_Q.\]</div>
+<ul>
+<li><code>[DERIVATION]</code> Direct evaluation forms the <span class="math-inline">\(T\times T\)</span> kernel matrix. Associativity allows</li>
+</ul>
+<div class="math-display">\[Y=(V\Phi_K^\top)\Phi_Q.\]</div>
+<ul>
+<li><code>[DERIVATION]</code> The summary</li>
+</ul>
+<div class="math-display">\[S:=V\Phi_K^\top=\sum_{s=1}^{T}v_s\phi(k_s)^\top\in\mathbb{R}^{d\times r}\]</div>
+<p>costs <span class="math-inline">\(O(Tdr)\)</span> to form. Reading all queries via <span class="math-inline">\(y_t=S\phi(q_t)\)</span> costs another <span class="math-inline">\(O(Tdr)\)</span>. Only <span class="math-inline">\(S\)</span> must persist between the two stages.
+- <code>[CONCLUSION]</code> For fixed feature dimension <span class="math-inline">\(r\)</span>, the sequence-length dependence is linear rather than quadratic.</p>
+<h3 id="23-causal-linear-attention-is-an-rnn">2.3 Causal linear attention is an RNN</h3>
+<ul>
+<li><code>[DIRECT]</code> The causal output is</li>
+</ul>
+<div class="math-display">\[y_t=\sum_{s=1}^{t}\langle\phi(q_t),\phi(k_s)\rangle v_s.\]</div>
+<ul>
+<li><code>[DIRECT]</code> Initialize <span class="math-inline">\(S_0=0\in\mathbb{R}^{d\times r}\)</span> and update</li>
+</ul>
+<div class="math-display">\[S_t=S_{t-1}+v_t\phi(k_t)^\top,
+\qquad
+y_t=S_t\phi(q_t).\]</div>
+<ul>
+<li><code>[DERIVATION]</code> Induction gives</li>
+</ul>
+<div class="math-display">\[S_t=\sum_{s=1}^{t}v_s\phi(k_s)^\top.\]</div>
+<p>Substituting into the read operation recovers the causal attention formula exactly.
+- <code>[SYNTHESIS]</code> The state is a compressed collection of all past key-value contributions. The key writes, the value supplies content, and the query reads from the fixed-size state.</p>
+<h2 id="3-state-space-models">3. State space models</h2>
+<h3 id="31-general-recurrence">3.1 General recurrence</h3>
+<ul>
+<li><code>[DIRECT]</code> With state dimension <span class="math-inline">\(N\)</span>, an SSM uses</li>
+</ul>
+<div class="math-display">\[H_0=0,
+\qquad
+H_t=A_tH_{t-1}+B_tx_t^\top,
+\qquad
+y_t=H_t^\top C_t,\]</div>
+<p>where <span class="math-inline">\(H_t\in\mathbb{R}^{N\times d}\)</span>, <span class="math-inline">\(A_t\in\mathbb{R}^{N\times N}\)</span>, and <span class="math-inline">\(B_t,C_t\in\mathbb{R}^N\)</span>.
+- <code>[SYNTHESIS]</code> Linear attention copies the old state and adds a rank-one write. An SSM additionally transforms the old state with <span class="math-inline">\(A_t\)</span>, allowing coordinates to decay, persist, or mix.</p>
+<h3 id="32-unrolling-the-recurrence">3.2 Unrolling the recurrence</h3>
+<ul>
+<li><code>[DIRECT]</code> Define</li>
+</ul>
+<div class="math-display">\[A_{t:s+1}=A_tA_{t-1}\cdots A_{s+1},
+\qquad
+A_{t:t+1}=I_N.\]</div>
+<ul>
+<li><code>[DERIVATION]</code> Repeated substitution yields</li>
+</ul>
+<div class="math-display">\[H_t=\sum_{s=1}^{t}A_{t:s+1}B_sx_s^\top,\]</div>
+<p>and therefore</p>
+<div class="math-display">\[y_t
+=\sum_{s=1}^{t}\left(C_t^\top A_{t:s+1}B_s\right)x_s.\]</div>
+<ul>
+<li><code>[DIRECT]</code> Hence <span class="math-inline">\(Y=XM\)</span> for the causal matrix</li>
+</ul>
+<div class="math-display">\[M_{st}=
+\begin{cases}
+C_t^\top A_{t:s+1}B_s,&amp;s\le t,\\
+0,&amp;s&gt;t.
+\end{cases}\]</div>
+<h3 id="33-why-semiseparable-structure-appears">3.3 Why semiseparable structure appears</h3>
+<ul>
+<li><code>[DIRECT]</code> A causal matrix is <span class="math-inline">\(N\)</span>-semiseparable when every rectangular block lying on or above the diagonal has rank at most <span class="math-inline">\(N\)</span>.</li>
+<li><code>[DERIVATION]</code> Choose a block with source indices <span class="math-inline">\(s\)</span> to the left of target indices <span class="math-inline">\(t\)</span>, and split every transition at a common boundary <span class="math-inline">\(a\)</span>:</li>
+</ul>
+<div class="math-display">\[M_{st}
+=\left(A_{a:s+1}B_s\right)^\top
+\left(A_{t:a+1}^\top C_t\right).\]</div>
+<ul>
+<li><code>[DERIVATION]</code> Stack the left factors into <span class="math-inline">\(L\in\mathbb{R}^{|I|\times N}\)</span> and the right factors into <span class="math-inline">\(R\in\mathbb{R}^{N\times|J|}\)</span>. The entire block factors as</li>
+</ul>
+<div class="math-display">\[M[I,J]=LR,\]</div>
+<p>so its rank is at most <span class="math-inline">\(N\)</span>.
+- <code>[DIRECT]</code> The lecture also proves the converse: every <span class="math-inline">\(N\)</span>-semiseparable upper-triangular matrix admits such sequential generators <span class="math-inline">\((A,B,C)\)</span>. The recurrent representation and the structured-matrix rank condition therefore describe the same class.
+- <code>[CHECK]</code> Reconstruct the converse proof from the nested upper-right blocks in Appendix A.1 before treating this equivalence as internalized.</p>
+<h3 id="34-two-computation-modes">3.4 Two computation modes</h3>
+<ul>
+<li><code>[DIRECT]</code> The recurrent form performs a left-to-right scan and is natural for generation. The quadratic form materializes</li>
+</ul>
+<div class="math-display">\[Y=X\operatorname{SSS}(A,B,C),\]</div>
+<p>exposing a structured causal matrix multiplication that may be accelerator-friendly during training.
+- <code>[DIRECT]</code> A compressed block representation multiplies an <span class="math-inline">\(N\)</span>-semiseparable <span class="math-inline">\(T\times T\)</span> matrix by a vector in <span class="math-inline">\(O(NT)\)</span> time with <span class="math-inline">\(O(NT)\)</span> stored scalars.
+- <code>[SYNTHESIS]</code> Recurrence and matrix multiplication are not two different models. They are two algorithms for the same structured transformation, with different hardware tradeoffs.</p>
+<h2 id="4-mamba-2-and-structured-state-space-duality">4. Mamba-2 and structured state space duality</h2>
+<h3 id="41-scalar-identity-transitions">4.1 Scalar-identity transitions</h3>
+<ul>
+<li><code>[DIRECT]</code> Mamba-2's SSD specialization uses</li>
+</ul>
+<div class="math-display">\[A_t=a_tI_N.\]</div>
+<ul>
+<li><code>[DERIVATION]</code> The transition product becomes</li>
+</ul>
+<div class="math-display">\[A_{t:s+1}
+=\left(\prod_{r=s+1}^{t}a_r\right)I_N.\]</div>
+<ul>
+<li><code>[DIRECT]</code> Define the causal persistence mask</li>
+</ul>
+<div class="math-display">\[L_{st}=
+\begin{cases}
+\prod_{r=s+1}^{t}a_r,&amp;s\le t,\\
+0,&amp;s&gt;t.
+\end{cases}\]</div>
+<ul>
+<li><code>[DERIVATION]</code> With <span class="math-inline">\(G_{st}=C_t^\top B_s\)</span>, the induced sequence matrix is</li>
+</ul>
+<div class="math-display">\[M=L\odot G,
+\qquad
+Y=X(L\odot G).\]</div>
+<ul>
+<li><code>[SYNTHESIS]</code> This looks like masked linear attention: <span class="math-inline">\(B_s\)</span> behaves like a key, <span class="math-inline">\(C_t\)</span> like a query, <span class="math-inline">\(x_s\)</span> like a value, and <span class="math-inline">\(L_{st}\)</span> controls how information survives between positions.</li>
+<li><code>[CHECK]</code> If every <span class="math-inline">\(a_t=1\)</span>, then <span class="math-inline">\(L\)</span> becomes the ordinary causal mask. If <span class="math-inline">\(|a_t|&lt;1\)</span>, older information is multiplicatively attenuated.</li>
+</ul>
+<h3 id="42-block-level-picture">4.2 Block-level picture</h3>
+<ul>
+<li><code>[DIRECT]</code> Mamba-2 produces the SSD inputs and parameters in parallel, applies a short causal convolution and nonlinear activation, performs the SSD sequence transformation, gates its output, normalizes, and finally projects back to the residual stream.</li>
+<li><code>[SYNTHESIS]</code> The architectural goal is to keep the recurrent interpretation needed for cheap decoding while arranging training around large matrix multiplications.</li>
+</ul>
+<h2 id="5-conditional-barriers-to-subquadratic-alternatives">5. Conditional barriers to subquadratic alternatives</h2>
+<h3 id="51-orthogonal-vectors-and-document-similarity">5.1 Orthogonal Vectors and document similarity</h3>
+<ul>
+<li><code>[DIRECT]</code> Orthogonal Vectors asks whether Boolean vectors <span class="math-inline">\(v_1,\ldots,v_T\in\{0,1\}^{\ell}\)</span> contain distinct <span class="math-inline">\(i,j\)</span> with</li>
+</ul>
+<div class="math-display">\[\langle v_i,v_j\rangle=0.\]</div>
+<ul>
+<li><code>[DIRECT]</code> Under the Orthogonal Vectors Conjecture, which follows from SETH, there is no truly subquadratic algorithm for all logarithmic dimensions.</li>
+<li><code>[DIRECT]</code> Least Similar Documents minimizes cosine similarity</li>
+</ul>
+<div class="math-display">\[\operatorname{sim}(u,v)=\frac{\langle u,v\rangle}{\|u\|_2\|v\|_2}.\]</div>
+<ul>
+<li><code>[DERIVATION]</code> When all input vectors are nonzero,</li>
+</ul>
+<div class="math-display">\[\min_{i\ne j}\operatorname{sim}(v_i,v_j)=0
+\quad\Longleftrightarrow\quad
+\exists i\ne j:\langle v_i,v_j\rangle=0.\]</div>
+<ul>
+<li><code>[CONCLUSION]</code> A truly subquadratic exact LSD algorithm in the lecture's logarithmic-dimensional regime would solve Orthogonal Vectors equally fast and contradict OVC.</li>
+</ul>
+<h3 id="52-why-one-ordinary-attention-head-can-detect-ov">5.2 Why one ordinary attention head can detect OV</h3>
+<ul>
+<li><code>[DIRECT]</code> Append a zero vector <span class="math-inline">\(v_{T+1}=0\)</span> and choose query/key projections so the scaled score equals</li>
+</ul>
+<div class="math-display">\[-C\log T\,\langle v_i,v_j\rangle.\]</div>
+<ul>
+<li><code>[DERIVATION]</code> Exponentiation gives weight</li>
+</ul>
+<div class="math-display">\[T^{-C\langle v_i,v_j\rangle}.\]</div>
+<p>An orthogonal partner contributes <span class="math-inline">\(1\)</span>, whereas every nonorthogonal vector contributes at most <span class="math-inline">\(T^{-C}\)</span>.
+- <code>[DIRECT]</code> Choose values whose first coordinate is <span class="math-inline">\(\|v_j\|_1\)</span> and whose other coordinates vanish. The appended zero vector contributes <span class="math-inline">\(1\)</span> to the softmax denominator but <span class="math-inline">\(0\)</span> to the numerator.
+- <code>[DERIVATION]</code> If query <span class="math-inline">\(i\)</span> has an orthogonal partner, its first output coordinate satisfies</p>
+<div class="math-display">\[r_i\ge\frac{1}{T+1}.\]</div>
+<ul>
+<li><code>[DERIVATION]</code> If no orthogonal pair exists, then</li>
+</ul>
+<div class="math-display">\[r_i\le \ell T^{1-C}.\]</div>
+<ul>
+<li><code>[CONCLUSION]</code> A sufficiently large <span class="math-inline">\(C\)</span> creates a nonempty decision gap. Exact pairwise attention can therefore express the hard interaction that the conditional lower bound targets.</li>
+<li><code>[SYNTHESIS]</code> This does not say every linear-time alternative is useless. It says that a universally exact replacement for all such pairwise computations should not be expected without additional assumptions or a complexity-theoretic breakthrough.</li>
+</ul>
+<h2 id="6-minimal-takeaways">6. Minimal takeaways</h2>
+<ul>
+<li>Associativity turns kernel attention into a fixed-size summary when its weights factor through a finite feature map.</li>
+<li>Causal linear attention is literally an RNN with state <span class="math-inline">\(S_t\)</span>.</li>
+<li>SSMs generalize the state update and induce semiseparable causal matrices.</li>
+<li>Mamba-2's scalar transition makes the recurrence resemble linear attention with a learned persistence mask.</li>
+<li>Recurrent and quadratic forms compute the same structured transformation but suit different hardware regimes.</li>
+<li>Conditional lower bounds identify global pairwise problems that exact standard attention can express and generic subquadratic alternatives may not solve.</li>
+</ul>
+<h2 id="7-questions-for-manual-reconstruction">7. Questions for manual reconstruction</h2>
+<ul>
+<li>[ ] Re-derive every FLOP term in the first table from matrix dimensions.</li>
+<li>[ ] Starting from <span class="math-inline">\(Y=V\Phi_K^\top\Phi_Q\)</span>, derive both the batch and recurrent algorithms.</li>
+<li>[ ] Unroll the SSM recurrence for <span class="math-inline">\(t=3\)</span> before writing the general formula.</li>
+<li>[ ] Prove the low-rank factorization of one off-diagonal semiseparable block.</li>
+<li>[ ] Explain why <span class="math-inline">\(A_t=a_tI\)</span> turns transition products into scalar persistence weights.</li>
+<li>[ ] Reconstruct the yes/no output gap in the attention solution to Orthogonal Vectors.</li>
+</ul>
+<h2 id="8-open-questions">8. Open questions</h2>
+<ul>
+<li><code>[CHECK]</code> Which normalization is required in practical linear attention to prevent state magnitude from growing with sequence length?</li>
+<li><code>[CHECK]</code> Which Mamba-2 quantities are input-dependent, and how does that affect linearity in the sequence <span class="math-inline">\(X\)</span> once parameters are conditioned on the input?</li>
+<li><code>[HYPOTHESIS]</code> The semiseparable order <span class="math-inline">\(N\)</span> may be viewed as a communication bandwidth across sequence cuts. This analogy should be tested against the exact rank definition.</li>
+</ul>
+<h2 id="references">References</h2>
+<ul>
+<li><code>[DIRECT]</code> Noah Golowich. <em>CS 395T — Lecture 4: Linear Attention and State Space Models.</em> <a href="https://noahgol.github.io/teaching/cs395t-f26/lecture4.pdf">https://noahgol.github.io/teaching/cs395t-f26/lecture4.pdf</a></li>
+<li><code>[DIRECT]</code> The lecture draws primarily on Katharopoulos et al. for recurrent linear attention, Dao and Gu for structured state space duality and Mamba-2, and Alman and Yu for conditional limitations. These are reading pointers; the papers have not been independently reconstructed here.</li>
+</ul>
+      </article>
+    </div>
+  </main>
+
+  <footer class="site-footer section-shell">
+    <div><strong>CS 395T</strong><span>Learning note</span></div>
+    <p>Markdown source · draft</p>
+    <a href="../index.html#notes">Return to index ←</a>
+  </footer>
+</body>
+</html>

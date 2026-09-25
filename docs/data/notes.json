@@ -17,6 +17,91 @@
     "disclaimer": "AI-assisted · in progress"
   },
   {
+    "title": "Lecture 04 — Linear Attention and State Space Models",
+    "question": "A first reconstruction of attention FLOPs, linear attention as a recurrent computation, state space duality, Mamba-2, and conditional barriers to subquadratic attention alternatives.",
+    "type": "learning",
+    "typeLabel": "Learning note",
+    "status": "Draft",
+    "date": "Sep 2026",
+    "tags": [
+      "linear attention",
+      "state space models",
+      "Mamba-2",
+      "semiseparable matrices",
+      "fine-grained complexity"
+    ],
+    "url": "course-notes/lecture-04.html",
+    "disclaimer": "AI-assisted · in progress"
+  },
+  {
+    "title": "Lecture 05 — Mixture-of-Experts and Scaling Laws",
+    "question": "A first reconstruction of sparse expert routing, load balancing, empirical power laws, compute-optimal parameter-data allocation, and a linear-regression scaling-law example.",
+    "type": "learning",
+    "typeLabel": "Learning note",
+    "status": "Draft",
+    "date": "Sep 2026",
+    "tags": [
+      "mixture of experts",
+      "routing",
+      "load balancing",
+      "scaling laws",
+      "compute optimality"
+    ],
+    "url": "course-notes/lecture-05.html",
+    "disclaimer": "AI-assisted · in progress"
+  },
+  {
+    "title": "Lecture 06 — Optimization I",
+    "question": "A first reconstruction of stochastic-gradient convergence, AdaGrad and Adam, adaptive regret, and the Hessian-block motivation for Transformer optimization.",
+    "type": "learning",
+    "typeLabel": "Learning note",
+    "status": "Draft",
+    "date": "Sep 2026",
+    "tags": [
+      "stochastic gradient descent",
+      "AdaGrad",
+      "Adam",
+      "regret",
+      "Hessian structure"
+    ],
+    "url": "course-notes/lecture-06.html",
+    "disclaimer": "AI-assisted · in progress"
+  },
+  {
+    "title": "Lecture 07 — Optimization II: Muon",
+    "question": "A first reconstruction of matrix orthogonalization, Muon's momentum update, and the Newton-Schulz polynomial iteration used to approximate the polar factor.",
+    "type": "learning",
+    "typeLabel": "Learning note",
+    "status": "Draft",
+    "date": "Sep 2026",
+    "tags": [
+      "Muon",
+      "Newton-Schulz",
+      "orthogonalization",
+      "singular values",
+      "matrix-aware optimization"
+    ],
+    "url": "course-notes/lecture-07.html",
+    "disclaimer": "AI-assisted · in progress"
+  },
+  {
+    "title": "Lecture 08 — Optimization III: The Optimizer Zoo",
+    "question": "A first reconstruction of optimizer updates as norm-dependent steepest descent, together with full-matrix AdaGrad, Shampoo, and SOAP.",
+    "type": "learning",
+    "typeLabel": "Learning note",
+    "status": "Draft",
+    "date": "Sep 2026",
+    "tags": [
+      "steepest descent",
+      "Shampoo",
+      "SOAP",
+      "full-matrix AdaGrad",
+      "optimizer geometry"
+    ],
+    "url": "course-notes/lecture-08.html",
+    "disclaimer": "AI-assisted · in progress"
+  },
+  {
     "title": "Lecture 09 — Chain-of-Thought and Speculative Decoding",
     "question": "A detailed guided reconstruction of chain-of-thought, STaR, function-composition lower bounds, and speculative decoding, with proofs explained step by step.",
     "type": "learning",

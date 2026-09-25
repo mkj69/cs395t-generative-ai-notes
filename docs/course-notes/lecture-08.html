@@ -1,0 +1,407 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A first reconstruction of optimizer updates as norm-dependent steepest descent, together with full-matrix AdaGrad, Shampoo, and SOAP.">
+  <title>Lecture 08 — Optimization III: The Optimizer Zoo — CS 395T</title>
+  <link rel="stylesheet" href="../assets/styles.css">
+  <script>
+    window.MathJax = {
+      tex: {
+        processEscapes: true
+      },
+      svg: { fontCache: 'global' }
+    };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js" defer></script>
+  <script src="../assets/app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header">
+    <a class="wordmark" href="../index.html"><span>CS 395T</span><small>Learning &amp; research notebook</small></a>
+    <button class="menu-button" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button>
+    <nav id="site-nav" class="site-nav" aria-label="Primary navigation">
+      <a href="../structure.html">Structure</a>
+      <a href="../index.html#notes">Index</a>
+      <a href="../method.html">Writing guide</a>
+      <a href="../index.html#about">About</a>
+    </nav>
+  </header>
+
+  <main id="main" class="note-shell">
+    <header class="note-hero">
+      <div class="template-banner learning-banner">
+        <strong>LEARNING NOTE · DRAFT</strong>
+        <span>Work in progress</span>
+      </div>
+      <p class="eyebrow">25 SEP 2026 · DRAFT</p>
+      <h1>Lecture 08 — Optimization III: The Optimizer Zoo</h1>
+      <p class="note-abstract">A first reconstruction of optimizer updates as norm-dependent steepest descent, together with full-matrix AdaGrad, Shampoo, and SOAP.</p>
+      <ul class="tag-list" aria-label="Topics"><li>steepest descent</li><li>Shampoo</li><li>SOAP</li><li>full-matrix AdaGrad</li><li>optimizer geometry</li></ul>
+    </header>
+
+    <div class="note-layout">
+      <aside class="note-toc" aria-label="On this page">
+        <p class="aside-label">ON THIS PAGE</p>
+        <div class="toc">
+<ul>
+<li><a href="#lecture-context">Lecture context</a></li>
+<li><a href="#reading-map">Reading map</a></li>
+<li><a href="#1-review-of-update-rules">1. Review of update rules</a></li>
+<li><a href="#2-optimizers-as-steepest-descent">2. Optimizers as steepest descent</a><ul>
+<li><a href="#21-gradient-descent-from-a-euclidean-penalty">2.1 Gradient descent from a Euclidean penalty</a></li>
+<li><a href="#22-sign-descent-from-a-max-norm-penalty">2.2 Sign descent from a max-norm penalty</a></li>
+<li><a href="#23-matrix-analogue-spectral-norm">2.3 Matrix analogue: spectral norm</a></li>
+</ul>
+</li>
+<li><a href="#3-shampoo">3. Shampoo</a><ul>
+<li><a href="#31-row-and-column-statistics">3.1 Row and column statistics</a></li>
+<li><a href="#32-removing-accumulation-recovers-muon-without-momentum">3.2 Removing accumulation recovers Muon without momentum</a></li>
+<li><a href="#33-kronecker-factored-full-matrix-view">3.3 Kronecker-factored full-matrix view</a></li>
+<li><a href="#34-regret-comparison">3.4 Regret comparison</a></li>
+</ul>
+</li>
+<li><a href="#4-soap">4. SOAP</a><ul>
+<li><a href="#41-a-tensor-product-basis">4.1 A tensor-product basis</a></li>
+<li><a href="#42-matrix-coordinate-implementation">4.2 Matrix-coordinate implementation</a></li>
+<li><a href="#43-why-this-equals-the-vectorized-algorithm">4.3 Why this equals the vectorized algorithm</a></li>
+<li><a href="#44-adam-in-a-rotated-basis">4.4 Adam in a rotated basis</a></li>
+<li><a href="#45-connection-back-to-shampoo">4.5 Connection back to Shampoo</a></li>
+</ul>
+</li>
+<li><a href="#5-optimizer-family-map">5. Optimizer-family map</a></li>
+<li><a href="#6-minimal-takeaways">6. Minimal takeaways</a></li>
+<li><a href="#7-questions-for-manual-reconstruction">7. Questions for manual reconstruction</a></li>
+<li><a href="#8-open-questions">8. Open questions</a></li>
+<li><a href="#references">References</a></li>
+</ul>
+</div>
+
+      </aside>
+      <article class="prose note-prose markdown-body">
+        <blockquote>
+<p><strong>AI-assisted first draft.</strong> This note reconstructs Lecture 08 and expands the norm-duality, Kronecker, and rotated-basis derivations. It is a learning scaffold, not a finished personal account.</p>
+</blockquote>
+<h2 id="lecture-context">Lecture context</h2>
+<ul>
+<li><code>[DIRECT]</code> Source: <a href="https://noahgol.github.io/teaching/cs395t-f26/lecture8.pdf">https://noahgol.github.io/teaching/cs395t-f26/lecture8.pdf</a></li>
+<li><code>[SYNTHESIS]</code> Optimizers can be organized by the geometry in which they define a small step. SGD uses Euclidean geometry, sign descent uses coordinatewise <span class="math-inline">\(\ell_\infty\)</span> geometry, Muon uses the matrix spectral norm, Shampoo uses Kronecker-factored second moments, and SOAP applies Adam in a changing matrix-derived basis.</li>
+</ul>
+<h2 id="reading-map">Reading map</h2>
+<table>
+<thead>
+<tr>
+<th>Optimizer</th>
+<th>Stored statistics</th>
+<th>Geometry / transformation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>SGD</td>
+<td>current gradient</td>
+<td>Euclidean</td>
+</tr>
+<tr>
+<td>AdaGrad</td>
+<td>coordinate squares</td>
+<td>diagonal rescaling</td>
+</tr>
+<tr>
+<td>Full-matrix AdaGrad</td>
+<td>outer products</td>
+<td>unrestricted linear preconditioner</td>
+</tr>
+<tr>
+<td>Muon</td>
+<td>momentum matrix</td>
+<td>spectral normalization</td>
+</tr>
+<tr>
+<td>Shampoo</td>
+<td>row/column Gram matrices</td>
+<td>Kronecker-factored preconditioning</td>
+</tr>
+<tr>
+<td>SOAP</td>
+<td>Gram eigenvectors + Adam moments</td>
+<td>Adam in a rotated basis</td>
+</tr>
+</tbody>
+</table>
+<h2 id="1-review-of-update-rules">1. Review of update rules</h2>
+<ul>
+<li><code>[DIRECT]</code> Diagonal AdaGrad uses</li>
+</ul>
+<div class="math-display">\[s_t=\sum_{\tau=1}^{t}g_\tau^2,
+\qquad
+\theta_{t+1,i}
+=\theta_{t,i}
+-\alpha_t\frac{g_{t,i}}{\sqrt{s_{t,i}+\epsilon}}.\]</div>
+<ul>
+<li><code>[DIRECT]</code> Full-matrix AdaGrad accumulates</li>
+</ul>
+<div class="math-display">\[C_t=\sum_{\tau=1}^{t}g_\tau g_\tau^\top\]</div>
+<p>and updates</p>
+<div class="math-display">\[\theta_{t+1}=\theta_t-\alpha_tC_t^{-1/2}g_t,\]</div>
+<p>with stabilization in practice.
+- <code>[DIRECT]</code> Idealized Muon, for <span class="math-inline">\(B_t=U_t\Sigma_tV_t^\top\)</span>, uses</p>
+<div class="math-display">\[W_{t+1}=W_t-\alpha_tU_tV_t^\top.\]</div>
+<h2 id="2-optimizers-as-steepest-descent">2. Optimizers as steepest descent</h2>
+<h3 id="21-gradient-descent-from-a-euclidean-penalty">2.1 Gradient descent from a Euclidean penalty</h3>
+<ul>
+<li><code>[DIRECT]</code> Linearize the loss at <span class="math-inline">\(\theta\)</span> with <span class="math-inline">\(g=\nabla f(\theta)\)</span> and solve</li>
+</ul>
+<div class="math-display">\[\min_\Delta
+\left\{
+f(\theta)+\langle g,\Delta\rangle
++\frac1{2\alpha}\|\Delta\|_2^2
+\right\}.\]</div>
+<ul>
+<li><code>[DERIVATION]</code> Complete the square:</li>
+</ul>
+<div class="math-display">\[\langle g,\Delta\rangle
++\frac1{2\alpha}\|\Delta\|_2^2
+=-\frac\alpha2\|g\|_2^2
++\frac1{2\alpha}\|\Delta+\alpha g\|_2^2.\]</div>
+<ul>
+<li><code>[CONCLUSION]</code> The unique minimizer is</li>
+</ul>
+<div class="math-display">\[\Delta^*=-\alpha g.\]</div>
+<h3 id="22-sign-descent-from-a-max-norm-penalty">2.2 Sign descent from a max-norm penalty</h3>
+<ul>
+<li><code>[DIRECT]</code> Consider</li>
+</ul>
+<div class="math-display">\[\min_\Delta
+\left\{
+\langle g,\Delta\rangle
++\frac\lambda2\|\Delta\|_\infty^2
+\right\}.\]</div>
+<ul>
+<li><code>[DERIVATION]</code> Put <span class="math-inline">\(a=\|\Delta\|_\infty\)</span>. Coordinatewise,</li>
+</ul>
+<div class="math-display">\[g_i\Delta_i\ge-|g_i|a,\]</div>
+<p>so</p>
+<div class="math-display">\[\langle g,\Delta\rangle
++\frac\lambda2a^2
+\ge-a\|g\|_1+\frac\lambda2a^2.\]</div>
+<ul>
+<li><code>[DERIVATION]</code> The scalar quadratic is minimized at <span class="math-inline">\(a=\|g\|_1/\lambda\)</span>. Equality in the coordinate bounds is reached by choosing every nonzero coordinate opposite to <span class="math-inline">\(g_i\)</span>.</li>
+<li><code>[CONCLUSION]</code> One minimizer is</li>
+</ul>
+<div class="math-display">\[\Delta^*
+=-\frac{\|g\|_1}{\lambda}\operatorname{sign}(g).\]</div>
+<ul>
+<li><code>[SYNTHESIS]</code> Sign descent is steepest descent under an <span class="math-inline">\(\ell_\infty\)</span> notion of step size; <span class="math-inline">\(\ell_1\)</span> appears because it is the dual norm.</li>
+</ul>
+<h3 id="23-matrix-analogue-spectral-norm">2.3 Matrix analogue: spectral norm</h3>
+<ul>
+<li><code>[DIRECT]</code> For a matrix,</li>
+</ul>
+<div class="math-display">\[\|A\|_{\mathrm{op}}
+=\sup_{\|x\|_2=1}\|Ax\|_2
+=\max_i\sigma_i(A).\]</div>
+<ul>
+<li><code>[DIRECT]</code> Its dual under the Frobenius inner product is the nuclear norm</li>
+</ul>
+<div class="math-display">\[\|G\|_*=\sum_i\sigma_i(G).\]</div>
+<ul>
+<li><code>[DIRECT]</code> For <span class="math-inline">\(G=U\Sigma V^\top\)</span>, spectral steepest descent solves</li>
+</ul>
+<div class="math-display">\[\min_\Delta
+\left\{
+\langle G,\Delta\rangle_F
++\frac\lambda2\|\Delta\|_{\mathrm{op}}^2
+\right\}.\]</div>
+<ul>
+<li><code>[DERIVATION]</code> With <span class="math-inline">\(a=\|\Delta\|_{\mathrm{op}}\)</span>,</li>
+</ul>
+<div class="math-display">\[\langle G,\Delta\rangle_F
+=\sum_i\sigma_i u_i^\top\Delta v_i
+\ge-a\sum_i\sigma_i
+=-a\|G\|_*.\]</div>
+<ul>
+<li><code>[DERIVATION]</code> Minimizing <span class="math-inline">\(-a\|G\|_*+\lambda a^2/2\)</span> gives <span class="math-inline">\(a=\|G\|_*/\lambda\)</span>.</li>
+<li><code>[CONCLUSION]</code> The bound is attained by</li>
+</ul>
+<div class="math-display">\[\Delta^*
+=-\frac{\|G\|_*}{\lambda}UV^\top.\]</div>
+<ul>
+<li><code>[SYNTHESIS]</code> Orthogonalized gradients are the matrix analogue of sign gradients when step size is measured by spectral norm.</li>
+</ul>
+<h2 id="3-shampoo">3. Shampoo</h2>
+<h3 id="31-row-and-column-statistics">3.1 Row and column statistics</h3>
+<ul>
+<li><code>[DIRECT]</code> For <span class="math-inline">\(W_t\in\mathbb{R}^{m\times n}\)</span> and gradient <span class="math-inline">\(G_t\)</span>, Shampoo accumulates</li>
+</ul>
+<div class="math-display">\[L_t=\epsilon I_m+\sum_{s=1}^{t}G_sG_s^\top,
+\qquad
+R_t=\epsilon I_n+\sum_{s=1}^{t}G_s^\top G_s.\]</div>
+<ul>
+<li><code>[DIRECT]</code> Its update is</li>
+</ul>
+<div class="math-display">\[W_{t+1}
+=W_t-\alpha L_t^{-1/4}G_tR_t^{-1/4}.\]</div>
+<h3 id="32-removing-accumulation-recovers-muon-without-momentum">3.2 Removing accumulation recovers Muon without momentum</h3>
+<ul>
+<li><code>[DERIVATION]</code> Replace <span class="math-inline">\(L_t,R_t\)</span> by current Gram matrices and let <span class="math-inline">\(G=U\Sigma V^\top\)</span>. Then</li>
+</ul>
+<div class="math-display">\[(GG^\top)^{-1/4}=U\Sigma^{-1/2}U^\top,\]</div>
+<div class="math-display">\[(G^\top G)^{-1/4}=V\Sigma^{-1/2}V^\top.\]</div>
+<ul>
+<li><code>[DERIVATION]</code> Multiplying gives</li>
+</ul>
+<div class="math-display">\[(GG^\top)^{-1/4}G(G^\top G)^{-1/4}
+=UV^\top.\]</div>
+<ul>
+<li><code>[CONCLUSION]</code> Without second-moment accumulation, Shampoo's two-sided preconditioning is Muon's exact orthogonalization with no momentum.</li>
+</ul>
+<h3 id="33-kronecker-factored-full-matrix-view">3.3 Kronecker-factored full-matrix view</h3>
+<ul>
+<li><code>[DIRECT]</code> Stack matrix rows into <span class="math-inline">\(\operatorname{vec}(G)\)</span>. The identity</li>
+</ul>
+<div class="math-display">\[\operatorname{vec}(LGR)
+=(L\otimes R^\top)\operatorname{vec}(G)\]</div>
+<p>turns two-sided multiplication into one vector-space preconditioner.
+- <code>[DERIVATION]</code> Because <span class="math-inline">\(L_t,R_t\)</span> are symmetric,</p>
+<div class="math-display">\[H_t=L_t^{1/4}\otimes R_t^{1/4}\]</div>
+<p>yields</p>
+<div class="math-display">\[w_{t+1}=w_t-\alpha H_t^{-1}g_t.\]</div>
+<ul>
+<li><code>[SYNTHESIS]</code> Full-matrix AdaGrad stores an unrestricted <span class="math-inline">\(mn\times mn\)</span> statistic. Shampoo approximates its geometry with row and column factors, storing <span class="math-inline">\(m^2+n^2\)</span> entries instead of <span class="math-inline">\(m^2n^2\)</span>.</li>
+</ul>
+<h3 id="34-regret-comparison">3.4 Regret comparison</h3>
+<ul>
+<li><code>[DIRECT]</code> Under rank-<span class="math-inline">\(r\)</span> gradients and a Frobenius iterate-distance bound <span class="math-inline">\(D\)</span>, the lecture states the Shampoo guarantee</li>
+</ul>
+<div class="math-display">\[R_T(W^*)
+\le\sqrt{2r}\,D
+\operatorname{tr}(L_T^{1/4})
+\operatorname{tr}(R_T^{1/4}).\]</div>
+<ul>
+<li><code>[DIRECT]</code> The comparable full-matrix AdaGrad bound is</li>
+</ul>
+<div class="math-display">\[R_T(W^*)
+\le\sqrt2D\operatorname{tr}(C_T^{1/2}).\]</div>
+<ul>
+<li><code>[SYNTHESIS]</code> The stated Shampoo bound is not automatically tighter. Its advantage is a structured, tractable preconditioner; the price can be a looser guarantee.</li>
+<li><code>[CHECK]</code> Reconstruct the rank-<span class="math-inline">\(r\)</span> example and the positive-semidefinite inequality comparing these two bounds before treating the regret section as complete.</li>
+</ul>
+<h2 id="4-soap">4. SOAP</h2>
+<h3 id="41-a-tensor-product-basis">4.1 A tensor-product basis</h3>
+<ul>
+<li><code>[DIRECT]</code> Let</li>
+</ul>
+<div class="math-display">\[L_{t-1}=Q_{L,t}\Lambda_{L,t}Q_{L,t}^\top,
+\qquad
+R_{t-1}=Q_{R,t}\Lambda_{R,t}Q_{R,t}^\top.\]</div>
+<ul>
+<li><code>[DIRECT]</code> The induced vector-space basis is</li>
+</ul>
+<div class="math-display">\[Q_t=Q_{L,t}\otimes Q_{R,t}.\]</div>
+<ul>
+<li><code>[DERIVATION]</code> It is orthogonal because</li>
+</ul>
+<div class="math-display">\[Q_t^\top Q_t
+=(Q_{L,t}^\top Q_{L,t})
+\otimes
+(Q_{R,t}^\top Q_{R,t})
+=I_{mn}.\]</div>
+<h3 id="42-matrix-coordinate-implementation">4.2 Matrix-coordinate implementation</h3>
+<ul>
+<li><code>[DIRECT]</code> Rotate the gradient into the current basis:</li>
+</ul>
+<div class="math-display">\[G_t&#x27;=Q_{L,t}^\top G_tQ_{R,t}.\]</div>
+<ul>
+<li><code>[DIRECT]</code> Maintain original-coordinate first momentum</li>
+</ul>
+<div class="math-display">\[M_t=\beta_1M_{t-1}+(1-\beta_1)G_t\]</div>
+<p>and rotate it when needed:</p>
+<div class="math-display">\[M_t&#x27;=Q_{L,t}^\top M_tQ_{R,t}.\]</div>
+<ul>
+<li><code>[DIRECT]</code> Maintain the second moment in rotated coordinates:</li>
+</ul>
+<div class="math-display">\[V_t=\beta_2V_{t-1}+(1-\beta_2)(G_t&#x27;\odot G_t&#x27;).\]</div>
+<ul>
+<li><code>[DIRECT]</code> Normalize entrywise, rotate back, and update:</li>
+</ul>
+<div class="math-display">\[N_t&#x27;=\frac{M_t&#x27;}{\sqrt{V_t+\epsilon}},
+\qquad
+N_t=Q_{L,t}N_t&#x27;Q_{R,t}^\top,
+\qquad
+W_{t+1}=W_t-\alpha_tN_t.\]</div>
+<h3 id="43-why-this-equals-the-vectorized-algorithm">4.3 Why this equals the vectorized algorithm</h3>
+<ul>
+<li><code>[DERIVATION]</code> The vec identity gives</li>
+</ul>
+<div class="math-display">\[\operatorname{vec}(Q_{L,t}^\top AQ_{R,t})
+=Q_t^\top\operatorname{vec}(A).\]</div>
+<ul>
+<li><code>[SYNTHESIS]</code> Every matrix-side rotation, entrywise operation, and inverse rotation therefore matches the corresponding vector-space basis change without constructing the <span class="math-inline">\(mn\times mn\)</span> matrix <span class="math-inline">\(Q_t\)</span>.</li>
+</ul>
+<h3 id="44-adam-in-a-rotated-basis">4.4 Adam in a rotated basis</h3>
+<ul>
+<li><code>[DIRECT]</code> If <span class="math-inline">\(Q\)</span> were fixed and <span class="math-inline">\(z=Q^\top w\)</span>, then <span class="math-inline">\(g&#x27;=Q^\top g\)</span> is the gradient in <span class="math-inline">\(z\)</span> coordinates. SOAP's moment and parameter recurrences become exactly Adam in those coordinates.</li>
+<li><code>[CHECK]</code> In actual SOAP, the basis changes with <span class="math-inline">\(t\)</span>. The first moment is maintained in original coordinates and reprojected exactly; the second moment stores squared gradients measured in their historical bases.</li>
+</ul>
+<h3 id="45-connection-back-to-shampoo">4.5 Connection back to Shampoo</h3>
+<ul>
+<li><code>[DIRECT]</code> The tensor-product eigenbasis also diagonalizes Shampoo's preconditioner:</li>
+</ul>
+<div class="math-display">\[L_t^{1/4}\otimes R_t^{1/4}
+=Q_t
+\left(\Lambda_{L,t}^{1/4}\otimes\Lambda_{R,t}^{1/4}\right)
+Q_t^\top.\]</div>
+<ul>
+<li><code>[SYNTHESIS]</code> Shampoo and SOAP share a matrix-derived basis. Shampoo uses the analytic scaling <span class="math-inline">\((\ell_i\rho_j)^{-1/4}\)</span>; SOAP learns an Adam-style coordinate scaling inside that basis.</li>
+</ul>
+<h2 id="5-optimizer-family-map">5. Optimizer-family map</h2>
+<ul>
+<li><code>[SYNTHESIS]</code> The lecture's optimizer zoo can be read as a sequence of design decisions:
+1. Should scaling be scalar, coordinatewise, or matrix-aware?
+2. Should second moments accumulate forever or use an EMA?
+3. Should matrix structure be represented fully or with Kronecker row/column factors?
+4. Should the factors directly define the scale, or only define a basis in which Adam learns the scale?</li>
+</ul>
+<h2 id="6-minimal-takeaways">6. Minimal takeaways</h2>
+<ul>
+<li>A gradient direction is incomplete without specifying the norm that measures allowable steps.</li>
+<li>SGD, sign descent, and Muon are steepest-descent updates in Euclidean, <span class="math-inline">\(\ell_\infty\)</span>, and spectral geometries respectively.</li>
+<li>Shampoo approximates full-matrix adaptation using row and column Gram factors.</li>
+<li>Without accumulation, Shampoo collapses algebraically to Muon without momentum.</li>
+<li>SOAP uses Shampoo-like eigenvectors to choose coordinates and Adam to normalize within those coordinates.</li>
+<li>Structured preconditioners trade expressivity for feasible storage and computation.</li>
+</ul>
+<h2 id="7-questions-for-manual-reconstruction">7. Questions for manual reconstruction</h2>
+<ul>
+<li>[ ] Complete the square to recover gradient descent.</li>
+<li>[ ] Derive sign descent using <span class="math-inline">\(\ell_1\)</span>-<span class="math-inline">\(\ell_\infty\)</span> duality.</li>
+<li>[ ] Repeat the spectral steepest-descent proof using nuclear-spectral duality.</li>
+<li>[ ] Starting from an SVD, show that current-step Shampoo equals <span class="math-inline">\(UV^\top\)</span>.</li>
+<li>[ ] Prove the vec/Kronecker identity coordinate by coordinate.</li>
+<li>[ ] Explain precisely what SOAP stores in the current basis and what remains tied to past bases.</li>
+</ul>
+<h2 id="8-open-questions">8. Open questions</h2>
+<ul>
+<li><code>[CHECK]</code> How often can practical SOAP recompute eigendecompositions before their cost dominates?</li>
+<li><code>[CHECK]</code> How do numerical stabilizers and low-rank Gram matrices change the ideal formulas?</li>
+<li><code>[HYPOTHESIS]</code> An optimizer's most important inductive bias may be its invariance under reparameterization. Compare the invariance groups of Adam, Muon, Shampoo, and SOAP.</li>
+</ul>
+<h2 id="references">References</h2>
+<ul>
+<li><code>[DIRECT]</code> Noah Golowich. <em>CS 395T — Lecture 8: Optimization III — The Optimizer Zoo.</em> <a href="https://noahgol.github.io/teaching/cs395t-f26/lecture8.pdf">https://noahgol.github.io/teaching/cs395t-f26/lecture8.pdf</a></li>
+<li><code>[DIRECT]</code> The lecture's primary reading pointers are Duchi et al. for AdaGrad, Gupta et al. for Shampoo, Vyas et al. for SOAP, and Bernstein and Newhouse for norm-based optimizer geometry. They have not been independently reconstructed here.</li>
+</ul>
+      </article>
+    </div>
+  </main>
+
+  <footer class="site-footer section-shell">
+    <div><strong>CS 395T</strong><span>Learning note</span></div>
+    <p>Markdown source · draft</p>
+    <a href="../index.html#notes">Return to index ←</a>
+  </footer>
+</body>
+</html>

@@ -1,0 +1,354 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A first reconstruction of stochastic-gradient convergence, AdaGrad and Adam, adaptive regret, and the Hessian-block motivation for Transformer optimization.">
+  <title>Lecture 06 — Optimization I — CS 395T</title>
+  <link rel="stylesheet" href="../assets/styles.css">
+  <script>
+    window.MathJax = {
+      tex: {
+        processEscapes: true
+      },
+      svg: { fontCache: 'global' }
+    };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js" defer></script>
+  <script src="../assets/app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header">
+    <a class="wordmark" href="../index.html"><span>CS 395T</span><small>Learning &amp; research notebook</small></a>
+    <button class="menu-button" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button>
+    <nav id="site-nav" class="site-nav" aria-label="Primary navigation">
+      <a href="../structure.html">Structure</a>
+      <a href="../index.html#notes">Index</a>
+      <a href="../method.html">Writing guide</a>
+      <a href="../index.html#about">About</a>
+    </nav>
+  </header>
+
+  <main id="main" class="note-shell">
+    <header class="note-hero">
+      <div class="template-banner learning-banner">
+        <strong>LEARNING NOTE · DRAFT</strong>
+        <span>Work in progress</span>
+      </div>
+      <p class="eyebrow">25 SEP 2026 · DRAFT</p>
+      <h1>Lecture 06 — Optimization I</h1>
+      <p class="note-abstract">A first reconstruction of stochastic-gradient convergence, AdaGrad and Adam, adaptive regret, and the Hessian-block motivation for Transformer optimization.</p>
+      <ul class="tag-list" aria-label="Topics"><li>stochastic gradient descent</li><li>AdaGrad</li><li>Adam</li><li>regret</li><li>Hessian structure</li></ul>
+    </header>
+
+    <div class="note-layout">
+      <aside class="note-toc" aria-label="On this page">
+        <p class="aside-label">ON THIS PAGE</p>
+        <div class="toc">
+<ul>
+<li><a href="#lecture-context">Lecture context</a></li>
+<li><a href="#reading-map">Reading map</a></li>
+<li><a href="#1-optimization-and-stochastic-gradients">1. Optimization and stochastic gradients</a></li>
+<li><a href="#2-sgd-reaches-an-approximate-stationary-point">2. SGD reaches an approximate stationary point</a><ul>
+<li><a href="#21-smoothness-inequality">2.1 Smoothness inequality</a></li>
+<li><a href="#22-one-step-expected-descent">2.2 One-step expected descent</a></li>
+<li><a href="#23-telescoping-the-proof">2.3 Telescoping the proof</a></li>
+</ul>
+</li>
+<li><a href="#3-adaptive-optimizers">3. Adaptive optimizers</a><ul>
+<li><a href="#31-generic-diagonal-preconditioning">3.1 Generic diagonal preconditioning</a></li>
+<li><a href="#32-adagrad">3.2 AdaGrad</a></li>
+<li><a href="#33-adam">3.3 Adam</a></li>
+</ul>
+</li>
+<li><a href="#4-adagrads-adaptive-regret">4. AdaGrad's adaptive regret</a><ul>
+<li><a href="#41-online-setting">4.1 Online setting</a></li>
+</ul>
+</li>
+<li><a href="#5-hessian-structure-and-transformer-optimization">5. Hessian structure and Transformer optimization</a><ul>
+<li><a href="#51-curvature-controls-stable-step-sizes">5.1 Curvature controls stable step sizes</a></li>
+<li><a href="#52-why-one-global-rate-can-be-inefficient">5.2 Why one global rate can be inefficient</a></li>
+</ul>
+</li>
+<li><a href="#6-minimal-takeaways">6. Minimal takeaways</a></li>
+<li><a href="#7-questions-for-manual-reconstruction">7. Questions for manual reconstruction</a></li>
+<li><a href="#8-open-questions">8. Open questions</a></li>
+<li><a href="#references">References</a></li>
+</ul>
+</div>
+
+      </aside>
+      <article class="prose note-prose markdown-body">
+        <blockquote>
+<p><strong>AI-assisted first draft.</strong> This note reconstructs Lecture 06 and expands the central SGD and adaptive-optimization arguments. It should be verified and rewritten during manual study.</p>
+</blockquote>
+<h2 id="lecture-context">Lecture context</h2>
+<ul>
+<li><code>[DIRECT]</code> Source: <a href="https://noahgol.github.io/teaching/cs395t-f26/lecture6.pdf">https://noahgol.github.io/teaching/cs395t-f26/lecture6.pdf</a></li>
+<li><code>[SYNTHESIS]</code> The lecture moves from a basic nonconvex SGD guarantee to coordinate-adaptive methods, then asks why Transformer parameter blocks may benefit from different effective learning rates.</li>
+</ul>
+<h2 id="reading-map">Reading map</h2>
+<table>
+<thead>
+<tr>
+<th>Part</th>
+<th>Question</th>
+<th>Main mathematical tool</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>SGD</td>
+<td>Does noisy descent approach stationarity?</td>
+<td>smoothness and telescoping</td>
+</tr>
+<tr>
+<td>AdaGrad / Adam</td>
+<td>Why rescale coordinates?</td>
+<td>accumulated or moving second moments</td>
+</tr>
+<tr>
+<td>AdaGrad regret</td>
+<td>What does adaptivity buy online?</td>
+<td>coordinatewise potential bounds</td>
+</tr>
+<tr>
+<td>Hessian blocks</td>
+<td>Why can one global step size be inefficient?</td>
+<td>curvature eigenvalues</td>
+</tr>
+</tbody>
+</table>
+<h2 id="1-optimization-and-stochastic-gradients">1. Optimization and stochastic gradients</h2>
+<ul>
+<li><code>[DIRECT]</code> The population objective is</li>
+</ul>
+<div class="math-display">\[\min_{\theta\in\mathcal B}F(\theta),
+\qquad
+F(\theta)=\mathbb E_{z\sim\mathcal D}[f(\theta,z)].\]</div>
+<ul>
+<li><code>[DIRECT]</code> At iteration <span class="math-inline">\(t\)</span>, a batch <span class="math-inline">\(B_t=(z_{t,1},\ldots,z_{t,b})\)</span> defines</li>
+</ul>
+<div class="math-display">\[g_t
+=\frac1b\sum_{r=1}^{b}\nabla_\theta f(\theta_t,z_{t,r}).\]</div>
+<ul>
+<li><code>[DIRECT]</code> Conditional on the history before drawing the batch,</li>
+</ul>
+<div class="math-display">\[\mathbb E_t[g_t]=\nabla F(\theta_t),
+\qquad
+\mathbb E_t\|g_t-\nabla F(\theta_t)\|_2^2
+\le\frac{\sigma_0^2}{b}=:\sigma^2.\]</div>
+<ul>
+<li><code>[SYNTHESIS]</code> Larger batches reduce this variance bound by <span class="math-inline">\(1/b\)</span>, but they do not change the underlying population gradient.</li>
+</ul>
+<h2 id="2-sgd-reaches-an-approximate-stationary-point">2. SGD reaches an approximate stationary point</h2>
+<h3 id="21-smoothness-inequality">2.1 Smoothness inequality</h3>
+<ul>
+<li><code>[DIRECT]</code> <span class="math-inline">\(F\)</span> is <span class="math-inline">\(L\)</span>-smooth when</li>
+</ul>
+<div class="math-display">\[\|\nabla F(\theta)-\nabla F(\theta&#x27;)\|_2
+\le L\|\theta-\theta&#x27;\|_2.\]</div>
+<ul>
+<li><code>[DERIVATION]</code> Along the segment <span class="math-inline">\(\theta+us\)</span>,</li>
+</ul>
+<div class="math-display">\[F(\theta+s)-F(\theta)
+=\int_0^1\langle\nabla F(\theta+us),s\rangle\,du.\]</div>
+<ul>
+<li><code>[DERIVATION]</code> Add and subtract <span class="math-inline">\(\nabla F(\theta)\)</span> and use smoothness:</li>
+</ul>
+<div class="math-display">\[F(\theta+s)
+\le F(\theta)+\langle\nabla F(\theta),s\rangle
++\int_0^1Lu\|s\|_2^2\,du.\]</div>
+<ul>
+<li><code>[CONCLUSION]</code> Therefore</li>
+</ul>
+<div class="math-display">\[F(\theta+s)
+\le F(\theta)+\langle\nabla F(\theta),s\rangle
++\frac L2\|s\|_2^2.\]</div>
+<h3 id="22-one-step-expected-descent">2.2 One-step expected descent</h3>
+<ul>
+<li><code>[DIRECT]</code> SGD updates</li>
+</ul>
+<div class="math-display">\[\theta_{t+1}=\theta_t-\alpha g_t.\]</div>
+<ul>
+<li><code>[DERIVATION · Step 1]</code> Substitute <span class="math-inline">\(s=-\alpha g_t\)</span> into the smoothness inequality and take conditional expectation:</li>
+</ul>
+<div class="math-display">\[\mathbb E_t[F(\theta_{t+1})]
+\le F(\theta_t)
+-\alpha\langle\nabla F(\theta_t),\mathbb E_tg_t\rangle
++\frac{L\alpha^2}{2}\mathbb E_t\|g_t\|_2^2.\]</div>
+<ul>
+<li><code>[DERIVATION · Step 2]</code> Unbiasedness and the bias-variance identity give</li>
+</ul>
+<div class="math-display">\[\mathbb E_t\|g_t\|_2^2
+=\|\nabla F(\theta_t)\|_2^2
++\mathbb E_t\|g_t-\nabla F(\theta_t)\|_2^2
+\le\|\nabla F(\theta_t)\|_2^2+\sigma^2.\]</div>
+<ul>
+<li><code>[DERIVATION · Step 3]</code> If <span class="math-inline">\(\alpha\le1/L\)</span>, then</li>
+</ul>
+<div class="math-display">\[\mathbb E_t[F(\theta_{t+1})]
+\le F(\theta_t)
+-\frac\alpha2\|\nabla F(\theta_t)\|_2^2
++\frac{L\alpha^2\sigma^2}{2}.\]</div>
+<h3 id="23-telescoping-the-proof">2.3 Telescoping the proof</h3>
+<ul>
+<li><code>[DIRECT]</code> Let <span class="math-inline">\(F_*=\min_{\theta\in\mathcal B}F(\theta)\)</span> and <span class="math-inline">\(\Delta=F(\theta_1)-F_*\)</span>. Sum the one-step bound from <span class="math-inline">\(1\)</span> to <span class="math-inline">\(T\)</span>:</li>
+</ul>
+<div class="math-display">\[\frac\alpha2
+\sum_{t=1}^{T}\mathbb E\|\nabla F(\theta_t)\|_2^2
+\le
+\Delta+rac{TL\alpha^2\sigma^2}{2}.\]</div>
+<ul>
+<li><code>[DIRECT]</code> Dividing by <span class="math-inline">\(\alpha T/2\)</span> gives</li>
+</ul>
+<div class="math-display">\[\frac1T\sum_{t=1}^{T}
+\mathbb E\|\nabla F(\theta_t)\|_2^2
+\le
+\frac{2\Delta}{\alpha T}+L\alpha\sigma^2.\]</div>
+<ul>
+<li><code>[SYNTHESIS]</code> The first term rewards a larger step; the second term amplifies gradient noise. The theorem exposes a bias-variance-like tradeoff in the step size.</li>
+<li><code>[DIRECT]</code> Choosing <span class="math-inline">\(\alpha=1/(L\sqrt T)\)</span> gives</li>
+</ul>
+<div class="math-display">\[\mathbb E\|\nabla F(\theta_\tau)\|_2^2
+\le
+\frac{2L\Delta+\sigma_0^2/b}{\sqrt T},\]</div>
+<p>for a uniformly random iterate <span class="math-inline">\(\tau\)</span>.
+- <code>[CHECK]</code> This proves approximate stationarity, not convergence to a global minimum. A small gradient can occur at a local minimum, saddle, or flat nonoptimal region.</p>
+<h2 id="3-adaptive-optimizers">3. Adaptive optimizers</h2>
+<h3 id="31-generic-diagonal-preconditioning">3.1 Generic diagonal preconditioning</h3>
+<ul>
+<li><code>[DIRECT]</code> Adaptive methods maintain a direction <span class="math-inline">\(m_t\)</span> and a positive diagonal scale <span class="math-inline">\(V_t=\operatorname{diag}(v_t)\)</span>:</li>
+</ul>
+<div class="math-display">\[\theta_{t+1}
+=\theta_t-\alpha_tV_t^{-1/2}m_t.\]</div>
+<ul>
+<li><code>[SYNTHESIS]</code> Coordinate <span class="math-inline">\(i\)</span> receives effective step size <span class="math-inline">\(\alpha_t/\sqrt{v_{t,i}}\)</span>. Ordinary SGD corresponds to <span class="math-inline">\(m_t=g_t\)</span> and <span class="math-inline">\(V_t=I\)</span>.</li>
+</ul>
+<h3 id="32-adagrad">3.2 AdaGrad</h3>
+<ul>
+<li><code>[DIRECT]</code> AdaGrad accumulates squared gradients:</li>
+</ul>
+<div class="math-display">\[s_t=s_{t-1}+g_t^2,
+\qquad
+\theta_{t+1,i}
+=\theta_{t,i}
+-\frac{\alpha g_{t,i}}{\sqrt{\epsilon+s_{t,i}}}.\]</div>
+<ul>
+<li><code>[DERIVATION]</code> Ignoring <span class="math-inline">\(\epsilon\)</span>, if every historical gradient in one coordinate is multiplied by <span class="math-inline">\(c&gt;0\)</span>, then both numerator and denominator scale by <span class="math-inline">\(c\)</span>. The update in that coordinate is unchanged.</li>
+<li><code>[SYNTHESIS]</code> Rarely active coordinates accumulate less squared gradient and retain larger effective rates. The limitation is permanent memory: the denominator never forgets old large gradients.</li>
+</ul>
+<h3 id="33-adam">3.3 Adam</h3>
+<ul>
+<li><code>[DIRECT]</code> Adam uses exponential moving averages</li>
+</ul>
+<div class="math-display">\[m_t=\beta_1m_{t-1}+(1-\beta_1)g_t,\]</div>
+<div class="math-display">\[v_t=\beta_2v_{t-1}+(1-\beta_2)g_t^2,\]</div>
+<p>followed by</p>
+<div class="math-display">\[\theta_{t+1,i}
+=\theta_{t,i}
+-\alpha_t\frac{m_{t,i}}{\sqrt{v_{t,i}+\epsilon}}.\]</div>
+<ul>
+<li><code>[DIRECT]</code> Bias correction replaces</li>
+</ul>
+<div class="math-display">\[m_t\mapsto\frac{m_t}{1-\beta_1^t},
+\qquad
+v_t\mapsto\frac{v_t}{1-\beta_2^t},\]</div>
+<p>compensating for initialization at zero.
+- <code>[DERIVATION]</code> For independent scalar gradients with variance <span class="math-inline">\(\nu^2\)</span>, an EMA with decay <span class="math-inline">\(\beta\)</span> has limiting variance</p>
+<div class="math-display">\[(1-\beta)^2\sum_{k=0}^{\infty}\beta^{2k}\nu^2
+=\frac{1-\beta}{1+\beta}\nu^2.\]</div>
+<ul>
+<li><code>[SYNTHESIS]</code> Momentum reduces noise in a persistent direction but introduces lag when the gradient changes. Adam's second moment forgets old scale information, unlike AdaGrad.</li>
+</ul>
+<h2 id="4-adagrads-adaptive-regret">4. AdaGrad's adaptive regret</h2>
+<h3 id="41-online-setting">4.1 Online setting</h3>
+<ul>
+<li><code>[DIRECT]</code> At round <span class="math-inline">\(t\)</span>, choose <span class="math-inline">\(\theta_t\)</span> before seeing a convex loss <span class="math-inline">\(f_t\)</span>, observe <span class="math-inline">\(g_t=\nabla f_t(\theta_t)\)</span>, and compare with a fixed <span class="math-inline">\(\theta^*\)</span> using</li>
+</ul>
+<div class="math-display">\[R_T(\theta^*)
+=\sum_{t=1}^{T}\bigl[f_t(\theta_t)-f_t(\theta^*)\bigr].\]</div>
+<ul>
+<li><code>[DIRECT]</code> With <span class="math-inline">\(s_{t,i}=\sum_{j=1}^{t}g_{j,i}^2\)</span>, coordinate AdaGrad yields a bound proportional to</li>
+</ul>
+<div class="math-display">\[D_\infty\sum_{i=1}^{d}\sqrt{s_{T,i}}.\]</div>
+<ul>
+<li><code>[SYNTHESIS]</code> This quantity adapts to the observed coordinate geometry rather than paying only for the global Euclidean norm.</li>
+<li><code>[DERIVATION]</code> If all gradients are supported on the same <span class="math-inline">\(k\)</span> coordinates, Cauchy-Schwarz gives</li>
+</ul>
+<div class="math-display">\[\sum_{i=1}^{d}\sqrt{s_{T,i}}
+=\sum_{i\in S}\sqrt{s_{T,i}}
+\le\sqrt{k}
+\left(\sum_{t=1}^{T}\|g_t\|_2^2\right)^{1/2}.\]</div>
+<ul>
+<li><code>[CONCLUSION]</code> The adaptive bound can replace ambient dimension dependence by effective active-coordinate dependence.</li>
+<li><code>[CHECK]</code> Reconstruct the exact potential argument and constants in Theorem 3.2 before treating the regret proof as complete.</li>
+</ul>
+<h2 id="5-hessian-structure-and-transformer-optimization">5. Hessian structure and Transformer optimization</h2>
+<h3 id="51-curvature-controls-stable-step-sizes">5.1 Curvature controls stable step sizes</h3>
+<ul>
+<li><code>[DIRECT]</code> Near <span class="math-inline">\(\theta\)</span>, a twice-differentiable objective has the local expansion</li>
+</ul>
+<div class="math-display">\[F(\theta+s)
+=F(\theta)+\langle\nabla F(\theta),s\rangle
++\frac12s^\top H(\theta)s+R_3(s).\]</div>
+<ul>
+<li><code>[DIRECT]</code> For a convex quadratic with Hessian <span class="math-inline">\(H\succeq0\)</span>, gradient descent error obeys</li>
+</ul>
+<div class="math-display">\[e_{t+1}=(I-\alpha H)e_t.\]</div>
+<ul>
+<li><code>[DERIVATION]</code> Along an eigenvector with eigenvalue <span class="math-inline">\(\lambda\)</span>, the scalar error is multiplied by <span class="math-inline">\(1-\alpha\lambda\)</span>. Every positive-curvature direction contracts when</li>
+</ul>
+<div class="math-display">\[0&lt;\alpha&lt;\frac{2}{\lambda_{\max}(H)}.\]</div>
+<h3 id="52-why-one-global-rate-can-be-inefficient">5.2 Why one global rate can be inefficient</h3>
+<ul>
+<li><code>[EXAMPLE]</code> For</li>
+</ul>
+<div class="math-display">\[Q(a,b)=\frac12(Ma^2+mb^2),
+\qquad M\gg m&gt;0,\]</div>
+<p>the globally safe choice <span class="math-inline">\(\alpha=1/M\)</span> removes the <span class="math-inline">\(a\)</span> error in one step but shrinks <span class="math-inline">\(b\)</span> only by <span class="math-inline">\(1-m/M\)</span> per step. Separate rates <span class="math-inline">\(1/M\)</span> and <span class="math-inline">\(1/m\)</span> remove both immediately.
+- <code>[DIRECT]</code> If the Hessian is approximately block diagonal,</p>
+<div class="math-display">\[H\approx\operatorname{diag}(H_{11},\ldots,H_{KK}),\]</div>
+<p>a global step must accommodate the most curved block.
+- <code>[DIRECT]</code> The lecture reports that sampled Transformer blocks have substantially different Hessian spectra, whereas sampled CNN blocks in the cited experiment are more similar.
+- <code>[SYNTHESIS]</code> This block heterogeneity is evidence for one explanation of Adam's advantage: adaptive scaling can supply different effective rates to parameter groups with different curvature.
+- <code>[CHECK]</code> This is empirical motivation, not a proof that Adam is optimal or that Hessian block structure is the only cause of its behavior.</p>
+<h2 id="6-minimal-takeaways">6. Minimal takeaways</h2>
+<ul>
+<li>Smoothness plus unbiased gradients gives a clean SGD stationarity bound through one-step descent and telescoping.</li>
+<li>A constant nonzero step leaves a noise floor; a horizon-dependent step balances progress and variance.</li>
+<li>AdaGrad remembers all squared gradients; Adam uses moving averages and can forget obsolete scale.</li>
+<li>Coordinate adaptivity can exploit sparse or heterogeneous gradient geometry.</li>
+<li>Transformer parameter blocks may have different curvature spectra, making one global learning rate inefficient.</li>
+</ul>
+<h2 id="7-questions-for-manual-reconstruction">7. Questions for manual reconstruction</h2>
+<ul>
+<li>[ ] Prove the smoothness descent inequality from the line integral.</li>
+<li>[ ] Derive the SGD theorem without skipping the conditional expectation step.</li>
+<li>[ ] Explain why the theorem selects a random iterate.</li>
+<li>[ ] Compare AdaGrad and Adam memory on a coordinate whose gradients become small halfway through training.</li>
+<li>[ ] Derive the scalar contraction factor <span class="math-inline">\(1-\alpha\lambda\)</span> for a quadratic.</li>
+</ul>
+<h2 id="8-open-questions">8. Open questions</h2>
+<ul>
+<li><code>[CHECK]</code> How do momentum and preconditioning alter the simple Hessian-eigenvector picture?</li>
+<li><code>[CHECK]</code> Which parameter partition best exposes Transformer block heterogeneity: tensors, layers, or functional groups such as <span class="math-inline">\(Q/K/V\)</span>?</li>
+<li><code>[HYPOTHESIS]</code> Much of adaptive optimization's benefit may come from matching architectural blocks rather than individual scalar coordinates. Lecture 07–08 will provide matrix-aware alternatives for testing this idea.</li>
+</ul>
+<h2 id="references">References</h2>
+<ul>
+<li><code>[DIRECT]</code> Noah Golowich. <em>CS 395T — Lecture 6: Optimization I.</em> <a href="https://noahgol.github.io/teaching/cs395t-f26/lecture6.pdf">https://noahgol.github.io/teaching/cs395t-f26/lecture6.pdf</a></li>
+<li><code>[DIRECT]</code> Primary reading pointers in the lecture are Kingma and Ba for Adam, Duchi et al. for AdaGrad, and Zhang et al. for the Hessian perspective. They have not been independently reconstructed here.</li>
+</ul>
+      </article>
+    </div>
+  </main>
+
+  <footer class="site-footer section-shell">
+    <div><strong>CS 395T</strong><span>Learning note</span></div>
+    <p>Markdown source · draft</p>
+    <a href="../index.html#notes">Return to index ←</a>
+  </footer>
+</body>
+</html>

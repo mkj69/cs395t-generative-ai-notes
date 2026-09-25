@@ -1,0 +1,339 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A first reconstruction of matrix orthogonalization, Muon&#x27;s momentum update, and the Newton-Schulz polynomial iteration used to approximate the polar factor.">
+  <title>Lecture 07 — Optimization II: Muon — CS 395T</title>
+  <link rel="stylesheet" href="../assets/styles.css">
+  <script>
+    window.MathJax = {
+      tex: {
+        processEscapes: true
+      },
+      svg: { fontCache: 'global' }
+    };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js" defer></script>
+  <script src="../assets/app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header">
+    <a class="wordmark" href="../index.html"><span>CS 395T</span><small>Learning &amp; research notebook</small></a>
+    <button class="menu-button" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button>
+    <nav id="site-nav" class="site-nav" aria-label="Primary navigation">
+      <a href="../structure.html">Structure</a>
+      <a href="../index.html#notes">Index</a>
+      <a href="../method.html">Writing guide</a>
+      <a href="../index.html#about">About</a>
+    </nav>
+  </header>
+
+  <main id="main" class="note-shell">
+    <header class="note-hero">
+      <div class="template-banner learning-banner">
+        <strong>LEARNING NOTE · DRAFT</strong>
+        <span>Work in progress</span>
+      </div>
+      <p class="eyebrow">25 SEP 2026 · DRAFT</p>
+      <h1>Lecture 07 — Optimization II: Muon</h1>
+      <p class="note-abstract">A first reconstruction of matrix orthogonalization, Muon&#x27;s momentum update, and the Newton-Schulz polynomial iteration used to approximate the polar factor.</p>
+      <ul class="tag-list" aria-label="Topics"><li>Muon</li><li>Newton-Schulz</li><li>orthogonalization</li><li>singular values</li><li>matrix-aware optimization</li></ul>
+    </header>
+
+    <div class="note-layout">
+      <aside class="note-toc" aria-label="On this page">
+        <p class="aside-label">ON THIS PAGE</p>
+        <div class="toc">
+<ul>
+<li><a href="#lecture-context">Lecture context</a></li>
+<li><a href="#reading-map">Reading map</a></li>
+<li><a href="#1-why-entrywise-signs-are-not-matrix-geometry">1. Why entrywise signs are not matrix geometry</a></li>
+<li><a href="#2-orthogonalization">2. Orthogonalization</a><ul>
+<li><a href="#21-target-definition">2.1 Target definition</a></li>
+<li><a href="#22-why-the-polar-factor-is-nearest">2.2 Why the polar factor is nearest</a></li>
+<li><a href="#23-change-of-basis-behavior">2.3 Change-of-basis behavior</a></li>
+</ul>
+</li>
+<li><a href="#3-muon">3. Muon</a></li>
+<li><a href="#4-newton-schulz-as-a-singular-value-iteration">4. Newton-Schulz as a singular-value iteration</a><ul>
+<li><a href="#41-polynomial-matrix-update">4.1 Polynomial matrix update</a></li>
+<li><a href="#42-initialization">4.2 Initialization</a></li>
+<li><a href="#43-classical-cubic-convergence">4.3 Classical cubic convergence</a></li>
+</ul>
+</li>
+<li><a href="#5-newtonschulz5-in-muon">5. NewtonSchulz5 in Muon</a></li>
+<li><a href="#6-worked-singular-value-picture">6. Worked singular-value picture</a></li>
+<li><a href="#7-minimal-takeaways">7. Minimal takeaways</a></li>
+<li><a href="#8-questions-for-manual-reconstruction">8. Questions for manual reconstruction</a></li>
+<li><a href="#9-open-questions">9. Open questions</a></li>
+<li><a href="#references">References</a></li>
+</ul>
+</div>
+
+      </aside>
+      <article class="prose note-prose markdown-body">
+        <blockquote>
+<p><strong>AI-assisted first draft.</strong> This note follows Lecture 07 and expands the proofs that orthogonalization is the nearest semi-orthogonal matrix and that Newton-Schulz acts independently on singular values.</p>
+</blockquote>
+<h2 id="lecture-context">Lecture context</h2>
+<ul>
+<li><code>[DIRECT]</code> Source: <a href="https://noahgol.github.io/teaching/cs395t-f26/lecture7.pdf">https://noahgol.github.io/teaching/cs395t-f26/lecture7.pdf</a></li>
+<li><code>[SYNTHESIS]</code> Adam normalizes scalar coordinates. Muon instead respects the fact that neural-network weights are matrices acting between activation spaces: it keeps a momentum matrix's singular vectors and approximately normalizes its singular values.</li>
+</ul>
+<h2 id="reading-map">Reading map</h2>
+<table>
+<thead>
+<tr>
+<th>Part</th>
+<th>Scalar/vector analogue</th>
+<th>Matrix operation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Sign gradient</td>
+<td>normalize coordinates</td>
+<td>entrywise sign</td>
+</tr>
+<tr>
+<td>Orthogonalization</td>
+<td>normalize magnitude</td>
+<td>set positive singular values to one</td>
+</tr>
+<tr>
+<td>Muon</td>
+<td>momentum plus normalization</td>
+<td>orthogonalize momentum buffer</td>
+</tr>
+<tr>
+<td>Newton-Schulz</td>
+<td>scalar fixed-point iteration</td>
+<td>polynomial matrix multiplication</td>
+</tr>
+</tbody>
+</table>
+<h2 id="1-why-entrywise-signs-are-not-matrix-geometry">1. Why entrywise signs are not matrix geometry</h2>
+<ul>
+<li><code>[DIRECT]</code> Adam with <span class="math-inline">\(\beta_1=\beta_2=0\)</span> and no stabilizer becomes</li>
+</ul>
+<div class="math-display">\[\theta_{t+1,i}
+=\theta_{t,i}
+-\alpha_t\frac{g_{t,i}}{\sqrt{g_{t,i}^2}}
+=\theta_{t,i}-\alpha_t\operatorname{sign}(g_{t,i}).\]</div>
+<ul>
+<li><code>[DIRECT]</code> For</li>
+</ul>
+<div class="math-display">\[G=
+\begin{pmatrix}
+2&amp;1\\
+1&amp;2
+\end{pmatrix},
+\qquad
+\operatorname{sign}(G)=
+\begin{pmatrix}
+1&amp;1\\
+1&amp;1
+\end{pmatrix},\]</div>
+<p>the original matrix has eigenvalues <span class="math-inline">\(3\)</span> and <span class="math-inline">\(1\)</span>, while its sign matrix annihilates the <span class="math-inline">\((1,-1)^\top\)</span> direction.
+- <code>[SYNTHESIS]</code> Entrywise normalization depends on the chosen coordinate basis and can destroy a direction that the original linear map treats nontrivially.</p>
+<h2 id="2-orthogonalization">2. Orthogonalization</h2>
+<h3 id="21-target-definition">2.1 Target definition</h3>
+<ul>
+<li><code>[DIRECT]</code> Let <span class="math-inline">\(G\in\mathbb{R}^{m\times n}\)</span> have full rank <span class="math-inline">\(r=\min\{m,n\}\)</span>. A matrix <span class="math-inline">\(O\)</span> is semi-orthogonal if</li>
+</ul>
+<div class="math-display">\[O^\top O=I_n\quad(m\ge n),
+\qquad\text{or}\qquad
+OO^\top=I_m\quad(m\le n).\]</div>
+<ul>
+<li><code>[DIRECT]</code> Orthogonalization is the nearest semi-orthogonal matrix in Frobenius norm:</li>
+</ul>
+<div class="math-display">\[\operatorname{Ortho}(G)
+=\arg\min_{O\text{ semi-orthogonal}}\|O-G\|_F.\]</div>
+<ul>
+<li><code>[DIRECT]</code> For a thin SVD</li>
+</ul>
+<div class="math-display">\[G=U\Sigma V^\top,\]</div>
+<p>with positive diagonal singular values, the result is</p>
+<div class="math-display">\[\operatorname{Ortho}(G)=UV^\top.\]</div>
+<h3 id="22-why-the-polar-factor-is-nearest">2.2 Why the polar factor is nearest</h3>
+<ul>
+<li><code>[DERIVATION · Step 1]</code> Every feasible semi-orthogonal <span class="math-inline">\(O\)</span> has</li>
+</ul>
+<div class="math-display">\[\|O\|_F^2=r.\]</div>
+<ul>
+<li><code>[DERIVATION · Step 2]</code> Expand the objective:</li>
+</ul>
+<div class="math-display">\[\|O-G\|_F^2
+=r+\|G\|_F^2-2\operatorname{tr}(O^\top G).\]</div>
+<ul>
+<li><code>[DERIVATION · Step 3]</code> Writing <span class="math-inline">\(G=\sum_{i=1}^{r}\sigma_i u_iv_i^\top\)</span>,</li>
+</ul>
+<div class="math-display">\[\operatorname{tr}(O^\top G)
+=\sum_{i=1}^{r}\sigma_i u_i^\top Ov_i.\]</div>
+<ul>
+<li><code>[DERIVATION · Step 4]</code> A semi-orthogonal map is nonexpansive, so</li>
+</ul>
+<div class="math-display">\[u_i^\top Ov_i
+\le\|u_i\|_2\|Ov_i\|_2
+\le1.\]</div>
+<p>Consequently,</p>
+<div class="math-display">\[\operatorname{tr}(O^\top G)\le\sum_i\sigma_i.\]</div>
+<ul>
+<li><code>[DERIVATION · Step 5]</code> <span class="math-inline">\(O=UV^\top\)</span> is feasible and satisfies <span class="math-inline">\(Ov_i=u_i\)</span>, attaining equality in every term.</li>
+<li><code>[CONCLUSION]</code> Maximizing the trace minimizes the squared distance, so <span class="math-inline">\(UV^\top\)</span> is the desired orthogonalization.</li>
+<li><code>[SYNTHESIS]</code> <span class="math-inline">\(Gv_i=\sigma_i u_i\)</span> becomes <span class="math-inline">\(\operatorname{Ortho}(G)v_i=u_i\)</span>: singular directions remain, but their positive singular values become one.</li>
+</ul>
+<h3 id="23-change-of-basis-behavior">2.3 Change-of-basis behavior</h3>
+<ul>
+<li><code>[DIRECT]</code> For orthogonal <span class="math-inline">\(P\)</span> and <span class="math-inline">\(Q\)</span>,</li>
+</ul>
+<div class="math-display">\[\operatorname{Ortho}(PGQ^\top)
+=P\operatorname{Ortho}(G)Q^\top.\]</div>
+<ul>
+<li><code>[DERIVATION]</code> If <span class="math-inline">\(G=U\Sigma V^\top\)</span>, then <span class="math-inline">\(PGQ^\top=(PU)\Sigma(QV)^\top\)</span> is another SVD. Removing <span class="math-inline">\(\Sigma\)</span> produces the identity above.</li>
+<li><code>[SYNTHESIS]</code> This equivariance makes orthogonalization compatible with Euclidean changes of basis in the input and output activation spaces.</li>
+</ul>
+<h2 id="3-muon">3. Muon</h2>
+<ul>
+<li><code>[DIRECT]</code> For one hidden-layer weight matrix <span class="math-inline">\(W_t\)</span>, let <span class="math-inline">\(G_t=\nabla_W f_t(W_t)\)</span>. Muon maintains momentum</li>
+</ul>
+<div class="math-display">\[B_t=\mu B_{t-1}+G_t,\]</div>
+<p>approximates its orthogonalization,</p>
+<div class="math-display">\[O_t=\operatorname{NewtonSchulz5}(B_t),\]</div>
+<p>and updates</p>
+<div class="math-display">\[W_{t+1}=W_t-\alpha_tO_t.\]</div>
+<ul>
+<li><code>[SYNTHESIS]</code> Momentum is accumulated <strong>before</strong> normalization. Magnitudes influence the temporal average <span class="math-inline">\(B_t\)</span>, but the final update approximately equalizes the singular values of that averaged direction.</li>
+</ul>
+<h2 id="4-newton-schulz-as-a-singular-value-iteration">4. Newton-Schulz as a singular-value iteration</h2>
+<h3 id="41-polynomial-matrix-update">4.1 Polynomial matrix update</h3>
+<ul>
+<li><code>[DIRECT]</code> Consider</li>
+</ul>
+<div class="math-display">\[X_{k+1}
+=aX_k+b(X_kX_k^\top)X_k
++c(X_kX_k^\top)^2X_k.\]</div>
+<ul>
+<li><code>[DERIVATION]</code> If <span class="math-inline">\(X_k=US_kV^\top\)</span>, then</li>
+</ul>
+<div class="math-display">\[X_kX_k^\top=US_k^2U^\top,\]</div>
+<div class="math-display">\[(X_kX_k^\top)X_k=US_k^3V^\top,\]</div>
+<p>and</p>
+<div class="math-display">\[(X_kX_k^\top)^2X_k=US_k^5V^\top.\]</div>
+<ul>
+<li><code>[CONCLUSION]</code> Hence</li>
+</ul>
+<div class="math-display">\[X_{k+1}
+=U\bigl(aS_k+bS_k^3+cS_k^5\bigr)V^\top.\]</div>
+<p>The singular vectors stay fixed, while each singular value follows</p>
+<div class="math-display">\[\phi(x)=ax+bx^3+cx^5.\]</div>
+<h3 id="42-initialization">4.2 Initialization</h3>
+<ul>
+<li><code>[DIRECT]</code> Start from</li>
+</ul>
+<div class="math-display">\[X_0=\frac{G}{\|G\|_F}.\]</div>
+<ul>
+<li><code>[DERIVATION]</code> Since <span class="math-inline">\(\|G\|_F^2=\sum_i\sigma_i^2\)</span>, every normalized singular value lies in <span class="math-inline">\([0,1]\)</span>.</li>
+<li><code>[DIRECT]</code> After <span class="math-inline">\(K\)</span> steps,</li>
+</ul>
+<div class="math-display">\[X_K
+=U\operatorname{diag}\!\left(
+\phi^{\circ K}\!\left(\frac{\sigma_1}{\|G\|_F}\right),
+\ldots,
+\phi^{\circ K}\!\left(\frac{\sigma_r}{\|G\|_F}\right)
+\right)V^\top.\]</div>
+<ul>
+<li><code>[CHECK]</code> <span class="math-inline">\(\phi^{\circ K}\)</span> means composition <span class="math-inline">\(K\)</span> times, not a scalar power.</li>
+</ul>
+<h3 id="43-classical-cubic-convergence">4.3 Classical cubic convergence</h3>
+<ul>
+<li><code>[DIRECT]</code> The classical choice is</li>
+</ul>
+<div class="math-display">\[\phi(x)=\frac{3x-x^3}{2}.\]</div>
+<ul>
+<li><code>[DERIVATION]</code> For <span class="math-inline">\(0&lt;x&lt;1\)</span>,</li>
+</ul>
+<div class="math-display">\[\phi(x)-x=\frac{x(1-x^2)}2&gt;0,\]</div>
+<p>while</p>
+<div class="math-display">\[1-\phi(x)=\frac{(1-x)^2(x+2)}2&gt;0.\]</div>
+<ul>
+<li><code>[CONCLUSION]</code> Iterates increase but remain below one, so they converge. A positive limit <span class="math-inline">\(\ell\)</span> must satisfy <span class="math-inline">\(\ell=\phi(\ell)\)</span>, whose only positive solution in <span class="math-inline">\((0,1]\)</span> is <span class="math-inline">\(1\)</span>. Zero singular values remain zero.</li>
+</ul>
+<h2 id="5-newtonschulz5-in-muon">5. NewtonSchulz5 in Muon</h2>
+<ul>
+<li><code>[DIRECT]</code> Muon uses</li>
+</ul>
+<div class="math-display">\[(a,b,c)=(3.4445,-4.7750,2.0315),
+\qquad
+\epsilon_{\mathrm{NS}}=10^{-7}.\]</div>
+<ul>
+<li><code>[DIRECT]</code> Normalize</li>
+</ul>
+<div class="math-display">\[X\leftarrow\frac{G}{\|G\|_F+\epsilon_{\mathrm{NS}}}.\]</div>
+<ul>
+<li><code>[DIRECT]</code> If <span class="math-inline">\(m&gt;n\)</span>, transpose <span class="math-inline">\(X\)</span> so the Gram matrix is formed in the smaller dimension. Repeat five times:</li>
+</ul>
+<div class="math-display">\[A\leftarrow XX^\top,
+\qquad
+D\leftarrow bA+cA^2,
+\qquad
+X\leftarrow aX+DX.\]</div>
+<ul>
+<li><code>[DERIVATION]</code> Expanding <span class="math-inline">\(DX\)</span> gives</li>
+</ul>
+<div class="math-display">\[aX+b(XX^\top)X+c(XX^\top)^2X,\]</div>
+<p>exactly the polynomial update above.
+- <code>[DIRECT]</code> Transpose back if necessary and return <span class="math-inline">\(X\)</span>.
+- <code>[SYNTHESIS]</code> The tuned quintic is not required to converge asymptotically to exact orthogonalization in the same monotone way as the classical cubic. Its purpose is to move small singular values rapidly toward an acceptable band within only five matrix-multiplication rounds.</p>
+<h2 id="6-worked-singular-value-picture">6. Worked singular-value picture</h2>
+<ul>
+<li><code>[EXAMPLE]</code> Suppose</li>
+</ul>
+<div class="math-display">\[G=U\operatorname{diag}(4,1)V^\top.\]</div>
+<ul>
+<li><code>[DERIVATION]</code> Its Frobenius norm is <span class="math-inline">\(\sqrt{17}\)</span>, so Newton-Schulz starts with singular values</li>
+</ul>
+<div class="math-display">\[\left(\frac4{\sqrt{17}},\frac1{\sqrt{17}}\right).\]</div>
+<ul>
+<li><code>[SYNTHESIS]</code> Every polynomial step changes these two scalars but leaves <span class="math-inline">\(U,V\)</span> fixed. Exact orthogonalization would end at <span class="math-inline">\((1,1)\)</span> and return <span class="math-inline">\(UV^\top\)</span>.</li>
+</ul>
+<h2 id="7-minimal-takeaways">7. Minimal takeaways</h2>
+<ul>
+<li>Entrywise sign normalization is basis-dependent and may destroy matrix directions.</li>
+<li>Orthogonalization preserves singular vectors while replacing positive singular values by one.</li>
+<li>Muon orthogonalizes a momentum buffer rather than the instantaneous gradient.</li>
+<li>Newton-Schulz avoids an explicit SVD by applying a polynomial to all singular values in parallel.</li>
+<li>The matrix implementation is composed of accelerator-friendly matrix multiplications.</li>
+</ul>
+<h2 id="8-questions-for-manual-reconstruction">8. Questions for manual reconstruction</h2>
+<ul>
+<li>[ ] Prove the nearest semi-orthogonal matrix result from the trace expansion.</li>
+<li>[ ] Verify the change-of-basis equivariance using an SVD.</li>
+<li>[ ] Starting from <span class="math-inline">\(X_k=US_kV^\top\)</span>, derive the <span class="math-inline">\(S_k^3\)</span> and <span class="math-inline">\(S_k^5\)</span> terms.</li>
+<li>[ ] Prove monotone convergence of the classical cubic scalar map.</li>
+<li>[ ] Explain why the optional transpose reduces the Gram-matrix size.</li>
+</ul>
+<h2 id="9-open-questions">9. Open questions</h2>
+<ul>
+<li><code>[CHECK]</code> Which parameter matrices should use Muon, and which should remain under AdamW in practical implementations?</li>
+<li><code>[CHECK]</code> How sensitive are five-step approximations to very small singular values and low precision?</li>
+<li><code>[HYPOTHESIS]</code> Orthogonalizing the update may be understood as choosing a geometry on linear maps rather than merely a numerical preconditioner. Lecture 08 makes this norm-based interpretation precise.</li>
+</ul>
+<h2 id="references">References</h2>
+<ul>
+<li><code>[DIRECT]</code> Noah Golowich. <em>CS 395T — Lecture 7: Optimization II — Muon.</em> <a href="https://noahgol.github.io/teaching/cs395t-f26/lecture7.pdf">https://noahgol.github.io/teaching/cs395t-f26/lecture7.pdf</a></li>
+<li><code>[DIRECT]</code> The lecture points to the Muon post by Jordan et al. and Bernstein and Newhouse's norm-based optimizer anthology. They have not been independently reconstructed here.</li>
+</ul>
+      </article>
+    </div>
+  </main>
+
+  <footer class="site-footer section-shell">
+    <div><strong>CS 395T</strong><span>Learning note</span></div>
+    <p>Markdown source · draft</p>
+    <a href="../index.html#notes">Return to index ←</a>
+  </footer>
+</body>
+</html>
