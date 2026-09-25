@@ -1,5 +1,22 @@
 [
   {
+    "title": "Lecture 03 — Transformer Architecture",
+    "question": "An AI-assisted first reconstruction of the decoder-only Transformer: tokenization, attention, positional information, normalization, MLPs, unembedding, and the full pre-norm residual stack.",
+    "type": "learning",
+    "typeLabel": "Learning note",
+    "status": "Draft",
+    "date": "Sep 2026",
+    "tags": [
+      "transformer architecture",
+      "attention",
+      "RoPE",
+      "normalization",
+      "decoder-only language models"
+    ],
+    "url": "course-notes/lecture-03.html",
+    "disclaimer": "AI-assisted · in progress"
+  },
+  {
     "title": "Lecture 09 — Chain-of-Thought and Speculative Decoding",
     "question": "A detailed guided reconstruction of chain-of-thought, STaR, function-composition lower bounds, and speculative decoding, with proofs explained step by step.",
     "type": "learning",

@@ -1,0 +1,594 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="An AI-assisted first reconstruction of the decoder-only Transformer: tokenization, attention, positional information, normalization, MLPs, unembedding, and the full pre-norm residual stack.">
+  <title>Lecture 03 — Transformer Architecture — CS 395T</title>
+  <link rel="stylesheet" href="../assets/styles.css">
+  <script>
+    window.MathJax = {
+      tex: {
+        processEscapes: true
+      },
+      svg: { fontCache: 'global' }
+    };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js" defer></script>
+  <script src="../assets/app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header">
+    <a class="wordmark" href="../index.html"><span>CS 395T</span><small>Learning &amp; research notebook</small></a>
+    <button class="menu-button" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button>
+    <nav id="site-nav" class="site-nav" aria-label="Primary navigation">
+      <a href="../structure.html">Structure</a>
+      <a href="../index.html#notes">Index</a>
+      <a href="../method.html">Writing guide</a>
+      <a href="../index.html#about">About</a>
+    </nav>
+  </header>
+
+  <main id="main" class="note-shell">
+    <header class="note-hero">
+      <div class="template-banner learning-banner">
+        <strong>LEARNING NOTE · DRAFT</strong>
+        <span>Work in progress</span>
+      </div>
+      <p class="eyebrow">25 SEP 2026 · DRAFT</p>
+      <h1>Lecture 03 — Transformer Architecture</h1>
+      <p class="note-abstract">An AI-assisted first reconstruction of the decoder-only Transformer: tokenization, attention, positional information, normalization, MLPs, unembedding, and the full pre-norm residual stack.</p>
+      <ul class="tag-list" aria-label="Topics"><li>transformer architecture</li><li>attention</li><li>RoPE</li><li>normalization</li><li>decoder-only language models</li></ul>
+    </header>
+
+    <div class="note-layout">
+      <aside class="note-toc" aria-label="On this page">
+        <p class="aside-label">ON THIS PAGE</p>
+        <div class="toc">
+<ul>
+<li><a href="#lecture-context">Lecture context</a><ul>
+<li><a href="#label-key">Label key</a></li>
+</ul>
+</li>
+<li><a href="#reading-map">Reading map</a></li>
+<li><a href="#learning-goals">Learning goals</a></li>
+<li><a href="#1-from-text-to-vectors">1. From text to vectors</a><ul>
+<li><a href="#11-why-subword-tokenization-is-a-compromise">1.1 Why subword tokenization is a compromise</a></li>
+<li><a href="#12-byte-pair-encoding">1.2 Byte-pair encoding</a></li>
+<li><a href="#13-embedding-lookup">1.3 Embedding lookup</a></li>
+</ul>
+</li>
+<li><a href="#2-attention-as-content-dependent-information-routing">2. Attention as content-dependent information routing</a><ul>
+<li><a href="#21-single-head-attention-and-its-shapes">2.1 Single-head attention and its shapes</a></li>
+<li><a href="#22-why-the-softmax-output-is-a-weighted-average">2.2 Why the softmax output is a weighted average</a></li>
+<li><a href="#23-a-three-position-masked-example">2.3 A three-position masked example</a></li>
+<li><a href="#24-causal-self-attention">2.4 Causal self-attention</a></li>
+<li><a href="#25-multi-head-attention">2.5 Multi-head attention</a></li>
+</ul>
+</li>
+<li><a href="#3-position-must-enter-somewhere">3. Position must enter somewhere</a><ul>
+<li><a href="#31-why-plain-attention-does-not-know-order">3.1 Why plain attention does not know order</a></li>
+<li><a href="#32-absolute-sinusoidal-embeddings">3.2 Absolute sinusoidal embeddings</a></li>
+<li><a href="#33-rotary-position-embeddings">3.3 Rotary position embeddings</a></li>
+</ul>
+</li>
+<li><a href="#4-transforming-each-position">4. Transforming each position</a><ul>
+<li><a href="#41-layernorm">4.1 LayerNorm</a></li>
+<li><a href="#42-rmsnorm">4.2 RMSNorm</a></li>
+<li><a href="#43-position-wise-mlps">4.3 Position-wise MLPs</a></li>
+</ul>
+</li>
+<li><a href="#5-returning-to-tokens">5. Returning to tokens</a><ul>
+<li><a href="#51-unembedding">5.1 Unembedding</a></li>
+</ul>
+</li>
+<li><a href="#6-the-complete-decoder-only-transformer">6. The complete decoder-only Transformer</a><ul>
+<li><a href="#61-one-pre-norm-residual-block">6.1 One pre-norm residual block</a></li>
+<li><a href="#62-final-prediction">6.2 Final prediction</a></li>
+<li><a href="#63-end-to-end-shape-ledger">6.3 End-to-end shape ledger</a></li>
+</ul>
+</li>
+<li><a href="#7-minimal-takeaways">7. Minimal takeaways</a></li>
+<li><a href="#8-questions-for-manual-reconstruction">8. Questions for manual reconstruction</a></li>
+<li><a href="#9-open-questions-and-research-parking-lot">9. Open questions and research parking lot</a></li>
+<li><a href="#references">References</a></li>
+</ul>
+</div>
+
+      </aside>
+      <article class="prose note-prose markdown-body">
+        <blockquote>
+<p><strong>AI-assisted first draft.</strong> This note reconstructs the mathematical route of the Lecture 03 PDF and adds step-by-step derivations and small examples. It is not the author's manual reconstruction. Claims tagged <code>[DIRECT]</code> come from the lecture; the remaining explanations should be checked, rewritten, or corrected in Logseq during study.</p>
+</blockquote>
+<h2 id="lecture-context">Lecture context</h2>
+<ul>
+<li><code>[DIRECT]</code> Source: <a href="https://noahgol.github.io/teaching/cs395t-f26/lecture3.pdf">https://noahgol.github.io/teaching/cs395t-f26/lecture3.pdf</a></li>
+<li><code>[DIRECT]</code> The lecture builds a decoder-only Transformer from seven pieces: tokenization, embedding lookup, attention, positional information, normalization, position-wise MLPs, and unembedding.</li>
+<li><code>[SYNTHESIS]</code> The architecture alternates two operations. Attention moves information <strong>between token positions</strong>; an MLP transforms information <strong>within each position</strong>. Residual connections preserve a running state while normalization controls the scale of each update.</li>
+</ul>
+<h3 id="label-key">Label key</h3>
+<ul>
+<li><code>[DIRECT]</code>: a definition, equation, algorithm, or claim stated in the lecture PDF.</li>
+<li><code>[DERIVATION]</code>: an intermediate mathematical step written out in this note.</li>
+<li><code>[SYNTHESIS]</code>: a connection or interpretation assembled across lecture sections.</li>
+<li><code>[EXAMPLE]</code>: a toy construction added to make an operation concrete.</li>
+<li><code>[CHECK]</code>: something to verify manually before treating the note as complete.</li>
+</ul>
+<h2 id="reading-map">Reading map</h2>
+<table>
+<thead>
+<tr>
+<th>Stage</th>
+<th>Object entering the stage</th>
+<th>What changes</th>
+<th>Object leaving the stage</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Tokenization</td>
+<td>text</td>
+<td>strings become discrete IDs</td>
+<td><span class="math-inline">\(v_1,\ldots,v_T\)</span></td>
+</tr>
+<tr>
+<td>Embedding</td>
+<td>token IDs</td>
+<td>lookup supplies learned vectors</td>
+<td><span class="math-inline">\(X^{(0)}\in\mathbb{R}^{d\times T}\)</span></td>
+</tr>
+<tr>
+<td>Attention</td>
+<td>token representations</td>
+<td>positions exchange information</td>
+<td>context-dependent vectors</td>
+</tr>
+<tr>
+<td>MLP</td>
+<td>one vector per position</td>
+<td>features are transformed locally</td>
+<td>updated vectors</td>
+</tr>
+<tr>
+<td>Unembedding</td>
+<td>final contextual vector</td>
+<td>vector becomes vocabulary logits</td>
+<td><span class="math-inline">\(z\in\mathbb{R}^{N_V}\)</span></td>
+</tr>
+<tr>
+<td>Softmax</td>
+<td>logits</td>
+<td>scores become probabilities</td>
+<td><span class="math-inline">\(p(\cdot\mid v_{\le t})\)</span></td>
+</tr>
+</tbody>
+</table>
+<h2 id="learning-goals">Learning goals</h2>
+<ul>
+<li>After working through the note manually, I should be able to:</li>
+<li>[ ] explain why BPE keeps open-vocabulary coverage without using a word-sized vocabulary;</li>
+<li>[ ] derive the shape and meaning of every matrix in a single attention head;</li>
+<li>[ ] prove that a causal mask prevents position <span class="math-inline">\(i\)</span> from depending on future positions;</li>
+<li>[ ] derive why RoPE makes query-key scores depend on relative displacement;</li>
+<li>[ ] distinguish LayerNorm from RMSNorm and state their invariances carefully;</li>
+<li>[ ] trace one token representation through a complete pre-norm decoder block; and</li>
+<li>[ ] explain why the probability in column <span class="math-inline">\(t\)</span> predicts token <span class="math-inline">\(v_{t+1}\)</span> rather than <span class="math-inline">\(v_t\)</span>.</li>
+</ul>
+<h2 id="1-from-text-to-vectors">1. From text to vectors</h2>
+<h3 id="11-why-subword-tokenization-is-a-compromise">1.1 Why subword tokenization is a compromise</h3>
+<ul>
+<li><code>[DIRECT]</code> Let <span class="math-inline">\(\mathcal V\)</span> be a finite vocabulary. A tokenizer maps a string to a sequence of elements of <span class="math-inline">\(\mathcal V\)</span>.</li>
+<li><code>[SYNTHESIS]</code> Character tokenization has excellent coverage but creates long sequences. Word tokenization shortens common text but requires a huge vocabulary and still encounters unseen words. Subword tokenization trades between those extremes: frequent strings can become single tokens, while rare strings can be assembled from smaller units.</li>
+</ul>
+<h3 id="12-byte-pair-encoding">1.2 Byte-pair encoding</h3>
+<ul>
+<li><code>[DIRECT]</code> The lecture's BPE procedure starts with words represented as byte sequences. At each training round it counts adjacent pairs without crossing word boundaries, selects a most frequent pair, creates a new symbol for that pair, and replaces nonoverlapping occurrences from left to right. The ordered merge list is the learned tokenizer rule set.</li>
+<li><code>[DERIVATION]</code> The order of the rules matters. A later rule may refer to a symbol that did not exist before an earlier merge. Therefore the learned object is not merely a set of pairs; it is an ordered program</li>
+</ul>
+<div class="math-display">\[\mathcal R=(r_1,r_2,\ldots,r_M).\]</div>
+<ul>
+<li><code>[EXAMPLE]</code> Consider a tiny corpus with the words <code>low</code>, <code>lower</code>, and <code>lowest</code>, initially split into bytes. If <code>(l,o)</code> is the most frequent pair, the first rule creates <code>lo</code>. A later rule can merge <code>(lo,w)</code> into <code>low</code>. The base bytes remain available, so a string that never appeared during training is still representable.</li>
+<li><code>[CHECK]</code> Run two BPE merge rounds by hand on a corpus with repeated words. Record pair counts before and after each replacement, and verify that overlapping occurrences are not both merged in one left-to-right pass.</li>
+</ul>
+<h3 id="13-embedding-lookup">1.3 Embedding lookup</h3>
+<ul>
+<li><code>[DIRECT]</code> Let <span class="math-inline">\(N_V=|\mathcal V|\)</span>, identify tokens with <span class="math-inline">\([N_V]\)</span>, and let <span class="math-inline">\(\delta_v\in\mathbb{R}^{N_V}\)</span> be the one-hot vector for token <span class="math-inline">\(v\)</span>. The learned embedding matrix is</li>
+</ul>
+<div class="math-display">\[W_E\in\mathbb{R}^{d\times N_V}.\]</div>
+<ul>
+<li><code>[DIRECT]</code> Token <span class="math-inline">\(v\)</span> is represented by</li>
+</ul>
+<div class="math-display">\[e(v)=W_E\delta_v=W_E[:,v]\in\mathbb{R}^{d}.\]</div>
+<ul>
+<li><code>[DERIVATION]</code> Multiplying by a one-hot vector selects a column because</li>
+</ul>
+<div class="math-display">\[W_E\delta_v
+=\sum_{u=1}^{N_V}\delta_v[u]W_E[:,u]
+=W_E[:,v].\]</div>
+<ul>
+<li><code>[SYNTHESIS]</code> The token ID contains no geometry by itself. Similarity between embedding vectors is learned jointly with the rest of the language model because the training loss updates <span class="math-inline">\(W_E\)</span> through every downstream layer.</li>
+</ul>
+<h2 id="2-attention-as-content-dependent-information-routing">2. Attention as content-dependent information routing</h2>
+<h3 id="21-single-head-attention-and-its-shapes">2.1 Single-head attention and its shapes</h3>
+<ul>
+<li><code>[DIRECT]</code> Put the primary sequence in columns of</li>
+</ul>
+<div class="math-display">\[X=[x_1,\ldots,x_{T_x}]\in\mathbb{R}^{d_x\times T_x}\]</div>
+<p>and the context sequence in columns of</p>
+<div class="math-display">\[Z=[z_1,\ldots,z_{T_z}]\in\mathbb{R}^{d_z\times T_z}.\]</div>
+<ul>
+<li><code>[DIRECT]</code> A head has learned matrices</li>
+</ul>
+<div class="math-display">\[W_Q\in\mathbb{R}^{d_k\times d_x},\qquad
+W_K\in\mathbb{R}^{d_k\times d_z},\qquad
+W_V\in\mathbb{R}^{d_v\times d_z}.\]</div>
+<ul>
+<li><code>[DERIVATION · Step 1]</code> Project inputs into queries, keys, and values:</li>
+</ul>
+<div class="math-display">\[Q=W_QX\in\mathbb{R}^{d_k\times T_x},\qquad
+K=W_KZ\in\mathbb{R}^{d_k\times T_z},\qquad
+V=W_VZ\in\mathbb{R}^{d_v\times T_z}.\]</div>
+<ul>
+<li><code>[DERIVATION · Step 2]</code> Every key is compared with every query:</li>
+</ul>
+<div class="math-display">\[S=\frac{K^\top Q}{\sqrt{d_k}}\in\mathbb{R}^{T_z\times T_x}.\]</div>
+<ul>
+<li><code>[EXPLANATION]</code> Entry <span class="math-inline">\(S_{ji}=k_j^\top q_i/\sqrt{d_k}\)</span> measures how strongly query position <span class="math-inline">\(i\)</span> matches context position <span class="math-inline">\(j\)</span>. Columns correspond to queries; rows correspond to candidate context positions.</li>
+<li><code>[DERIVATION · Step 3]</code> Apply the mask by replacing forbidden scores with <span class="math-inline">\(-\infty\)</span>, then normalize each column:</li>
+</ul>
+<div class="math-display">\[A_{ji}
+=\frac{\exp(S_{ji})}{\sum_{u=1}^{T_z}\exp(S_{ui})},
+\qquad
+A\in\mathbb{R}^{T_z\times T_x}.\]</div>
+<ul>
+<li><code>[DERIVATION · Step 4]</code> Mix the values:</li>
+</ul>
+<div class="math-display">\[Y=VA\in\mathbb{R}^{d_v\times T_x},
+\qquad
+y_i=\sum_{j=1}^{T_z}A_{ji}v_j.\]</div>
+<ul>
+<li><code>[SYNTHESIS]</code> The keys decide <strong>where to read</strong>, the queries express <strong>what a position is looking for</strong>, and the values determine <strong>what information is returned</strong>.</li>
+</ul>
+<h3 id="22-why-the-softmax-output-is-a-weighted-average">2.2 Why the softmax output is a weighted average</h3>
+<ul>
+<li><code>[DERIVATION]</code> For a fixed query <span class="math-inline">\(i\)</span>, exponentials are nonnegative and the denominator is their sum. Therefore</li>
+</ul>
+<div class="math-display">\[A_{ji}\ge 0,
+\qquad
+\sum_{j=1}^{T_z}A_{ji}=1.\]</div>
+<ul>
+<li><code>[DERIVATION]</code> Hence <span class="math-inline">\(y_i\)</span> lies in the convex hull of the value vectors before the output projection. A head cannot directly return an arbitrary linear combination with negative attention coefficients, although the value and output projections can still introduce signed features.</li>
+<li><code>[DIRECT]</code> The factor <span class="math-inline">\(1/\sqrt{d_k}\)</span> controls the scale of dot products when query and key coordinates have roughly unit variance.</li>
+<li><code>[DERIVATION]</code> If coordinates are independent, mean zero, and unit variance, then</li>
+</ul>
+<div class="math-display">\[\operatorname{Var}(q_i^\top k_j)
+=\operatorname{Var}\!\left(\sum_{r=1}^{d_k}q_{ri}k_{rj}\right)
+\approx d_k.\]</div>
+<p>Dividing by <span class="math-inline">\(\sqrt{d_k}\)</span> brings the variance back to order one, which helps prevent the softmax from becoming extremely sharp solely because the head dimension is large.</p>
+<h3 id="23-a-three-position-masked-example">2.3 A three-position masked example</h3>
+<ul>
+<li><code>[EXAMPLE]</code> At query position <span class="math-inline">\(i=2\)</span>, suppose the unmasked scores for three context positions are</li>
+</ul>
+<div class="math-display">\[(S_{1,2},S_{2,2},S_{3,2})=(0,\log 2,5).\]</div>
+<ul>
+<li><code>[DERIVATION]</code> A causal mask forbids <span class="math-inline">\(j=3\)</span>, so the effective scores become <span class="math-inline">\((0,\log 2,-\infty)\)</span>. Their exponentials are <span class="math-inline">\((1,2,0)\)</span>, giving</li>
+</ul>
+<div class="math-display">\[(A_{1,2},A_{2,2},A_{3,2})
+=\left(\frac13,\frac23,0\right).\]</div>
+<ul>
+<li><code>[CONCLUSION]</code> Even though the future token originally had the largest score, masking forces its contribution to zero:</li>
+</ul>
+<div class="math-display">\[y_2=\frac13v_1+\frac23v_2.\]</div>
+<h3 id="24-causal-self-attention">2.4 Causal self-attention</h3>
+<ul>
+<li><code>[DIRECT]</code> Self-attention sets <span class="math-inline">\(Z=X\)</span>. Decoder-only language modeling uses the causal mask</li>
+</ul>
+<div class="math-display">\[M_{ji}=\mathbf{1}\{j\le i\}.\]</div>
+<ul>
+<li><code>[DERIVATION · Base layer]</code> At position <span class="math-inline">\(i\)</span>, masked attention can use only value vectors at positions <span class="math-inline">\(1,\ldots,i\)</span>. A position-wise MLP changes the vector at <span class="math-inline">\(i\)</span> but cannot introduce information from another position.</li>
+<li><code>[DERIVATION · Induction step]</code> Assume every representation at layer <span class="math-inline">\(r-1\)</span> and position <span class="math-inline">\(j\)</span> depends only on input tokens <span class="math-inline">\(v_1,\ldots,v_j\)</span>. At layer <span class="math-inline">\(r\)</span>, position <span class="math-inline">\(i\)</span> attends only to positions <span class="math-inline">\(j\le i\)</span>. Each of those representations depends only on <span class="math-inline">\(v_1,\ldots,v_j\subseteq v_1,\ldots,v_i\)</span>. Therefore the new position-<span class="math-inline">\(i\)</span> representation also depends only on the prefix <span class="math-inline">\(v_{\le i}\)</span>.</li>
+<li><code>[CONCLUSION]</code> By induction over layers, the final vector at position <span class="math-inline">\(i\)</span> cannot contain information from <span class="math-inline">\(v_{i+1},\ldots,v_T\)</span>. It can therefore parameterize the next-token distribution for <span class="math-inline">\(v_{i+1}\)</span> without leaking the target.</li>
+</ul>
+<h3 id="25-multi-head-attention">2.5 Multi-head attention</h3>
+<ul>
+<li><code>[DIRECT]</code> Head <span class="math-inline">\(h\in[H]\)</span> has its own <span class="math-inline">\((W_Q^{(h)},W_K^{(h)},W_V^{(h)})\)</span> and produces <span class="math-inline">\(Y^{(h)}\in\mathbb{R}^{d_v\times T_x}\)</span>. Concatenate the head outputs vertically and mix them with</li>
+</ul>
+<div class="math-display">\[W_O\in\mathbb{R}^{d_{\mathrm{out}}\times Hd_v}.\]</div>
+<ul>
+<li><code>[DIRECT]</code> The multi-head output is</li>
+</ul>
+<div class="math-display">\[\operatorname{MHA}(X,Z;M)
+=W_O
+\begin{bmatrix}
+Y^{(1)}\\
+\vdots\\
+Y^{(H)}
+\end{bmatrix}.\]</div>
+<ul>
+<li><code>[DIRECT]</code> In the common balanced configuration, <span class="math-inline">\(d_k=d_v=d/H\)</span>. Concatenating <span class="math-inline">\(H\)</span> heads then restores total width <span class="math-inline">\(d\)</span> before <span class="math-inline">\(W_O\)</span> mixes the head features.</li>
+<li><code>[SYNTHESIS]</code> Multiple heads do not merely repeat one calculation. They provide multiple attention distributions and multiple value projections, so different information-routing patterns can coexist at one layer.</li>
+</ul>
+<h2 id="3-position-must-enter-somewhere">3. Position must enter somewhere</h2>
+<h3 id="31-why-plain-attention-does-not-know-order">3.1 Why plain attention does not know order</h3>
+<ul>
+<li><code>[DIRECT]</code> Attention without positional information is permutation equivariant: permuting input columns produces the same permutation of output columns.</li>
+<li><code>[DERIVATION]</code> Let <span class="math-inline">\(\Pi\)</span> be a permutation matrix and set <span class="math-inline">\(X&#x27;=X\Pi\)</span>. In self-attention,</li>
+</ul>
+<div class="math-display">\[Q&#x27;=Q\Pi,\qquad K&#x27;=K\Pi,\qquad V&#x27;=V\Pi.\]</div>
+<ul>
+<li><code>[DERIVATION]</code> The score matrix becomes</li>
+</ul>
+<div class="math-display">\[S&#x27;=(K\Pi)^\top(Q\Pi)=\Pi^\top S\Pi.\]</div>
+<ul>
+<li><code>[DERIVATION]</code> Column-wise softmax respects this simultaneous row-column permutation, so <span class="math-inline">\(A&#x27;=\Pi^\top A\Pi\)</span>. Therefore</li>
+</ul>
+<div class="math-display">\[Y&#x27;=V\Pi A&#x27;=VA\Pi=Y\Pi.\]</div>
+<ul>
+<li><code>[CONCLUSION]</code> The mechanism can follow content but cannot infer which token was first or how far apart two tokens were. Positional information must break this symmetry.</li>
+</ul>
+<h3 id="32-absolute-sinusoidal-embeddings">3.2 Absolute sinusoidal embeddings</h3>
+<ul>
+<li><code>[DIRECT]</code> The original Transformer adds a fixed position vector <span class="math-inline">\(p_t\in\mathbb{R}^d\)</span> to the token embedding. Using zero-based frequency index <span class="math-inline">\(r=0,\ldots,d/2-1\)</span>,</li>
+</ul>
+<div class="math-display">\[p_t[2r+1]=\sin\!\left(\frac{t}{10000^{2r/d}}\right),
+\qquad
+p_t[2r+2]=\cos\!\left(\frac{t}{10000^{2r/d}}\right).\]</div>
+<ul>
+<li><code>[DIRECT]</code> The initial representation becomes</li>
+</ul>
+<div class="math-display">\[x_t^{(0)}=W_E\delta_{v_t}+p_t.\]</div>
+<ul>
+<li><code>[SYNTHESIS]</code> Each sine-cosine pair acts like a clock running at a different frequency. The collection gives the model several spatial scales on which to compare positions.</li>
+</ul>
+<h3 id="33-rotary-position-embeddings">3.3 Rotary position embeddings</h3>
+<ul>
+<li><code>[DIRECT]</code> For a two-dimensional coordinate pair, define</li>
+</ul>
+<div class="math-display">\[R(\phi)=
+\begin{pmatrix}
+\cos\phi&amp;-\sin\phi\\
+\sin\phi&amp;\cos\phi
+\end{pmatrix}.\]</div>
+<ul>
+<li><code>[DIRECT]</code> If the even head dimension is <span class="math-inline">\(d_k\)</span>, let <span class="math-inline">\(\theta_r=10000^{-2r/d_k}\)</span> and construct the block-diagonal rotation</li>
+</ul>
+<div class="math-display">\[R_t=\operatorname{diag}\!\left(R(t\theta_0),\ldots,R(t\theta_{d_k/2-1})\right).\]</div>
+<ul>
+<li><code>[DIRECT]</code> Given content-only vectors <span class="math-inline">\(\bar q_i=W_Qx_i\)</span> and <span class="math-inline">\(\bar k_j=W_Kx_j\)</span>, RoPE uses</li>
+</ul>
+<div class="math-display">\[q_i=R_i\bar q_i,
+\qquad
+k_j=R_j\bar k_j.\]</div>
+<h4 id="relative-position-derivation">Relative-position derivation</h4>
+<ul>
+<li><code>[DERIVATION · Step 1]</code> A two-dimensional rotation is orthogonal, so</li>
+</ul>
+<div class="math-display">\[R(a)^\top=R(-a).\]</div>
+<ul>
+<li><code>[DERIVATION · Step 2]</code> Rotations add their angles:</li>
+</ul>
+<div class="math-display">\[R(-a)R(b)=R(b-a).\]</div>
+<ul>
+<li><code>[DERIVATION · Step 3]</code> Apply this independently in every RoPE block:</li>
+</ul>
+<div class="math-display">\[R_i^\top R_j=R_{j-i}.\]</div>
+<ul>
+<li><code>[DERIVATION · Step 4]</code> The attention dot product is therefore</li>
+</ul>
+<div class="math-display">\[q_i^\top k_j
+=(R_i\bar q_i)^\top(R_j\bar k_j)
+=\bar q_i^\top R_{j-i}\bar k_j.\]</div>
+<ul>
+<li><code>[CONCLUSION]</code> Absolute indices <span class="math-inline">\(i\)</span> and <span class="math-inline">\(j\)</span> enter the rotations, but their contribution to the query-key score appears through the relative displacement <span class="math-inline">\(j-i\)</span>.</li>
+<li><code>[CHECK]</code> Verify <span class="math-inline">\(R(a)^\top R(b)=R(b-a)\)</span> by multiplying the two <span class="math-inline">\(2\times2\)</span> matrices and applying the sine and cosine angle-difference identities.</li>
+</ul>
+<h2 id="4-transforming-each-position">4. Transforming each position</h2>
+<h3 id="41-layernorm">4.1 LayerNorm</h3>
+<ul>
+<li><code>[DIRECT]</code> For <span class="math-inline">\(x\in\mathbb{R}^d\)</span>, define the feature mean and variance</li>
+</ul>
+<div class="math-display">\[\mu(x)=\frac1d\sum_{r=1}^d x_r,
+\qquad
+\sigma^2(x)=\frac1d\sum_{r=1}^d(x_r-\mu(x))^2.\]</div>
+<ul>
+<li><code>[DIRECT]</code> With learned scale <span class="math-inline">\(\gamma\in\mathbb{R}^d\)</span>, bias <span class="math-inline">\(\beta\in\mathbb{R}^d\)</span>, and numerical stabilizer <span class="math-inline">\(\epsilon_{\mathrm{norm}}&gt;0\)</span>,</li>
+</ul>
+<div class="math-display">\[\operatorname{LN}_{\gamma,\beta}(x)
+=\gamma\odot
+\frac{x-\mu(x)\mathbf 1_d}{\sqrt{\sigma^2(x)+\epsilon_{\mathrm{norm}}}}
++\beta.\]</div>
+<ul>
+<li><code>[SYNTHESIS]</code> LayerNorm removes the shared feature offset, normalizes feature scale, and then restores learnable coordinate-wise scale and shift through <span class="math-inline">\((\gamma,\beta)\)</span>.</li>
+</ul>
+<h3 id="42-rmsnorm">4.2 RMSNorm</h3>
+<ul>
+<li><code>[DIRECT]</code> RMSNorm omits mean subtraction:</li>
+</ul>
+<div class="math-display">\[\operatorname{RMSNorm}_\gamma(x)
+=\gamma\odot
+\frac{x}{\sqrt{d^{-1}\sum_{r=1}^d x_r^2+\epsilon_{\mathrm{norm}}}}.\]</div>
+<ul>
+<li><code>[DERIVATION]</code> Ignoring <span class="math-inline">\(\epsilon_{\mathrm{norm}}\)</span> for the moment and taking <span class="math-inline">\(a&gt;0\)</span>,</li>
+</ul>
+<div class="math-display">\[\frac{ax}{\sqrt{d^{-1}\sum_r (ax_r)^2}}
+=\frac{ax}{a\sqrt{d^{-1}\sum_r x_r^2}}
+=\frac{x}{\sqrt{d^{-1}\sum_r x_r^2}}.\]</div>
+<ul>
+<li><code>[CHECK]</code> The stabilizer makes the invariance approximate rather than exact when the input norm is comparable to <span class="math-inline">\(\sqrt{\epsilon_{\mathrm{norm}}}\)</span>. Also, unlike LayerNorm, RMSNorm is not invariant to adding the same constant to every feature.</li>
+</ul>
+<h3 id="43-position-wise-mlps">4.3 Position-wise MLPs</h3>
+<ul>
+<li><code>[DIRECT]</code> The original Transformer applies the same two-layer MLP independently at every position:</li>
+</ul>
+<div class="math-display">\[\operatorname{MLP}_{\mathrm{ReLU}}(x)=W_2\operatorname{ReLU}(W_1x),\]</div>
+<ul>
+<li><code>[EXPLANATION]</code> Here <span class="math-inline">\(W_1\in\mathbb{R}^{d_{\mathrm{ff}}\times d}\)</span> expands into the feed-forward width, and <span class="math-inline">\(W_2\in\mathbb{R}^{d\times d_{\mathrm{ff}}}\)</span> returns to model dimension.</li>
+<li><code>[DIRECT]</code> The lecture also gives the gated SwiGLU form. With <span class="math-inline">\(\operatorname{SiLU}(a)=a/(1+e^{-a})\)</span> applied coordinate-wise,</li>
+</ul>
+<div class="math-display">\[\operatorname{MLP}_{\mathrm{SwiGLU}}(x)
+=W_2\left(\operatorname{SiLU}(W_gx)\odot W_ux\right).\]</div>
+<ul>
+<li><code>[SYNTHESIS]</code> <span class="math-inline">\(W_gx\)</span> produces a nonlinear gate, while <span class="math-inline">\(W_ux\)</span> produces candidate features. Their element-wise product lets one branch modulate the other before <span class="math-inline">\(W_2\)</span> returns to model dimension.</li>
+<li><code>[SYNTHESIS]</code> Attention is the cross-position operation; the MLP is the per-position operation. Repeating both lets the model alternate routing information and computing with it.</li>
+</ul>
+<h2 id="5-returning-to-tokens">5. Returning to tokens</h2>
+<h3 id="51-unembedding">5.1 Unembedding</h3>
+<ul>
+<li><code>[DIRECT]</code> The unembedding matrix</li>
+</ul>
+<div class="math-display">\[W_U\in\mathbb{R}^{N_V\times d}\]</div>
+<p>maps a contextual representation <span class="math-inline">\(x\in\mathbb{R}^d\)</span> to one logit per vocabulary item:</p>
+<div class="math-display">\[z=W_Ux,
+\qquad
+p=\operatorname{softmax}(z).\]</div>
+<ul>
+<li><code>[DIRECT]</code> The model may learn <span class="math-inline">\(W_U\)</span> independently or tie it to the embedding matrix by setting <span class="math-inline">\(W_U=W_E^\top\)</span>.</li>
+<li><code>[SYNTHESIS]</code> Embedding and unembedding face opposite directions: <span class="math-inline">\(W_E\)</span> maps a discrete vocabulary coordinate into model space, while <span class="math-inline">\(W_U\)</span> compares a model-space state with vocabulary directions to produce token scores.</li>
+</ul>
+<h2 id="6-the-complete-decoder-only-transformer">6. The complete decoder-only Transformer</h2>
+<h3 id="61-one-pre-norm-residual-block">6.1 One pre-norm residual block</h3>
+<ul>
+<li><code>[DIRECT]</code> Let <span class="math-inline">\(X^{(0)}\in\mathbb{R}^{d\times T}\)</span> contain the initial token representations. For layer <span class="math-inline">\(r\in[L]\)</span>, the attention update is</li>
+</ul>
+<div class="math-display">\[U^{(r)}
+=X^{(r-1)}
++\operatorname{MHA}_r\!\left(
+\operatorname{Norm}^{(r)}_{\mathrm{attn}}(X^{(r-1)});M_{\mathrm{causal}}
+\right).\]</div>
+<ul>
+<li><code>[DIRECT]</code> The MLP update is</li>
+</ul>
+<div class="math-display">\[X^{(r)}
+=U^{(r)}
++\operatorname{MLP}_r\!\left(
+\operatorname{Norm}^{(r)}_{\mathrm{mlp}}(U^{(r)})
+\right).\]</div>
+<ul>
+<li><code>[DERIVATION]</code> These are <strong>pre-norm</strong> equations because normalization occurs inside each residual branch, before attention or the MLP. The residual stream itself passes forward through the identity paths <span class="math-inline">\(X^{(r-1)}\to U^{(r)}\)</span> and <span class="math-inline">\(U^{(r)}\to X^{(r)}\)</span>.</li>
+<li><code>[SYNTHESIS]</code> One block can be read as:
+1. normalize the current state;
+2. gather prefix information with attention and add it to the state;
+3. normalize the result;
+4. transform features locally with the MLP and add that update.</li>
+</ul>
+<h3 id="62-final-prediction">6.2 Final prediction</h3>
+<ul>
+<li><code>[DIRECT]</code> After <span class="math-inline">\(L\)</span> layers,</li>
+</ul>
+<div class="math-display">\[H=\operatorname{Norm}_{\mathrm{final}}(X^{(L)}),
+\qquad
+Z=W_UH,
+\qquad
+P=\operatorname{softmax}(Z),\]</div>
+<ul>
+<li><code>[EXPLANATION]</code> Softmax is applied independently to each column of <span class="math-inline">\(Z\)</span>.</li>
+<li><code>[DERIVATION]</code> Column <span class="math-inline">\(H[:,t]\)</span> depends only on <span class="math-inline">\(v_1,\ldots,v_t\)</span> by the causal-dependence proof above. Consequently,</li>
+</ul>
+<div class="math-display">\[P[:,t]
+=p_\theta(\,\cdot\mid v_1,\ldots,v_t)\]</div>
+<ul>
+<li><code>[CONCLUSION]</code> This column is aligned with the target token <span class="math-inline">\(v_{t+1}\)</span>.</li>
+<li><code>[SYNTHESIS]</code> Training can score all next-token targets in parallel because the triangular causal mask creates the correct prefix restriction simultaneously at every column. Generation remains sequential because the input token at the next position does not exist until it has been sampled or selected.</li>
+</ul>
+<h3 id="63-end-to-end-shape-ledger">6.3 End-to-end shape ledger</h3>
+<table>
+<thead>
+<tr>
+<th>Symbol</th>
+<th>Shape</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><span class="math-inline">\(v_{1:T}\)</span></td>
+<td><span class="math-inline">\(T\)</span> discrete IDs</td>
+<td>tokenized sequence</td>
+</tr>
+<tr>
+<td><span class="math-inline">\(X^{(r)}\)</span></td>
+<td><span class="math-inline">\(d\times T\)</span></td>
+<td>residual stream after layer <span class="math-inline">\(r\)</span></td>
+</tr>
+<tr>
+<td><span class="math-inline">\(Q,K\)</span></td>
+<td><span class="math-inline">\(d_k\times T\)</span></td>
+<td>per-head queries and keys</td>
+</tr>
+<tr>
+<td><span class="math-inline">\(V\)</span></td>
+<td><span class="math-inline">\(d_v\times T\)</span></td>
+<td>per-head values</td>
+</tr>
+<tr>
+<td><span class="math-inline">\(S,A\)</span></td>
+<td><span class="math-inline">\(T\times T\)</span></td>
+<td>attention scores and weights</td>
+</tr>
+<tr>
+<td><span class="math-inline">\(Y^{(h)}\)</span></td>
+<td><span class="math-inline">\(d_v\times T\)</span></td>
+<td>output of head <span class="math-inline">\(h\)</span></td>
+</tr>
+<tr>
+<td><span class="math-inline">\(H\)</span></td>
+<td><span class="math-inline">\(d\times T\)</span></td>
+<td>final normalized states</td>
+</tr>
+<tr>
+<td><span class="math-inline">\(Z\)</span></td>
+<td><span class="math-inline">\(N_V\times T\)</span></td>
+<td>vocabulary logits</td>
+</tr>
+<tr>
+<td><span class="math-inline">\(P\)</span></td>
+<td><span class="math-inline">\(N_V\times T\)</span></td>
+<td>next-token distributions</td>
+</tr>
+</tbody>
+</table>
+<h2 id="7-minimal-takeaways">7. Minimal takeaways</h2>
+<ul>
+<li>Tokenization chooses the discrete units on which the model operates; embedding turns those IDs into learned vectors.</li>
+<li>Attention performs content-dependent routing across positions, while an MLP transforms each position independently.</li>
+<li>The causal mask is a structural guarantee: output position <span class="math-inline">\(i\)</span> can depend only on the prefix through <span class="math-inline">\(i\)</span>.</li>
+<li>Positional information is necessary because content-only attention is permutation equivariant.</li>
+<li>RoPE places relative displacement inside the query-key dot product through the identity <span class="math-inline">\(R_i^\top R_j=R_{j-i}\)</span>.</li>
+<li>Normalization controls feature scale; residual connections maintain a persistent stream to which each sublayer adds an update.</li>
+<li>Unembedding and softmax turn the final contextual state at position <span class="math-inline">\(t\)</span> into a distribution for token <span class="math-inline">\(t+1\)</span>.</li>
+</ul>
+<h2 id="8-questions-for-manual-reconstruction">8. Questions for manual reconstruction</h2>
+<ul>
+<li>[ ] Starting only from <span class="math-inline">\(Q=W_QX\)</span>, <span class="math-inline">\(K=W_KZ\)</span>, and <span class="math-inline">\(V=W_VZ\)</span>, recover the shape of <span class="math-inline">\(S\)</span>, <span class="math-inline">\(A\)</span>, and <span class="math-inline">\(Y\)</span> without looking above.</li>
+<li>[ ] Explain why the softmax is column-wise under the lecture's column-token convention.</li>
+<li>[ ] Prove the causal-dependence claim by induction over layers in my own words.</li>
+<li>[ ] Multiply two rotation matrices to recover <span class="math-inline">\(R(a)^\top R(b)=R(b-a)\)</span>.</li>
+<li>[ ] Explain exactly what LayerNorm removes that RMSNorm keeps.</li>
+<li>[ ] Draw the two residual paths in one pre-norm block and label every normalization point.</li>
+<li>[ ] Explain why training is parallel across positions but autoregressive generation is not.</li>
+</ul>
+<h2 id="9-open-questions-and-research-parking-lot">9. Open questions and research parking lot</h2>
+<ul>
+<li><code>[CHECK]</code> How do implementation conventions change when tokens are stored as rows rather than columns? Rewrite every matrix product in batch-major notation.</li>
+<li><code>[CHECK]</code> How does key-value caching change the computation performed during autoregressive generation without changing the model distribution?</li>
+<li><code>[HYPOTHESIS]</code> RoPE extrapolation failures may be easier to understand by inspecting how unseen relative displacements change rotation phases at different frequencies. This is only a research direction, not a conclusion from the lecture.</li>
+<li><code>[HYPOTHESIS]</code> The attention/MLP alternation resembles a separation between communication and local computation. A later note could test where this analogy is mathematically useful and where it breaks.</li>
+</ul>
+<h2 id="references">References</h2>
+<ul>
+<li><code>[DIRECT]</code> Noah Golowich. <em>CS 395T: Foundations of Modern Generative AI — Lecture 3: Transformer Architecture.</em> Fall 2026. <a href="https://noahgol.github.io/teaching/cs395t-f26/lecture3.pdf">https://noahgol.github.io/teaching/cs395t-f26/lecture3.pdf</a></li>
+<li><code>[DIRECT]</code> The lecture attributes its formal Transformer presentation to Mary Phuong and Marcus Hutter, <em>Formal Algorithms for Transformers</em>, arXiv:2207.09238. Listed here from the lecture bibliography; not yet independently reconstructed in this note.</li>
+<li><code>[DIRECT]</code> Other works listed in the lecture bibliography include BPE by Sennrich, Haddow, and Birch; the original Transformer by Vaswani et al.; RoPE by Su et al.; LayerNorm by Ba, Kiros, and Hinton; RMSNorm by Zhang and Sennrich; and SwiGLU by Shazeer. These papers are reading pointers, not claims that they were independently read for this first draft.</li>
+</ul>
+      </article>
+    </div>
+  </main>
+
+  <footer class="site-footer section-shell">
+    <div><strong>CS 395T</strong><span>Learning note</span></div>
+    <p>Markdown source · draft</p>
+    <a href="../index.html#notes">Return to index ←</a>
+  </footer>
+</body>
+</html>
