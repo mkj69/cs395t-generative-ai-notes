@@ -1,10 +1,10 @@
 [
   {
     "title": "Lecture 09 — Chain-of-Thought and Speculative Decoding",
-    "question": "A manual reconstruction in progress: concepts, derivations, examples, corrections, and unresolved questions.",
+    "question": "A first-pass study note on sequential computation through chain-of-thought and distribution-preserving acceleration through speculative decoding.",
     "type": "learning",
     "typeLabel": "Learning note",
-    "status": "Capturing",
+    "status": "Draft",
     "date": "Sep 2026",
     "tags": [
       "chain-of-thought",
@@ -13,7 +13,7 @@
       "speculative decoding"
     ],
     "url": "course-notes/lecture-09.html",
-    "disclaimer": "Manual · in progress"
+    "disclaimer": "AI-assisted · in progress"
   },
   {
     "title": "Research note template",

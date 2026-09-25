@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="A manual reconstruction in progress: concepts, derivations, examples, corrections, and unresolved questions.">
+  <meta name="description" content="A first-pass study note on sequential computation through chain-of-thought and distribution-preserving acceleration through speculative decoding.">
   <title>Lecture 09 — Chain-of-Thought and Speculative Decoding — CS 395T</title>
   <link rel="stylesheet" href="../assets/styles.css">
   <script src="../assets/app.js" defer></script>
@@ -24,12 +24,12 @@
   <main id="main" class="note-shell">
     <header class="note-hero">
       <div class="template-banner learning-banner">
-        <strong>LEARNING NOTE · CAPTURING</strong>
-        <span>Manual reconstruction in progress</span>
+        <strong>LEARNING NOTE · DRAFT</strong>
+        <span>Work in progress</span>
       </div>
-      <p class="eyebrow">23 SEP 2026 · NOT YET CHECKED</p>
+      <p class="eyebrow">23 SEP 2026 · DRAFT</p>
       <h1>Lecture 09 — Chain-of-Thought and Speculative Decoding</h1>
-      <p class="note-abstract">A manual reconstruction in progress: concepts, derivations, examples, corrections, and unresolved questions.</p>
+      <p class="note-abstract">A first-pass study note on sequential computation through chain-of-thought and distribution-preserving acceleration through speculative decoding.</p>
       <ul class="tag-list" aria-label="Topics"><li>chain-of-thought</li><li>STaR</li><li>function composition</li><li>speculative decoding</li></ul>
     </header>
 
@@ -39,136 +39,177 @@
         <div class="toc">
 <ul>
 <li><a href="#lecture-context">Lecture context</a></li>
-<li><a href="#learning-goals">Learning goals</a></li>
-<li><a href="#concept-map">Concept map</a></li>
-<li><a href="#1-chain-of-thought">1. Chain-of-Thought</a><ul>
-<li><a href="#11-cot-prompting">1.1 CoT prompting</a></li>
-<li><a href="#12-star">1.2 STaR</a></li>
-<li><a href="#13-function-composition">1.3 Function composition</a></li>
+<li><a href="#reading-map">Reading map</a></li>
+<li><a href="#1-chain-of-thought-as-sequential-computation">1. Chain-of-thought as sequential computation</a><ul>
+<li><a href="#11-prompting-with-intermediate-steps">1.1 Prompting with intermediate steps</a></li>
+<li><a href="#12-star-learning-from-successful-rationales">1.2 STaR: learning from successful rationales</a></li>
+<li><a href="#13-why-dependent-lookups-are-difficult-in-one-layer">1.3 Why dependent lookups are difficult in one layer</a></li>
 </ul>
 </li>
 <li><a href="#2-speculative-decoding">2. Speculative decoding</a><ul>
-<li><a href="#21-drafting-and-verification">2.1 Drafting and verification</a></li>
-<li><a href="#22-correctness">2.2 Correctness</a></li>
+<li><a href="#21-draft-verify-accept-correct">2.1 Draft, verify, accept, correct</a></li>
+<li><a href="#22-why-the-sampler-is-exact">2.2 Why the sampler is exact</a></li>
 <li><a href="#23-expected-progress-and-speedup">2.3 Expected progress and speedup</a></li>
 </ul>
 </li>
-<li><a href="#worked-examples-and-code">Worked examples and code</a></li>
-<li><a href="#what-i-can-now-explain">What I can now explain</a></li>
-<li><a href="#what-is-still-unclear">What is still unclear?</a></li>
-<li><a href="#research-parking-lot">Research parking lot</a></li>
-<li><a href="#corrections-log">Corrections log</a></li>
+<li><a href="#3-connecting-the-two-halves">3. Connecting the two halves</a></li>
+<li><a href="#4-minimal-takeaways">4. Minimal takeaways</a></li>
+<li><a href="#5-questions-for-manual-reconstruction">5. Questions for manual reconstruction</a></li>
+<li><a href="#6-open-questions">6. Open questions</a></li>
 <li><a href="#references">References</a></li>
 </ul>
 </div>
 
       </aside>
       <article class="prose note-prose markdown-body">
-        <h2 id="lecture-context">Lecture context</h2>
+        <blockquote>
+<p><strong>AI-assisted draft.</strong> This baseline was synthesized from the Lecture 09 PDF so that the main ideas, derivations, and questions are available for study. It is not the author's manual reconstruction; it should be revised, corrected, and extended in Logseq during learning.</p>
+</blockquote>
+<h2 id="lecture-context">Lecture context</h2>
 <ul>
 <li><code>[SOURCE]</code>：<a href="https://noahgol.github.io/teaching/cs395t-f26/lecture9.pdf">https://noahgol.github.io/teaching/cs395t-f26/lecture9.pdf</a></li>
 <li>How chain-of-thought supports sequential computation and how sepculative decoding speeds up generation?</li>
+<li><code>[SYNTHESIS]</code> The two halves study different uses of inference-time computation. Chain-of-thought adds sequential state to expand what a model can compute. Speculative decoding reorganizes generation so expensive target-model work is used more efficiently.</li>
 </ul>
-<h2 id="learning-goals">Learning goals</h2>
-<ul>
-<li>[ ] 不看讲义解释 Chain-of-Thought 的基本建模方式。</li>
-<li>[ ] 手工重建 STaR 的训练流程及相关推导。</li>
-<li>[ ] 说明 function composition 例子中的关键依赖。</li>
-<li>[ ] 用自己的话重写 speculative decoding 算法。</li>
-<li>[ ] 重推正确性与 speedup 相关公式。</li>
-<li>[ ] 区分已经理解、仅见过和仍不清楚的内容。</li>
-</ul>
-<h2 id="concept-map">Concept map</h2>
-<p>[第一次阅读后手工绘制。]</p>
-<h2 id="1-chain-of-thought">1. Chain-of-Thought</h2>
-<h3 id="11-cot-prompting">1.1 CoT prompting</h3>
-<ul>
-<li><code>[RECALL]</code>：</li>
-<li><code>[SOURCE]</code>：</li>
-<li><code>[EXAMPLE]</code>：</li>
-<li><code>[UNCLEAR]</code>：</li>
-<li><code>[CORRECTION]</code>：</li>
-</ul>
-<h3 id="12-star">1.2 STaR</h3>
-<ul>
-<li><code>[RECALL]</code>：</li>
-<li><code>[DERIVATION]</code>：</li>
-<li><code>[EXAMPLE]</code>：</li>
-<li><code>[UNCLEAR]</code>：</li>
-<li><code>[CORRECTION]</code>：</li>
-</ul>
-<h3 id="13-function-composition">1.3 Function composition</h3>
-<ul>
-<li><code>[RECALL]</code>：</li>
-<li><code>[DERIVATION]</code>：</li>
-<li><code>[EXAMPLE]</code>：</li>
-<li><code>[UNCLEAR]</code>：</li>
-<li><code>[CORRECTION]</code>：</li>
-</ul>
-<h2 id="2-speculative-decoding">2. Speculative decoding</h2>
-<h3 id="21-drafting-and-verification">2.1 Drafting and verification</h3>
-<ul>
-<li><code>[RECALL]</code>：</li>
-<li><code>[ALGORITHM]</code>：</li>
-<li><code>[EXAMPLE]</code>：</li>
-<li><code>[UNCLEAR]</code>：</li>
-<li><code>[CORRECTION]</code>：</li>
-</ul>
-<h3 id="22-correctness">2.2 Correctness</h3>
-<ul>
-<li><code>[DERIVATION]</code>：</li>
-<li>假设：</li>
-<li>检查：</li>
-<li><code>[UNCLEAR]</code>：</li>
-</ul>
-<h3 id="23-expected-progress-and-speedup">2.3 Expected progress and speedup</h3>
-<ul>
-<li><code>[DERIVATION]</code>：</li>
-<li>参数解释：</li>
-<li>数值例子：</li>
-<li><code>[UNCLEAR]</code>：</li>
-</ul>
-<h2 id="worked-examples-and-code">Worked examples and code</h2>
-<ul>
-<li>纸上例子：</li>
-<li>运行代码前写下的预期结果：</li>
-<li>自己编写的代码：</li>
-<li>观察结果：</li>
-<li>与预期不一致之处：</li>
-</ul>
-<h2 id="what-i-can-now-explain">What I can now explain</h2>
-<p>[完成闭卷重建后再填写。]</p>
-<h2 id="what-is-still-unclear">What is still unclear?</h2>
-<ul>
-<li>[ ] <code>[QUESTION]</code></li>
-</ul>
-<h2 id="research-parking-lot">Research parking lot</h2>
-<ul>
-<li><code>[IDEA]</code>：[只停放问题；如果以后展开，建立独立 research note。]</li>
-</ul>
-<h2 id="corrections-log">Corrections log</h2>
+<h2 id="reading-map">Reading map</h2>
 <table>
 <thead>
 <tr>
-<th>Date</th>
-<th>Original misunderstanding</th>
-<th>Correction</th>
-<th>Evidence</th>
+<th>Part</th>
+<th>Central question</th>
+<th>Main idea</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td></td>
-<td></td>
-<td></td>
-<td></td>
+<td>CoT prompting</td>
+<td>Why can intermediate tokens help?</td>
+<td>A generated rationale becomes context for later predictions.</td>
+</tr>
+<tr>
+<td>STaR</td>
+<td>How can a model learn rationales from answer supervision?</td>
+<td>Successful generated rationales become a fine-tuning set.</td>
+</tr>
+<tr>
+<td>Function composition</td>
+<td>What is difficult for one attention layer?</td>
+<td>Dependent lookups create an information bottleneck.</td>
+</tr>
+<tr>
+<td>Speculative decoding</td>
+<td>How can generation become faster without changing the target distribution?</td>
+<td>Draft cheaply, verify in parallel, and correct exactly.</td>
 </tr>
 </tbody>
 </table>
+<h2 id="1-chain-of-thought-as-sequential-computation">1. Chain-of-thought as sequential computation</h2>
+<h3 id="11-prompting-with-intermediate-steps">1.1 Prompting with intermediate steps</h3>
+<ul>
+<li><code>[SOURCE]</code> Let <code>x</code> be a question, <code>r</code> a generated rationale, and <code>y</code> the answer. The joint continuation factorizes as <code>p_theta(r, y | x) = p_theta(r | x) p_theta(y | x, r)</code>.</li>
+<li><code>[INTUITION]</code> The rationale is not merely an explanation attached after the answer. Once emitted, it becomes part of the context, so later tokens can reuse intermediate values produced earlier.</li>
+<li><code>[SYNTHESIS]</code> The autoregressive sequence acts like a small external state: write an intermediate result, attend to it, and continue the computation with the same model.</li>
+<li><code>[LIMIT]</code> More tokens do not guarantee valid reasoning. A fluent rationale can contain a wrong step, and a correct final answer does not certify the path that produced it.</li>
+</ul>
+<h3 id="12-star-learning-from-successful-rationales">1.2 STaR: learning from successful rationales</h3>
+<ul>
+<li><code>[SOURCE]</code> STaR begins with questions and known answers, plus a small set of rationale demonstrations. One round follows three steps:</li>
+<li>Generate a rationale and an answer for each question.</li>
+<li>Retain a generated sequence when its final answer matches the known answer.</li>
+<li>Fine-tune the original pretrained model on the retained rationale-answer sequences, then repeat generation.</li>
+<li><code>[INTUITION]</code> The model manufactures candidate reasoning traces, while the answer key supplies a cheap success signal. This turns answer-only supervision into a filtered rationale dataset.</li>
+<li><code>[SOURCE]</code> Rationalization covers some initially failed questions: reveal the correct answer as a hint, ask the model for a compatible rationale, then remove the hint from the fine-tuning input.</li>
+<li><code>[LIMIT]</code> The filter checks only the final answer. It can preserve a lucky or internally inconsistent rationale. Rationalized samples are also generated under an answer hint, not under the unhinted policy used at test time.</li>
+</ul>
+<h4 id="policy-gradient-view">Policy-gradient view</h4>
+<ul>
+<li><code>[SOURCE]</code> Treat the generated rationale and answer as a sampled action sequence and reward exact answer correctness. For examples <code>(x_i, y_i)</code>, write <code>J(theta) = sum_i E[1{y_hat_i = y_i}]</code>.</li>
+<li><code>[DERIVATION]</code> The score-function identity yields a term of the form <code>E[1{correct} grad_theta log p_theta(r_hat, y_hat | x)]</code>. Incorrect samples contribute zero; correct samples increase the likelihood of their complete generated sequence.</li>
+<li><code>[LIMIT]</code> This is an interpretation rather than an exact equivalence. The clean estimator assumes on-policy samples, whereas STaR uses greedy generations and several supervised updates on a retained dataset.</li>
+</ul>
+<h3 id="13-why-dependent-lookups-are-difficult-in-one-layer">1.3 Why dependent lookups are difficult in one layer</h3>
+<ul>
+<li><code>[SOURCE]</code> Consider arbitrary tables <code>g, f : [n] -&gt; [n]</code> and a query <code>a</code>. Computing <code>f(g(a))</code> needs two dependent lookups: first discover <code>g(a)</code>, then use that result as the key for <code>f</code>.</li>
+<li><code>[INTUITION]</code> In one attention layer, all heads form their queries from the original representations in parallel. A head cannot receive <code>g(a)</code> from another head and then change its own query within that same layer.</li>
+<li><code>[SOURCE]</code> With <code>H</code> heads, hidden dimension <code>d</code>, and <code>b</code> bits per scalar, define <code>B = H(d + 1)b</code>. When <code>B &lt; n log_2 n</code>, set <code>R = n log_2 n - B</code>; for uniformly random tables the error probability is at least <code>R / (3 n log_2 n)</code>.</li>
+</ul>
+<h4 id="proof-skeleton">Proof skeleton</h4>
+<ul>
+<li><code>[DERIVATION]</code> The lower bound reduces one attention layer to a one-way communication protocol.</li>
+<li>The party holding <code>f</code> summarizes its contribution to every attention head using partial attention numerators and denominators.</li>
+<li>This message contains at most <code>B</code> bits and is fixed before the requested index <code>J = g(a)</code> is known.</li>
+<li>Recovering <code>f(J)</code> from that short message is an indexing problem.</li>
+<li>Fano's inequality turns the remaining uncertainty about <code>f(J)</code> into a lower bound on prediction error.</li>
+<li><code>[INTUITION]</code> Attention can perform a lookup, but the second lookup depends on the result of the first while a single layer performs its lookups simultaneously.</li>
+</ul>
+<h4 id="iterated-composition-and-cot">Iterated composition and CoT</h4>
+<ul>
+<li><code>[SOURCE]</code> For <code>z_0 = a</code> and <code>z_j = f_j(z_{j-1})</code>, each generated CoT token can store the current state <code>z_j</code>, allowing the next autoregressive step to perform the next lookup.</li>
+<li><code>[SOURCE]</code> The lecture states a worst-case lower bound of <code>Omega(sqrt(n / (H d b)))</code> CoT steps for sufficiently general iterated composition in its finite-precision model. It also explains why <code>K</code> explicit sequential lookups suffice for a composition of length <code>K</code> under a suitable encoding.</li>
+<li><code>[SYNTHESIS]</code> This result does not claim that every real reasoning task needs a long visible rationale. It supplies a clean case in which sequentially generated state expands the available computation beyond one parallel layer.</li>
+</ul>
+<h2 id="2-speculative-decoding">2. Speculative decoding</h2>
+<h3 id="21-draft-verify-accept-correct">2.1 Draft, verify, accept, correct</h3>
+<ul>
+<li><code>[SOURCE]</code> Let <code>p</code> be the expensive target model and <code>q</code> a cheaper draft model. From prefix <code>s</code>, the draft model proposes <code>gamma</code> tokens sequentially. The target model then evaluates the corresponding draft prefixes together in one causally masked forward pass.</li>
+<li><code>[ALGORITHM]</code> At draft position <code>i</code>, accept proposed token <code>v</code> with probability <code>min(1, p_i(v) / q_i(v))</code>.</li>
+<li><code>[ALGORITHM]</code> On the first rejection, keep the previously accepted tokens, sample a correction from the normalized positive part <code>[p_i - q_i]_+</code>, and discard the rest of the draft.</li>
+<li><code>[ALGORITHM]</code> If all <code>gamma</code> proposals are accepted, sample one bonus token directly from the target distribution. An iteration therefore emits between one and <code>gamma + 1</code> tokens.</li>
+<li><code>[INTUITION]</code> The draft model guesses a short future and the target checks that future in parallel. Agreement creates progress; disagreement invokes an exact correction rather than an approximate fallback.</li>
+</ul>
+<h3 id="22-why-the-sampler-is-exact">2.2 Why the sampler is exact</h3>
+<ul>
+<li><code>[SOURCE]</code> For one token, the probability of proposing and accepting value <code>v</code> is <code>q(v) min(1, p(v)/q(v)) = min(p(v), q(v))</code>.</li>
+<li><code>[DERIVATION]</code> The total acceptance probability is <code>beta = sum_v min(p(v), q(v)) = 1 - TV(p, q)</code>, so rejection has probability <code>1 - beta</code>.</li>
+<li><code>[DERIVATION]</code> Define the residual distribution as <code>r(v) = [p(v) - q(v)]_+ / (1 - beta)</code>. Accepted and corrected mass combine to <code>min(p(v), q(v)) + (1 - beta)r(v) = p(v)</code>.</li>
+<li><code>[SYNTHESIS]</code> Exactness holds locally at every reached prefix. Repeating the one-token argument shows that the emitted sequence has the same autoregressive distribution as ordinary sampling from the target model.</li>
+<li><code>[LIMIT]</code> Draft tokens after the first rejection must be discarded because their target probabilities were evaluated under a prefix containing a token that was not emitted.</li>
+</ul>
+<h3 id="23-expected-progress-and-speedup">2.3 Expected progress and speedup</h3>
+<ul>
+<li><code>[SOURCE]</code> Assume the conditional mean acceptance probability at each reached draft position is a constant <code>alpha</code>. If <code>L</code> is the number of consecutive accepted drafts, then <code>P(L &gt;= j) = alpha^j</code> for <code>0 &lt;= j &lt;= gamma</code>.</li>
+<li><code>[DERIVATION]</code> With <code>N = L + 1</code> emitted tokens per iteration, the tail-sum identity gives <code>E[N] = sum_{j=0}^{gamma} alpha^j = (1 - alpha^(gamma+1)) / (1 - alpha)</code> for <code>alpha &lt; 1</code>.</li>
+<li><code>[SOURCE]</code> Let a target step cost <code>T_p</code>, a draft step cost <code>T_q</code>, and <code>c = T_q / T_p</code>. Under the parallel verification model, one iteration costs <code>(1 + gamma c)T_p</code>.</li>
+<li><code>[DERIVATION]</code> The idealized wall-clock speedup is <code>E[N] / (1 + gamma c)</code>.</li>
+<li><code>[EXAMPLE]</code> If <code>alpha = 0.8</code>, <code>gamma = 4</code>, and <code>c = 0.1</code>, then <code>E[N] = 3.3616</code> and the predicted speedup is approximately <code>2.40x</code>.</li>
+<li><code>[LIMIT]</code> This formula is not a hardware-independent promise. It assumes block verification takes roughly one target-step time and neglects acceptance overhead, memory traffic, batching effects, and the final truncated iteration.</li>
+</ul>
+<h2 id="3-connecting-the-two-halves">3. Connecting the two halves</h2>
+<ul>
+<li><code>[SYNTHESIS]</code> Chain-of-thought spends sequential tokens to make dependent computation possible. Speculative decoding tries to recover wall-clock efficiency by using a cheap model for proposals and parallel target verification.</li>
+<li><code>[SYNTHESIS]</code> Both methods expose the dependency structure of autoregressive generation. CoT emphasizes that later computation can depend on newly written state; speculative decoding exploits the fact that several conditional distributions can be evaluated together once a candidate prefix is known.</li>
+<li><code>[HYPOTHESIS]</code> Reasoning-heavy outputs may have uneven acceptance rates: routine connective text may be easy for the draft model, while decisive reasoning steps may cause rejection. Measuring acceptance by semantic role could show where speculative decoding saves time on reasoning tasks.</li>
+</ul>
+<h2 id="4-minimal-takeaways">4. Minimal takeaways</h2>
+<ul>
+<li>A rationale can function as sequential working state, not only as an explanation.</li>
+<li>STaR converts final-answer supervision into filtered rationale training, but answer correctness does not validate every reasoning step.</li>
+<li>Function composition isolates a concrete limitation of parallel single-layer lookup.</li>
+<li>Speculative decoding is distributionally exact because rejected probability mass is restored through the residual distribution.</li>
+<li>Speedup depends jointly on draft-target agreement, draft length, draft cost, and the hardware's ability to verify a block in parallel.</li>
+</ul>
+<h2 id="5-questions-for-manual-reconstruction">5. Questions for manual reconstruction</h2>
+<ul>
+<li>[ ] Derive the STaR score-function gradient without looking at the lecture PDF.</li>
+<li>[ ] Explain why one attention head cannot use another head's newly discovered <code>g(a)</code> in the same layer.</li>
+<li>[ ] Reconstruct the one-token speculative sampling proof from the overlap mass <code>min(p, q)</code>.</li>
+<li>[ ] Re-derive the tail-sum formula for <code>E[N]</code> and identify every runtime assumption.</li>
+<li>[ ] Test how predicted speedup changes as <code>gamma</code>, <code>alpha</code>, and <code>c</code> vary.</li>
+</ul>
+<h2 id="6-open-questions">6. Open questions</h2>
+<ul>
+<li><code>[QUESTION]</code> How often do answer-correct STaR rationales contain invalid intermediate claims?</li>
+<li><code>[QUESTION]</code> Which task properties determine whether visible CoT is genuinely computational or merely explanatory?</li>
+<li><code>[QUESTION]</code> How stable is the constant-mean-acceptance approximation across different positions in a reasoning trace?</li>
+<li><code>[QUESTION]</code> Can a draft model be trained specifically for low-entropy reasoning transitions without copying the full target model?</li>
+</ul>
 <h2 id="references">References</h2>
 <ul>
-<li>Noah Golowich. “Lecture 9: Chain-of-Thought and Speculative Decoding.”
-CS 395T, Fall 2026. <a href="https://noahgol.github.io/teaching/cs395t-f26/lecture9.pdf">https://noahgol.github.io/teaching/cs395t-f26/lecture9.pdf</a></li>
+<li>Noah Golowich. “Lecture 9: Chain-of-Thought and Speculative Decoding.” CS 395T, Fall 2026. <a href="https://noahgol.github.io/teaching/cs395t-f26/lecture9.pdf">https://noahgol.github.io/teaching/cs395t-f26/lecture9.pdf</a></li>
+<li>Jason Wei et al. “Chain-of-Thought Prompting Elicits Reasoning in Large Language Models.” NeurIPS, 2022. <a href="https://arxiv.org/abs/2201.11903">https://arxiv.org/abs/2201.11903</a></li>
+<li>Eric Zelikman et al. “STaR: Bootstrapping Reasoning With Reasoning.” NeurIPS, 2022. <a href="https://arxiv.org/abs/2203.14465">https://arxiv.org/abs/2203.14465</a></li>
+<li>Binghui Peng, Srini Narayanan, and Christos Papadimitriou. “On Limitations of the Transformer Architecture.” 2024. <a href="https://arxiv.org/abs/2402.08164">https://arxiv.org/abs/2402.08164</a></li>
+<li>Yaniv Leviathan, Matan Kalman, and Yossi Matias. “Fast Inference from Transformers via Speculative Decoding.” ICML, 2023. <a href="https://arxiv.org/abs/2211.17192">https://arxiv.org/abs/2211.17192</a></li>
 </ul>
       </article>
     </div>
@@ -176,7 +217,7 @@ CS 395T, Fall 2026. <a href="https://noahgol.github.io/teaching/cs395t-f26/lectu
 
   <footer class="site-footer section-shell">
     <div><strong>CS 395T</strong><span>Learning note</span></div>
-    <p>Markdown source · capturing</p>
+    <p>Markdown source · draft</p>
     <a href="../index.html#notes">Return to index ←</a>
   </footer>
 </body>

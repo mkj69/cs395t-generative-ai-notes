@@ -126,6 +126,7 @@ def render_note(path: Path, metadata: dict[str, Any], body: str) -> dict[str, An
     slug = str(metadata.get("slug") or path.stem)
     note_type = str(metadata["type"])
     status = str(metadata.get("status") or "draft").lower()
+    authorship = str(metadata.get("authorship") or "unspecified").lower()
     summary = str(metadata.get("summary") or "A public note in progress.")
     tags = [str(tag) for tag in metadata.get("tags") or []]
     note_date = normalized_date(metadata.get("date"))
@@ -140,7 +141,17 @@ def render_note(path: Path, metadata: dict[str, Any], body: str) -> dict[str, An
         type_value = "learning"
         banner_class = " learning-banner"
         footer_label = "Learning note"
-        disclaimer = "Manual · checked" if status == "checked" else "Manual · in progress"
+        if authorship == "manual":
+            authorship_label = "Manual"
+        elif authorship in {"ai-assisted", "ai_assisted"}:
+            authorship_label = "AI-assisted"
+        else:
+            authorship_label = "Authorship unspecified"
+        disclaimer = (
+            f"{authorship_label} · checked"
+            if status == "checked"
+            else f"{authorship_label} · in progress"
+        )
     else:
         output_dir = DOCS / "notes"
         url = f"notes/{slug}.html"
