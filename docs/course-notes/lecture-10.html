@@ -1,0 +1,603 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="An AI-assisted first reconstruction of GPU memory hierarchy, roofline analysis, FlashAttention&#x27;s online softmax and IO complexity, KV caching, and the different bottlenecks of prefill and generation.">
+  <title>Lecture 10 — GPUs, FlashAttention, and Inference — CS 395T</title>
+  <link rel="stylesheet" href="../assets/styles.css">
+  <script>
+    window.MathJax = {
+      tex: {
+        processEscapes: true
+      },
+      svg: { fontCache: 'global' }
+    };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js" defer></script>
+  <script src="../assets/app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header">
+    <a class="wordmark" href="../index.html"><span>CS 395T</span><small>Learning &amp; research notebook</small></a>
+    <button class="menu-button" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button>
+    <nav id="site-nav" class="site-nav" aria-label="Primary navigation">
+      <a href="../structure.html">Structure</a>
+      <a href="../index.html#notes">Index</a>
+      <a href="../method.html">Writing guide</a>
+      <a href="../index.html#about">About</a>
+    </nav>
+  </header>
+
+  <main id="main" class="note-shell">
+    <header class="note-hero">
+      <div class="template-banner learning-banner">
+        <strong>LEARNING NOTE · DRAFT</strong>
+        <span>Work in progress</span>
+      </div>
+      <p class="eyebrow">30 SEP 2026 · DRAFT</p>
+      <h1>Lecture 10 — GPUs, FlashAttention, and Inference</h1>
+      <p class="note-abstract">An AI-assisted first reconstruction of GPU memory hierarchy, roofline analysis, FlashAttention&#x27;s online softmax and IO complexity, KV caching, and the different bottlenecks of prefill and generation.</p>
+      <ul class="tag-list" aria-label="Topics"><li>GPU systems</li><li>roofline model</li><li>FlashAttention</li><li>KV cache</li><li>inference</li><li>arithmetic intensity</li></ul>
+    </header>
+
+    <div class="note-layout">
+      <aside class="note-toc" aria-label="On this page">
+        <p class="aside-label">ON THIS PAGE</p>
+        <div class="toc">
+<ul>
+<li><a href="#lecture-context">Lecture context</a></li>
+<li><a href="#reading-map">Reading map</a></li>
+<li><a href="#1-gpu-execution-and-memory">1. GPU execution and memory</a><ul>
+<li><a href="#11-streaming-multiprocessors-and-arithmetic-units">1.1 Streaming multiprocessors and arithmetic units</a></li>
+<li><a href="#12-the-memory-hierarchy">1.2 The memory hierarchy</a></li>
+<li><a href="#13-arithmetic-intensity-and-the-roofline-model">1.3 Arithmetic intensity and the roofline model</a></li>
+</ul>
+</li>
+<li><a href="#2-where-naive-attention-moves-data">2. Where naive attention moves data</a><ul>
+<li><a href="#21-column-oriented-attention">2.1 Column-oriented attention</a></li>
+<li><a href="#22-flops-are-not-the-whole-cost">2.2 FLOPs are not the whole cost</a></li>
+</ul>
+</li>
+<li><a href="#3-flashattention">3. FlashAttention</a><ul>
+<li><a href="#31-tiling-and-recomputation">3.1 Tiling and recomputation</a></li>
+<li><a href="#32-the-online-softmax-invariant">3.2 The online softmax invariant</a></li>
+<li><a href="#33-tiles-and-loop-order">3.3 Tiles and loop order</a></li>
+<li><a href="#34-correctness-and-storage">3.4 Correctness and storage</a></li>
+<li><a href="#35-hbm-transfer-complexity">3.5 HBM transfer complexity</a></li>
+</ul>
+</li>
+<li><a href="#4-autoregressive-inference-and-kv-caching">4. Autoregressive inference and KV caching</a><ul>
+<li><a href="#41-prefill-and-generation">4.1 Prefill and generation</a></li>
+<li><a href="#42-shape-notation-for-the-cost-model">4.2 Shape notation for the cost model</a></li>
+</ul>
+</li>
+<li><a href="#5-parameter-matrix-multiplications">5. Parameter matrix multiplications</a><ul>
+<li><a href="#51-flops-bytes-and-intensity">5.1 FLOPs, bytes, and intensity</a></li>
+<li><a href="#52-why-token-count-amortizes-weights">5.2 Why token count amortizes weights</a></li>
+</ul>
+</li>
+<li><a href="#6-attention-during-inference">6. Attention during inference</a><ul>
+<li><a href="#61-ideal-fused-attention-cost">6.1 Ideal fused-attention cost</a></li>
+<li><a href="#62-prefill">6.2 Prefill</a></li>
+<li><a href="#63-generation">6.3 Generation</a></li>
+<li><a href="#64-sram-limits-the-ideal-reuse">6.4 SRAM limits the ideal reuse</a></li>
+</ul>
+</li>
+<li><a href="#7-the-central-comparison">7. The central comparison</a></li>
+<li><a href="#8-manual-verification-checklist">8. Manual verification checklist</a></li>
+<li><a href="#9-questions-to-carry-into-study">9. Questions to carry into study</a></li>
+<li><a href="#references-recorded-from-the-supplied-lecture">References recorded from the supplied lecture</a></li>
+</ul>
+</div>
+
+      </aside>
+      <article class="prose note-prose markdown-body">
+        <blockquote>
+<p><strong>AI-assisted first draft.</strong> This note reconstructs the supplied Lecture 10 PDF and expands its equations into step-by-step derivations and small checks. It has not yet been manually verified or rewritten by the author. Statements tagged <code>[DIRECT]</code> follow the lecture; <code>[DERIVATION]</code> and <code>[SYNTHESIS]</code> make the reasoning explicit.</p>
+</blockquote>
+<h2 id="lecture-context">Lecture context</h2>
+<ul>
+<li><code>[DIRECT]</code> Source: <a href="https://noahgol.github.io/teaching/cs395t-f26/lecture10.pdf">https://noahgol.github.io/teaching/cs395t-f26/lecture10.pdf</a></li>
+<li><code>[DIRECT]</code> The supplied PDF is eight pages long. Its substantive sections cover GPU background, FlashAttention, and inference tricks.</li>
+<li><code>[SOURCE BOUNDARY]</code> The opening sentence says that the lecture will also analyze self-improvement through sharpening, and the reference list includes a sharpening paper. However, this PDF contains no sharpening section or corresponding derivation. This draft therefore does not invent one.</li>
+<li><code>[SYNTHESIS]</code> The lecture is organized around one systems question: when a Transformer operation is slow, is the machine spending its time doing arithmetic, or moving data? FlashAttention and KV caching are useful because they change data movement without changing the mathematical model being evaluated.</li>
+</ul>
+<h2 id="reading-map">Reading map</h2>
+<table>
+<thead>
+<tr>
+<th>Part</th>
+<th>Central question</th>
+<th>Main idea</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GPU hierarchy</td>
+<td>Where do computation and data live?</td>
+<td>Fast arithmetic is useful only when data reaches it quickly enough.</td>
+</tr>
+<tr>
+<td>Roofline model</td>
+<td>Is an operation compute-bound or memory-bound?</td>
+<td>Compare arithmetic intensity with the hardware balance.</td>
+</tr>
+<tr>
+<td>Naive attention</td>
+<td>Why can exact attention waste memory traffic?</td>
+<td>The score and probability matrices are written to and reread from HBM.</td>
+</tr>
+<tr>
+<td>FlashAttention</td>
+<td>How can exact attention avoid those transfers?</td>
+<td>Tile the computation, maintain online softmax statistics, and discard score tiles.</td>
+</tr>
+<tr>
+<td>KV caching</td>
+<td>What can causal decoding reuse?</td>
+<td>Earlier keys and values do not change when a new token is appended.</td>
+</tr>
+<tr>
+<td>Inference arithmetic</td>
+<td>Why do prefill and generation behave differently?</td>
+<td>Prompt tokens share weights; generated sequences do not share their KV caches.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="1-gpu-execution-and-memory">1. GPU execution and memory</h2>
+<h3 id="11-streaming-multiprocessors-and-arithmetic-units">1.1 Streaming multiprocessors and arithmetic units</h3>
+<ul>
+<li><code>[DIRECT]</code> An NVIDIA GPU contains many streaming multiprocessors (SMs). The lecture uses the H100 SXM as its running example and reports 132 SMs.</li>
+<li><code>[DIRECT]</code> Each H100 SM is divided into four subpartitions. A subpartition contains a warp scheduler, registers, CUDA cores, and tensor-core capacity.</li>
+<li><code>[DIRECT]</code> A warp is a group of 32 threads. The scheduler issues a common instruction to the threads, which apply that instruction to different data.</li>
+<li><code>[EXPLANATION]</code> Parallelism is therefore hierarchical. Many SMs work at once; several warps may reside on one SM; and the threads of a warp perform the same kind of operation on different elements.</li>
+<li><code>[DIRECT]</code> CUDA cores handle ordinary scalar or vector-like work, including pointwise operations and reductions. Tensor cores perform small matrix multiply-accumulate operations and supply most of the throughput used by large Transformer matrix multiplications.</li>
+<li><code>[SYNTHESIS]</code> Calling a GPU “fast” is incomplete. Tensor cores can execute matrix arithmetic extremely quickly, but a kernel benefits only if its work can be expressed in suitable matrix tiles and if those tiles are delivered without starving the arithmetic units.</li>
+</ul>
+<h3 id="12-the-memory-hierarchy">1.2 The memory hierarchy</h3>
+<ul>
+<li><code>[DIRECT]</code> The hierarchy in the lecture runs from registers, to an SM-local shared-memory/L1 pool, to chip-wide L2 cache, and finally to high-bandwidth memory (HBM).</li>
+<li><code>[DIRECT]</code> Registers are thread-local working storage. The H100 figure used by the lecture assigns 256 KiB of registers to an SM in total. A kernel that requires many registers per thread can reduce occupancy because fewer threads fit simultaneously.</li>
+<li><code>[DIRECT]</code> Each H100 SM also has a 256 KiB pool divided between programmer-managed shared memory (SMEM) and hardware-managed L1 cache. FlashAttention uses this kind of on-chip storage for reusable tiles.</li>
+<li><code>[DIRECT]</code> L2 is shared across SMs and is about 50 MB in the stated H100 configuration. HBM is much larger: the H100 SXM example has 80 GB and approximately <span class="math-inline">\(3.35\)</span> TB/s of peak bandwidth.</li>
+<li><code>[EXPLANATION]</code> Registers and on-chip caches use SRAM, which is fast but area-expensive. HBM uses DRAM, which stores far more data but is farther from the arithmetic units. Capacity increases as we move outward; latency and movement cost also increase.</li>
+<li><code>[SYNTHESIS]</code> The key distinction is not simply “cache versus memory.” It is whether an intermediate value can stay on-chip long enough to be reused. If it is written to HBM and later read back, the same mathematical computation may take much longer even when the FLOP count is unchanged.</li>
+</ul>
+<h3 id="13-arithmetic-intensity-and-the-roofline-model">1.3 Arithmetic intensity and the roofline model</h3>
+<ul>
+<li><code>[DIRECT]</code> Let <span class="math-inline">\(F\)</span> be an operation's FLOP count and let <span class="math-inline">\(D\)</span> be the number of bytes transferred between HBM and the chip. Its arithmetic intensity is</li>
+</ul>
+<div class="math-display">\[I=\frac{F}{D}\qquad\text{FLOPs per byte}.\]</div>
+<ul>
+<li><code>[DIRECT]</code> If the usable compute rate is <span class="math-inline">\(C\)</span> FLOPs/s and HBM bandwidth is <span class="math-inline">\(\beta\)</span> bytes/s, define the hardware balance</li>
+</ul>
+<div class="math-display">\[I^*=\frac{C}{\beta}.\]</div>
+<ul>
+<li><code>[DERIVATION · Step 1]</code> Arithmetic alone would require</li>
+</ul>
+<div class="math-display">\[t_{\mathrm{comp}}=\frac{F}{C}.\]</div>
+<ul>
+<li><code>[DERIVATION · Step 2]</code> Moving the required bytes alone would require</li>
+</ul>
+<div class="math-display">\[t_{\mathrm{mem}}=\frac{D}{\beta}.\]</div>
+<ul>
+<li><code>[DIRECT]</code> The idealized roofline model assumes that computation and transfer overlap, giving</li>
+</ul>
+<div class="math-display">\[t\approx\max\left\{t_{\mathrm{comp}},t_{\mathrm{mem}}\right\}.\]</div>
+<ul>
+<li><code>[DERIVATION · Step 3]</code> Compare the two times:</li>
+</ul>
+<div class="math-display">\[\frac{t_{\mathrm{comp}}}{t_{\mathrm{mem}}}
+=\frac{F/C}{D/\beta}
+=\frac{F/D}{C/\beta}
+=\frac{I}{I^*}.\]</div>
+<ul>
+<li><code>[CONCLUSION]</code> If <span class="math-inline">\(I&gt;I^*\)</span>, compute time is larger and the idealized operation is compute-bound. If <span class="math-inline">\(I&lt;I^*\)</span>, transfer time is larger and the operation is memory-bound.</li>
+</ul>
+<h4 id="h100-balance-check">H100 balance check</h4>
+<ul>
+<li><code>[DIRECT]</code> The lecture uses roughly <span class="math-inline">\(9.9\times10^{14}\)</span> dense FP16/BF16 Tensor Core FLOPs/s and <span class="math-inline">\(3.35\times10^{12}\)</span> HBM bytes/s.</li>
+<li><code>[DERIVATION]</code> Dividing gives</li>
+</ul>
+<div class="math-display">\[I^*\approx
+\frac{9.9\times10^{14}}{3.35\times10^{12}}
+\approx 295.5\ \text{FLOPs/byte}.\]</div>
+<ul>
+<li><code>[EXPLANATION]</code> An operation must perform roughly 300 useful FLOPs per byte fetched from HBM to keep peak matrix arithmetic busier than peak memory bandwidth in this simplified comparison.</li>
+</ul>
+<h4 id="small-numerical-example">Small numerical example</h4>
+<ul>
+<li><code>[EXAMPLE]</code> Suppose a kernel performs <span class="math-inline">\(10^{12}\)</span> FLOPs and transfers <span class="math-inline">\(10^{10}\)</span> bytes. Then <span class="math-inline">\(I=100\)</span> FLOPs/byte, below the stated H100 balance.</li>
+<li><code>[DERIVATION]</code> At the cited peaks,</li>
+</ul>
+<div class="math-display">\[t_{\mathrm{comp}}\approx\frac{10^{12}}{9.9\times10^{14}}
+\approx1.01\ \text{ms},\]</div>
+<p>while</p>
+<div class="math-display">\[t_{\mathrm{mem}}\approx\frac{10^{10}}{3.35\times10^{12}}
+\approx2.99\ \text{ms}.\]</div>
+<ul>
+<li><code>[CONCLUSION]</code> The roofline estimate predicts a memory bottleneck and an ideal time near <span class="math-inline">\(2.99\)</span> ms, not the sum of the two times.</li>
+<li><code>[LIMIT]</code> Peak specifications do not guarantee application throughput. Kernel launches, imperfect occupancy, synchronization, unsupported data shapes, cache behavior, and incomplete overlap can all increase runtime. The roofline maximum is an optimistic lower-bound model, not a timing oracle.</li>
+</ul>
+<h2 id="2-where-naive-attention-moves-data">2. Where naive attention moves data</h2>
+<h3 id="21-column-oriented-attention">2.1 Column-oriented attention</h3>
+<ul>
+<li><code>[DIRECT]</code> For one head, let the sequence length be <span class="math-inline">\(N\)</span> and let query, key, and value width all equal <span class="math-inline">\(d\)</span>. The lecture stores tokens as columns:</li>
+</ul>
+<div class="math-display">\[Q=[q_1,\ldots,q_N],\quad
+K=[k_1,\ldots,k_N],\quad
+V=[v_1,\ldots,v_N]\in\mathbb{R}^{d\times N}.\]</div>
+<ul>
+<li><code>[DIRECT]</code> Define the score matrix, column-wise attention matrix, and output by</li>
+</ul>
+<div class="math-display">\[S=\frac{K^\top Q}{\sqrt d},
+\qquad
+A_{ji}=\frac{e^{S_{ji}}}{\sum_{u=1}^N e^{S_{ui}}},
+\qquad
+Y=VA.\]</div>
+<ul>
+<li><code>[EXPLANATION]</code> Column <span class="math-inline">\(i\)</span> of <span class="math-inline">\(S\)</span> contains the scores produced by query <span class="math-inline">\(q_i\)</span> against every key. Column <span class="math-inline">\(i\)</span> of <span class="math-inline">\(A\)</span> is therefore a probability vector over key positions, and column <span class="math-inline">\(i\)</span> of <span class="math-inline">\(Y\)</span> is the weighted sum of the values for query <span class="math-inline">\(i\)</span>.</li>
+<li><code>[DIRECT]</code> For causal attention, entries with <span class="math-inline">\(j&gt;i\)</span> are masked by setting their scores to <span class="math-inline">\(-\infty\)</span>. This changes which entries contribute but not the systems argument about materializing a large score matrix.</li>
+</ul>
+<h3 id="22-flops-are-not-the-whole-cost">2.2 FLOPs are not the whole cost</h3>
+<ul>
+<li><code>[DERIVATION]</code> Multiplying <span class="math-inline">\(K^\top\in\mathbb{R}^{N\times d}\)</span> by <span class="math-inline">\(Q\in\mathbb{R}^{d\times N}\)</span> costs approximately <span class="math-inline">\(2N^2d\)</span> FLOPs when a multiply and an addition count separately.</li>
+<li><code>[DERIVATION]</code> Multiplying <span class="math-inline">\(V\in\mathbb{R}^{d\times N}\)</span> by <span class="math-inline">\(A\in\mathbb{R}^{N\times N}\)</span> costs another approximately <span class="math-inline">\(2N^2d\)</span> FLOPs. The two large matrix products therefore use about</li>
+</ul>
+<div class="math-display">\[4N^2d\]</div>
+<p>FLOPs, or <span class="math-inline">\(\Theta(N^2d)\)</span> asymptotically.</p>
+<ul>
+<li><code>[DIRECT]</code> A naive multi-kernel implementation writes <span class="math-inline">\(S\)</span> to HBM, rereads it for softmax, writes <span class="math-inline">\(A\)</span>, and rereads <span class="math-inline">\(A\)</span> for the value product. Both <span class="math-inline">\(S\)</span> and <span class="math-inline">\(A\)</span> have <span class="math-inline">\(N^2\)</span> entries.</li>
+<li><code>[SYNTHESIS]</code> The undesirable term is not a new mathematical object required by attention's definition. It is an implementation boundary: one kernel produces a full intermediate matrix in HBM so another kernel can consume it.</li>
+<li><code>[LIMIT]</code> “Fuse the kernels” is not by itself a complete solution. The entire <span class="math-inline">\(N\times N\)</span> matrix usually cannot fit in on-chip SRAM. The fused computation must be reorganized so only small pieces are live at once.</li>
+</ul>
+<h2 id="3-flashattention">3. FlashAttention</h2>
+<h3 id="31-tiling-and-recomputation">3.1 Tiling and recomputation</h3>
+<ul>
+<li><code>[DIRECT]</code> FlashAttention computes exact attention while avoiding a persistent <span class="math-inline">\(N\times N\)</span> attention matrix in HBM.</li>
+<li><code>[DIRECT]</code> Tiling loads blocks of queries, keys, and values into SRAM. It computes one score tile, uses the tile to update a small running state, and discards the tile before loading the next one.</li>
+<li><code>[DIRECT]</code> During training, recomputation keeps the output and softmax normalization statistics but recreates score and probability tiles during the backward pass. Reading a large stored intermediate from HBM can cost more time than recomputing it on-chip.</li>
+<li><code>[SYNTHESIS]</code> FlashAttention does not approximate or sparsify dense attention. Its output is the same mathematical <span class="math-inline">\(V\operatorname{softmax}(K^\top Q/\sqrt d)\)</span>; the algorithm changes the order and location of the work.</li>
+</ul>
+<h3 id="32-the-online-softmax-invariant">3.2 The online softmax invariant</h3>
+<ul>
+<li><code>[DIRECT]</code> Fix query <span class="math-inline">\(i\)</span> and suppose a set <span class="math-inline">\(J\)</span> of keys has already been processed. Maintain</li>
+</ul>
+<div class="math-display">\[m_i=\max_{j\in J}S_{ji},\]</div>
+<div class="math-display">\[\ell_i=\sum_{j\in J}e^{S_{ji}-m_i},\]</div>
+<p>and</p>
+<div class="math-display">\[y_i=
+\frac{\sum_{j\in J}e^{S_{ji}-m_i}v_j}{\ell_i}.\]</div>
+<ul>
+<li><code>[EXPLANATION]</code> <span class="math-inline">\(m_i\)</span> makes the exponentials numerically stable, <span class="math-inline">\(\ell_i\)</span> is the shifted softmax denominator, and <span class="math-inline">\(y_i\)</span> is already the normalized output over the processed keys.</li>
+<li><code>[DERIVATION · Step 1]</code> The unnormalized old numerator can be recovered from the stored state:</li>
+</ul>
+<div class="math-display">\[u_i^{\mathrm{old}}=\ell_i y_i
+=\sum_{j\in J}e^{S_{ji}-m_i}v_j.\]</div>
+<ul>
+<li><code>[DIRECT]</code> For a new block <span class="math-inline">\(\widetilde J\)</span>, compute its local maximum <span class="math-inline">\(\widetilde m_i\)</span>, shifted sum <span class="math-inline">\(\widetilde\ell_i\)</span>, and shifted unnormalized value sum</li>
+</ul>
+<div class="math-display">\[\widetilde u_i
+=\sum_{j\in\widetilde J}e^{S_{ji}-\widetilde m_i}v_j.\]</div>
+<ul>
+<li><code>[DERIVATION · Step 2]</code> The combined maximum must be</li>
+</ul>
+<div class="math-display">\[m_i&#x27;=\max\{m_i,\widetilde m_i\}.\]</div>
+<ul>
+<li><code>[DERIVATION · Step 3]</code> Rewrite each old exponential relative to the new maximum:</li>
+</ul>
+<div class="math-display">\[e^{S_{ji}-m_i&#x27;}
+=e^{m_i-m_i&#x27;}e^{S_{ji}-m_i}.\]</div>
+<ul>
+<li><code>[DERIVATION · Step 4]</code> The new block obeys the analogous identity</li>
+</ul>
+<div class="math-display">\[e^{S_{ji}-m_i&#x27;}
+=e^{\widetilde m_i-m_i&#x27;}e^{S_{ji}-\widetilde m_i}.\]</div>
+<ul>
+<li><code>[DERIVATION · Step 5]</code> Summing the two rescaled blocks yields the updated denominator</li>
+</ul>
+<div class="math-display">\[\ell_i&#x27;
+=e^{m_i-m_i&#x27;}\ell_i
++e^{\widetilde m_i-m_i&#x27;}\widetilde\ell_i.\]</div>
+<ul>
+<li><code>[DERIVATION · Step 6]</code> The corresponding normalized output is</li>
+</ul>
+<div class="math-display">\[y_i&#x27;
+=\frac{
+e^{m_i-m_i&#x27;}\ell_i y_i
++e^{\widetilde m_i-m_i&#x27;}\widetilde u_i
+}{\ell_i&#x27;}.\]</div>
+<ul>
+<li><code>[CONCLUSION]</code> The updated triple <span class="math-inline">\((m_i&#x27;,\ell_i&#x27;,y_i&#x27;)\)</span> has exactly the same form as the original invariant, now for <span class="math-inline">\(J\cup\widetilde J\)</span>. No earlier score has to remain in memory.</li>
+<li><code>[DIRECT]</code> Initialization uses <span class="math-inline">\(m_i=-\infty\)</span>, <span class="math-inline">\(\ell_i=0\)</span>, and <span class="math-inline">\(y_i=0\)</span>. The old contribution in the first update vanishes.</li>
+</ul>
+<h4 id="two-block-sanity-check">Two-block sanity check</h4>
+<ul>
+<li><code>[EXAMPLE]</code> Suppose a scalar-valued query sees scores <span class="math-inline">\([0,1]\)</span> with values <span class="math-inline">\([2,4]\)</span> in the first block and score <span class="math-inline">\(2\)</span> with value <span class="math-inline">\(10\)</span> in the second block.</li>
+<li><code>[DERIVATION]</code> The first block has <span class="math-inline">\(m=1\)</span>, <span class="math-inline">\(\ell=e^{-1}+1\)</span>, and</li>
+</ul>
+<div class="math-display">\[y=\frac{2e^{-1}+4}{e^{-1}+1}.\]</div>
+<ul>
+<li><code>[DERIVATION]</code> The second block has <span class="math-inline">\(\widetilde m=2\)</span>, <span class="math-inline">\(\widetilde\ell=1\)</span>, and <span class="math-inline">\(\widetilde u=10\)</span>. The merged maximum is <span class="math-inline">\(m&#x27;=2\)</span>, so</li>
+</ul>
+<div class="math-display">\[\ell&#x27;=e^{-1}(e^{-1}+1)+1=e^{-2}+e^{-1}+1.\]</div>
+<ul>
+<li><code>[DERIVATION]</code> The merged numerator becomes</li>
+</ul>
+<div class="math-display">\[e^{-1}(2e^{-1}+4)+10
+=2e^{-2}+4e^{-1}+10.\]</div>
+<ul>
+<li><code>[CHECK]</code> This is precisely what ordinary stable softmax produces when all three scores are shifted by the global maximum <span class="math-inline">\(2\)</span>. The block boundary disappears from the final answer.</li>
+</ul>
+<h3 id="33-tiles-and-loop-order">3.3 Tiles and loop order</h3>
+<ul>
+<li><code>[DIRECT]</code> Measure SRAM capacity as <span class="math-inline">\(M\)</span> scalar words. Split query columns into blocks of at most <span class="math-inline">\(B_q\)</span> tokens and key/value columns into blocks of at most <span class="math-inline">\(B_k\)</span> tokens, using</li>
+</ul>
+<div class="math-display">\[B_k=\left\lceil\frac{M}{4d}\right\rceil,
+\qquad
+B_q=\min\{B_k,d\}.\]</div>
+<ul>
+<li><code>[DIRECT]</code> The numbers of blocks are</li>
+</ul>
+<div class="math-display">\[T_q=\left\lceil\frac{N}{B_q}\right\rceil,
+\qquad
+T_k=\left\lceil\frac{N}{B_k}\right\rceil.\]</div>
+<ul>
+<li><code>[DERIVATION]</code> A live key/value pair uses <span class="math-inline">\(O(dB_k)\)</span> words. A query/output pair uses <span class="math-inline">\(O(dB_q)\)</span> words. The score tile uses <span class="math-inline">\(O(B_kB_q)\)</span> words.</li>
+<li><code>[DERIVATION]</code> Because <span class="math-inline">\(B_q\le d\)</span>, the score tile satisfies <span class="math-inline">\(B_kB_q\le dB_k\)</span>. Because <span class="math-inline">\(B_q\le B_k\)</span>, the query/output storage is no larger in order than the key/value storage. With <span class="math-inline">\(B_k=\Theta(M/d)\)</span>, all live tiles fit in <span class="math-inline">\(O(M)\)</span> words.</li>
+<li><code>[DIRECT]</code> The outer loop fixes one key/value block in SRAM. The inner loop sweeps over every query block, loading its current output and normalization state, computing a score tile, merging it, and writing the updated running state back to HBM.</li>
+<li><code>[EXPLANATION]</code> Reusing a resident key/value tile across many query blocks is the source of the HBM savings. The conceptual score matrix is still partitioned into tiles, but no complete score or probability matrix is stored in HBM.</li>
+</ul>
+<h3 id="34-correctness-and-storage">3.4 Correctness and storage</h3>
+<ul>
+<li><code>[DIRECT]</code> The lecture states that the tiled forward pass returns exact dense attention, uses <span class="math-inline">\(O(N^2d)\)</span> FLOPs, and requires only <span class="math-inline">\(O(N)\)</span> additional HBM storage beyond its inputs and output, plus the SRAM workspace.</li>
+<li><code>[DERIVATION · Correctness]</code> The online update preserves the invariant after each processed key block. Induction over all <span class="math-inline">\(T_k\)</span> blocks therefore leaves each query with the normalized weighted sum over every key, which is exactly its column of <span class="math-inline">\(V\operatorname{softmax}(K^\top Q/\sqrt d)\)</span>.</li>
+<li><code>[DERIVATION · FLOPs]</code> Every query-key pair participates once in a length-<span class="math-inline">\(d\)</span> dot product and once in a length-<span class="math-inline">\(d\)</span> weighted value contribution. There are <span class="math-inline">\(N^2\)</span> pairs, so the total remains <span class="math-inline">\(O(N^2d)\)</span>.</li>
+<li><code>[DERIVATION · Storage]</code> The persistent normalization state contains one maximum and one denominator per query, or <span class="math-inline">\(O(N)\)</span> scalars. Score tiles are temporary SRAM values, so they do not contribute <span class="math-inline">\(O(N^2)\)</span> HBM storage.</li>
+<li><code>[SYNTHESIS]</code> FlashAttention's main asymptotic improvement is in memory traffic and intermediate storage, not arithmetic count.</li>
+</ul>
+<h3 id="35-hbm-transfer-complexity">3.5 HBM transfer complexity</h3>
+<ul>
+<li><code>[DIRECT]</code> Under the lecture's word-access model, naive attention uses</li>
+</ul>
+<div class="math-display">\[\Theta(Nd+N^2)\]</div>
+<p>HBM accesses because it moves the <span class="math-inline">\(Nd\)</span>-sized inputs/output and materializes <span class="math-inline">\(N^2\)</span>-sized score and probability arrays.</p>
+<ul>
+<li><code>[DIRECT]</code> When <span class="math-inline">\(d\le M\le Nd\)</span>, the FlashAttention schedule uses</li>
+</ul>
+<div class="math-display">\[\Theta\!\left(\frac{N^2d^2}{M}\right)\]</div>
+<p>HBM word accesses.</p>
+<ul>
+<li><code>[DERIVATION · Step 1]</code> Since <span class="math-inline">\(B_k=\Theta(M/d)\)</span>, the number of key/value blocks is</li>
+</ul>
+<div class="math-display">\[T_k=\Theta\!\left(\frac{N}{B_k}\right)
+=\Theta\!\left(\frac{Nd}{M}\right).\]</div>
+<ul>
+<li><code>[DERIVATION · Step 2]</code> For each fixed key/value block, sweeping all query blocks reads and updates <span class="math-inline">\(Q\)</span>, <span class="math-inline">\(Y\)</span>, <span class="math-inline">\(m\)</span>, and <span class="math-inline">\(\ell\)</span>, costing <span class="math-inline">\(\Theta(Nd)\)</span> accesses in the stated model.</li>
+<li><code>[DERIVATION · Step 3]</code> Multiplying cost per sweep by the number of sweeps gives</li>
+</ul>
+<div class="math-display">\[\Theta(NdT_k)
+=\Theta\!\left(\frac{N^2d^2}{M}\right).\]</div>
+<ul>
+<li><code>[DERIVATION · Step 4]</code> Loading the base inputs and writing the output adds <span class="math-inline">\(\Theta(Nd)\)</span>. The assumption <span class="math-inline">\(M\le Nd\)</span> ensures the tiled-sweep term is at least the same order, so</li>
+</ul>
+<div class="math-display">\[\Theta\!\left(Nd+\frac{N^2d^2}{M}\right)
+=\Theta\!\left(\frac{N^2d^2}{M}\right).\]</div>
+<ul>
+<li><code>[INTUITION]</code> More SRAM permits a larger key/value tile. A larger tile means fewer complete sweeps over the queries and running outputs, so HBM traffic decreases inversely with <span class="math-inline">\(M\)</span> in this model.</li>
+<li><code>[LIMIT]</code> These are asymptotic word counts for a particular dense-attention schedule. Actual performance also depends on causal masking, head dimensions, data types, kernel occupancy, cache effects, and hardware-specific tiling.</li>
+</ul>
+<h2 id="4-autoregressive-inference-and-kv-caching">4. Autoregressive inference and KV caching</h2>
+<h3 id="41-prefill-and-generation">4.1 Prefill and generation</h3>
+<ul>
+<li><code>[DIRECT]</code> Inference includes two phases.</li>
+<li><strong>Prefill:</strong> process all known prompt tokens in parallel under the causal mask. At every layer, save their key and value vectors. The logits at the final prompt position define the distribution for the first generated token.</li>
+<li><strong>Generation:</strong> sample one token, process that new token using the existing cache, append its new key/value vectors, and use the new logits to predict the next token.</li>
+<li><code>[DERIVATION]</code> In a causal Transformer, the representation used to compute an earlier token's key and value depends only on that token and its prefix. Appending a later token does not alter that prefix. Earlier keys and values can therefore be reused exactly.</li>
+<li><code>[SYNTHESIS]</code> The KV cache removes repeated projection work for old tokens, but it creates a growing memory object that must be read during every decoding step.</li>
+</ul>
+<h3 id="42-shape-notation-for-the-cost-model">4.2 Shape notation for the cost model</h3>
+<ul>
+<li><code>[DIRECT]</code> Let</li>
+<li><span class="math-inline">\(B\)</span> be the number of sequences in a batch;</li>
+<li><span class="math-inline">\(T\)</span> be the number of query tokens processed per sequence in one forward call;</li>
+<li><span class="math-inline">\(S\)</span> be the number of key/value positions available to each sequence.</li>
+<li><code>[DIRECT]</code> For ordinary prefill, <span class="math-inline">\(S=T\)</span> equals the prompt length. For ordinary generation, <span class="math-inline">\(T=1\)</span> and <span class="math-inline">\(S\)</span> is the current context length including the new token.</li>
+<li><code>[DIRECT]</code> The lecture's byte estimates assume 16-bit values, so every scalar moved to or from HBM contributes two bytes. Non-matrix-multiplication arithmetic is omitted.</li>
+</ul>
+<h2 id="5-parameter-matrix-multiplications">5. Parameter matrix multiplications</h2>
+<h3 id="51-flops-bytes-and-intensity">5.1 FLOPs, bytes, and intensity</h3>
+<ul>
+<li><code>[DIRECT]</code> Let <span class="math-inline">\(W\in\mathbb{R}^{F\times D}\)</span> map model width <span class="math-inline">\(D\)</span> to width <span class="math-inline">\(F\)</span>. Combine the <span class="math-inline">\(BT\)</span> token activations into <span class="math-inline">\(X\in\mathbb{R}^{D\times BT}\)</span>.</li>
+<li><code>[DERIVATION]</code> Each of the <span class="math-inline">\(BTF\)</span> output entries is a dot product of length <span class="math-inline">\(D\)</span>. Counting multiplication and addition separately gives</li>
+</ul>
+<div class="math-display">\[F_{\mathrm{lin}}=2BTDF.\]</div>
+<ul>
+<li><code>[DIRECT]</code> Under the optimistic assumption that <span class="math-inline">\(X\)</span> and <span class="math-inline">\(W\)</span> are each read once and the output is written once, the bytes transferred are</li>
+</ul>
+<div class="math-display">\[D_{\mathrm{lin}}
+=2(BTD+DF+BTF).\]</div>
+<ul>
+<li><code>[DERIVATION]</code> The corresponding times and arithmetic intensity are</li>
+</ul>
+<div class="math-display">\[t_{\mathrm{comp}}=\frac{2BTDF}{C},
+\qquad
+t_{\mathrm{mem}}=\frac{2(BTD+DF+BTF)}{\beta},\]</div>
+<div class="math-display">\[I_{\mathrm{lin}}
+=\frac{BTDF}{BTD+DF+BTF}.\]</div>
+<h3 id="52-why-token-count-amortizes-weights">5.2 Why token count amortizes weights</h3>
+<ul>
+<li><code>[DIRECT]</code> When <span class="math-inline">\(BT\ll D,F\)</span>, the <span class="math-inline">\(DF\)</span> parameter matrix dominates the byte count. Then</li>
+</ul>
+<div class="math-display">\[I_{\mathrm{lin}}\approx BT.\]</div>
+<ul>
+<li><code>[EXPLANATION]</code> The weights are shared across all <span class="math-inline">\(BT\)</span> tokens in the call. Loading one weight supports roughly <span class="math-inline">\(BT\)</span> uses, so increasing either prompt length <span class="math-inline">\(T\)</span> or batch size <span class="math-inline">\(B\)</span> amortizes the same parameter read.</li>
+<li><code>[DIRECT]</code> The idealized crossover occurs around</li>
+</ul>
+<div class="math-display">\[BT\gtrsim I^*.\]</div>
+<p>With the cited H100 peak balance, this means a few hundred tokens per call.</p>
+<h4 id="concrete-dimension-check">Concrete dimension check</h4>
+<ul>
+<li><code>[EXAMPLE]</code> Take <span class="math-inline">\(D=4096\)</span> and <span class="math-inline">\(F=11008\)</span>.</li>
+<li><code>[DERIVATION]</code> With one token, <span class="math-inline">\(BT=1\)</span> and</li>
+</ul>
+<div class="math-display">\[I_{\mathrm{lin}}
+=\frac{4096\cdot11008}{4096+4096\cdot11008+11008}
+\approx1.\]</div>
+<ul>
+<li><code>[DERIVATION]</code> With <span class="math-inline">\(BT=1024\)</span> tokens,</li>
+</ul>
+<div class="math-display">\[I_{\mathrm{lin}}
+=\frac{1024\cdot4096\cdot11008}
+{1024\cdot4096+4096\cdot11008+1024\cdot11008}
+\approx762.\]</div>
+<ul>
+<li><code>[SYNTHESIS]</code> The same matrix multiplication can move from strongly memory-bound during single-token decoding to potentially compute-bound during a long prefill, even though the weights and layer definition are unchanged.</li>
+<li><code>[LIMIT]</code> This calculation assumes ideal reuse and a single read of the weights. Small or awkward shapes, quantization kernels, parallel sharding, cache behavior, and non-matmul operations can move the real crossover.</li>
+</ul>
+<h2 id="6-attention-during-inference">6. Attention during inference</h2>
+<h3 id="61-ideal-fused-attention-cost">6.1 Ideal fused-attention cost</h3>
+<ul>
+<li><code>[DIRECT]</code> For one head of width <span class="math-inline">\(d\)</span> in each of <span class="math-inline">\(B\)</span> sequences, let</li>
+</ul>
+<div class="math-display">\[Q\in\mathbb{R}^{d\times T},
+\qquad
+K,V\in\mathbb{R}^{d\times S}.\]</div>
+<ul>
+<li><code>[DERIVATION]</code> Computing <span class="math-inline">\(K^\top Q\)</span> costs approximately <span class="math-inline">\(2BSTd\)</span> FLOPs. Multiplying the values by the attention weights costs another <span class="math-inline">\(2BSTd\)</span>, so</li>
+</ul>
+<div class="math-display">\[F_{\mathrm{attn}}=4BSTd.\]</div>
+<ul>
+<li><code>[DERIVATION]</code> In an ideal fused implementation, reading <span class="math-inline">\(Q\)</span> and writing <span class="math-inline">\(Y\)</span> each move <span class="math-inline">\(2BTd\)</span> bytes, while reading both <span class="math-inline">\(K\)</span> and <span class="math-inline">\(V\)</span> moves <span class="math-inline">\(4BSd\)</span> bytes. Hence</li>
+</ul>
+<div class="math-display">\[D_{\mathrm{attn}}=4Bd(S+T).\]</div>
+<ul>
+<li><code>[DERIVATION]</code> Dividing gives</li>
+</ul>
+<div class="math-display">\[I_{\mathrm{attn}}
+=\frac{F_{\mathrm{attn}}}{D_{\mathrm{attn}}}
+=\frac{ST}{S+T}.\]</div>
+<ul>
+<li><code>[EXPLANATION]</code> Both <span class="math-inline">\(B\)</span> and <span class="math-inline">\(d\)</span> cancel. In this idealized model, increasing the number of independent sequences adds attention work and KV-cache bytes at the same rate.</li>
+</ul>
+<h3 id="62-prefill">6.2 Prefill</h3>
+<ul>
+<li><code>[DIRECT]</code> For prefill, <span class="math-inline">\(S=T\)</span>, so</li>
+</ul>
+<div class="math-display">\[I_{\mathrm{attn}}=\frac{T}{2}.\]</div>
+<ul>
+<li><code>[EXPLANATION]</code> Every key and value can be reused by many query positions. A longer prompt therefore increases potential arithmetic per byte.</li>
+<li><code>[DERIVATION]</code> Comparing with <span class="math-inline">\(I^*\approx295\)</span> predicts a compute crossover near</li>
+</ul>
+<div class="math-display">\[T\gtrsim2I^*\approx590,\]</div>
+<p>which the lecture rounds to roughly 600 tokens.</p>
+<ul>
+<li><code>[EXAMPLE]</code> At <span class="math-inline">\(T=2048\)</span>, the rectangular idealization gives <span class="math-inline">\(I_{\mathrm{attn}}=1024\)</span> FLOPs/byte, above the cited balance.</li>
+<li><code>[LIMIT]</code> Causal masking removes approximately half of the query-key pairs, finite SRAM can force repeated loads, and real kernels have efficiency losses. The numerical threshold is therefore only a rough guide.</li>
+</ul>
+<h3 id="63-generation">6.3 Generation</h3>
+<ul>
+<li><code>[DIRECT]</code> For ordinary generation, <span class="math-inline">\(T=1\)</span> and <span class="math-inline">\(S\gg1\)</span>, giving</li>
+</ul>
+<div class="math-display">\[I_{\mathrm{attn}}
+=\frac{S}{S+1}
+\approx1\ \text{FLOP/byte}.\]</div>
+<ul>
+<li><code>[EXPLANATION]</code> The new query attends over a long, sequence-specific KV cache but supplies only one query position. There is almost no cross-query reuse.</li>
+<li><code>[EXAMPLE]</code> At context length <span class="math-inline">\(S=8192\)</span>,</li>
+</ul>
+<div class="math-display">\[I_{\mathrm{attn}}=\frac{8192}{8193}\approx0.9999.\]</div>
+<ul>
+<li><code>[CONCLUSION]</code> Ordinary decoding attention is strongly memory-bound in the lecture's model.</li>
+<li><code>[DIRECT]</code> Increasing batch size does not improve this attention ratio. Each added sequence brings its own KV cache, so FLOPs and transferred bytes both scale with <span class="math-inline">\(B\)</span>.</li>
+<li><code>[SYNTHESIS]</code> This differs from parameter matrices. Model weights are shared across the whole batch, so batching amortizes weight reads. KV-cache entries belong to individual sequences, so batching supplies no analogous reuse for ordinary attention.</li>
+</ul>
+<h3 id="64-sram-limits-the-ideal-reuse">6.4 SRAM limits the ideal reuse</h3>
+<ul>
+<li><code>[DIRECT]</code> The one-read byte count above assumes enough SRAM to exploit all desired reuse. For dense square attention, the FlashAttention transfer theorem instead gives <span class="math-inline">\(\Theta(N^2d^2/M)\)</span> word transfers.</li>
+<li><code>[DERIVATION]</code> Dividing <span class="math-inline">\(\Theta(N^2d)\)</span> FLOPs by those transfers gives arithmetic intensity</li>
+</ul>
+<div class="math-display">\[\Theta\!\left(\frac{M}{d}\right)\]</div>
+<p>at fixed bytes per word.</p>
+<ul>
+<li><code>[SYNTHESIS]</code> Prompt length creates an opportunity for reuse, but SRAM capacity sets how much reuse one tiling schedule can realize before data must be fetched again.</li>
+</ul>
+<h2 id="7-the-central-comparison">7. The central comparison</h2>
+<table>
+<thead>
+<tr>
+<th>Operation</th>
+<th>Prefill behavior</th>
+<th>Generation behavior</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Parameter matmul</td>
+<td>Often high intensity for long prompts</td>
+<td>Low intensity at small batch</td>
+<td>All tokens share the same weights.</td>
+</tr>
+<tr>
+<td>Attention</td>
+<td>Reuses keys/values across many queries</td>
+<td>Reads a long KV cache for one query</td>
+<td>KV state is sequence-specific.</td>
+</tr>
+<tr>
+<td>Softmax / pointwise work</td>
+<td>Commonly memory-sensitive</td>
+<td>Commonly memory-sensitive</td>
+<td>Few FLOPs are performed per moved element.</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><code>[SYNTHESIS]</code> “Inference is memory-bound” is too coarse. During prefill, large matrix multiplications and sufficiently long attention can be compute-bound. During generation, weight reads at small batch and KV-cache reads at every batch size are the dominant memory-pressure mechanisms in this simplified model.</li>
+<li><code>[SYNTHESIS]</code> FlashAttention and KV caching solve different reuse problems. FlashAttention keeps temporary score work on-chip; KV caching keeps permanent prefix keys and values across decoding steps. The first avoids materializing an intermediate, while the second avoids recomputing an invariant prefix.</li>
+</ul>
+<h2 id="8-manual-verification-checklist">8. Manual verification checklist</h2>
+<ul>
+<li>[ ] Re-derive the online softmax merge without looking at the formula.</li>
+<li>[ ] Explain why <span class="math-inline">\(\ell_i y_i\)</span>, rather than <span class="math-inline">\(y_i\)</span> alone, is needed when two blocks are merged.</li>
+<li>[ ] Draw the key-block outer loop and query-block inner loop, then identify every HBM read and write.</li>
+<li>[ ] Re-derive <span class="math-inline">\(T_k=\Theta(Nd/M)\)</span> from the SRAM tile size.</li>
+<li>[ ] Explain why FlashAttention changes IO complexity but not the <span class="math-inline">\(O(N^2d)\)</span> dense-attention FLOP count.</li>
+<li>[ ] Derive <span class="math-inline">\(I_{\mathrm{lin}}\approx BT\)</span> and state exactly which denominator terms were neglected.</li>
+<li>[ ] Derive <span class="math-inline">\(I_{\mathrm{attn}}=ST/(S+T)\)</span> and explain why batch size cancels.</li>
+<li>[ ] Explain, without equations, why batching helps weight reads but not the per-sequence KV-cache ratio.</li>
+</ul>
+<h2 id="9-questions-to-carry-into-study">9. Questions to carry into study</h2>
+<ul>
+<li><code>[QUESTION]</code> How do grouped-query attention and multi-query attention change KV-cache bytes and generation intensity?</li>
+<li><code>[QUESTION]</code> How do quantized weights move the parameter-matmul crossover, especially when dequantization adds arithmetic?</li>
+<li><code>[QUESTION]</code> Which assumptions in the <span class="math-inline">\(\Theta(N^2d^2/M)\)</span> transfer result change for causal or sliding-window attention?</li>
+<li><code>[QUESTION]</code> At what sequence lengths do kernel launch overhead and non-matmul operations dominate the simple roofline estimate?</li>
+<li><code>[QUESTION]</code> How should the roofline model be extended when tensor-core compute, CUDA-core reductions, and communication overlap imperfectly?</li>
+<li><code>[QUESTION]</code> Was the sharpening section intentionally omitted from the supplied Lecture 10 PDF, or will it appear in a later version or lecture?</li>
+</ul>
+<h2 id="references-recorded-from-the-supplied-lecture">References recorded from the supplied lecture</h2>
+<ul>
+<li><code>[SOURCE NOTE]</code> These references are named by the lecture PDF. This first draft uses the lecture's presentation and has not independently checked every source.</li>
+<li>Tri Dao, Daniel Y. Fu, Stefano Ermon, Atri Rudra, and Christopher Ré. “FlashAttention: Fast and Memory-Efficient Exact Attention with IO-Awareness.” <em>NeurIPS</em>, 2022. <a href="https://arxiv.org/abs/2205.14135">https://arxiv.org/abs/2205.14135</a></li>
+<li>Jacob Austin, Swapnil Patil, Adam Paszke, and Reiner Pope. “How to Think About GPUs.” <em>How To Scale Your Model</em>, 2025. <a href="https://jax-ml.github.io/scaling-book/gpus/">https://jax-ml.github.io/scaling-book/gpus/</a></li>
+<li><em>How To Scale Your Model</em>. “All About Rooflines.” <a href="https://jax-ml.github.io/scaling-book/roofline/">https://jax-ml.github.io/scaling-book/roofline/</a></li>
+<li><em>How To Scale Your Model</em>. “All About Transformer Inference.” <a href="https://jax-ml.github.io/scaling-book/inference/">https://jax-ml.github.io/scaling-book/inference/</a></li>
+<li>NVIDIA. “NVIDIA H100 GPU: Product Specifications (H100 SXM).” <a href="https://www.nvidia.com/en-us/data-center/h100/">https://www.nvidia.com/en-us/data-center/h100/</a></li>
+<li>Michael Andersch et al. “NVIDIA Hopper Architecture In-Depth.” NVIDIA Technical Blog, 2022. <a href="https://developer.nvidia.com/blog/nvidia-hopper-architecture-in-depth/">https://developer.nvidia.com/blog/nvidia-hopper-architecture-in-depth/</a></li>
+<li><code>[SOURCE BOUNDARY]</code> The lecture also lists Huang et al., “Self-Improvement in Language Models: The Sharpening Mechanism,” but the supplied PDF does not contain a substantive sharpening section. It is not used to fill that missing material here.</li>
+</ul>
+      </article>
+    </div>
+  </main>
+
+  <footer class="site-footer section-shell">
+    <div><strong>CS 395T</strong><span>Learning note</span></div>
+    <p>Markdown source · draft</p>
+    <a href="../index.html#notes">Return to index ←</a>
+  </footer>
+</body>
+</html>

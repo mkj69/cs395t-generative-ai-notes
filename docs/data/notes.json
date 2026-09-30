@@ -1,5 +1,23 @@
 [
   {
+    "title": "Lecture 10 — GPUs, FlashAttention, and Inference",
+    "question": "An AI-assisted first reconstruction of GPU memory hierarchy, roofline analysis, FlashAttention's online softmax and IO complexity, KV caching, and the different bottlenecks of prefill and generation.",
+    "type": "learning",
+    "typeLabel": "Learning note",
+    "status": "Draft",
+    "date": "Sep 2026",
+    "tags": [
+      "GPU systems",
+      "roofline model",
+      "FlashAttention",
+      "KV cache",
+      "inference",
+      "arithmetic intensity"
+    ],
+    "url": "course-notes/lecture-10.html",
+    "disclaimer": "AI-assisted · in progress"
+  },
+  {
     "title": "Lecture 03 — Transformer Architecture",
     "question": "An AI-assisted first reconstruction of the decoder-only Transformer: tokenization, attention, positional information, normalization, MLPs, unembedding, and the full pre-norm residual stack.",
     "type": "learning",
