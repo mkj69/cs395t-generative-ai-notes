@@ -10,7 +10,7 @@ research ideas.
 ## What is here now
 
 - a dependency-free static website in `docs/`;
-- a searchable note index with eight clearly labeled AI-assisted learning-note drafts;
+- a searchable note index with nine clearly labeled AI-assisted learning-note drafts;
 - a manual, no-AI workflow for creating future learning notes;
 - a reusable learning-note template under `course-notes/_template/`;
 - a research-note template in both HTML and Markdown;
@@ -18,7 +18,7 @@ research ideas.
   hypothesis;
 - a proposed card for the Writing section of `mkj69.github.io`.
 
-Lectures 03–10 currently have AI-assisted first drafts. They are learning
+Lectures 03–10 and 13 currently have AI-assisted first drafts. They are learning
 scaffolds, not representations of the author's own verified understanding, and
 remain in progress until they are checked, rewritten, and extended manually.
 

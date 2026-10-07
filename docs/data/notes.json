@@ -1,5 +1,25 @@
 [
   {
+    "title": "Lecture 13 — Reinforcement Learning with Verifiable Rewards",
+    "question": "An AI-assisted reconstruction of RLVR from REINFORCE and PPO through RLOO, Dr. GRPO, GRPO, and MaxRL, with explicit derivations of their baselines, biases, normalization effects, and implicit objectives.",
+    "type": "learning",
+    "typeLabel": "Learning note",
+    "status": "Draft",
+    "date": "Oct 2026",
+    "tags": [
+      "RLVR",
+      "policy gradients",
+      "REINFORCE",
+      "PPO",
+      "RLOO",
+      "GRPO",
+      "MaxRL",
+      "pass@k"
+    ],
+    "url": "course-notes/lecture-13.html",
+    "disclaimer": "AI-assisted · in progress"
+  },
+  {
     "title": "Lecture 10 — GPUs, FlashAttention, and Inference",
     "question": "An AI-assisted first reconstruction of GPU memory hierarchy, roofline analysis, FlashAttention's online softmax and IO complexity, KV caching, and the different bottlenecks of prefill and generation.",
     "type": "learning",

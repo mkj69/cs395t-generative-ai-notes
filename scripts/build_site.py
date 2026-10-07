@@ -18,6 +18,7 @@ ROOT = Path(__file__).resolve().parents[1]
 DOCS = ROOT / "docs"
 INDEX_PATH = DOCS / "data" / "notes.json"
 PUBLIC_TYPES = {"learning-note", "research-note"}
+RLVR_LAB_MARKER = "<!-- component:rlvr-algorithm-lab -->"
 
 
 def normalize_logseq_body(body: str) -> str:
@@ -146,6 +147,16 @@ def restore_math(rendered_html: str, tokens: list[tuple[str, str, str]]) -> str:
     return restored
 
 
+def inject_interactive_components(rendered_html: str) -> tuple[str, bool]:
+    """Replace opt-in component markers after Markdown rendering."""
+    if RLVR_LAB_MARKER not in rendered_html:
+        return rendered_html, False
+
+    component_path = ROOT / "site-components" / "rlvr-algorithm-lab.html"
+    component_html = component_path.read_text(encoding="utf-8")
+    return rendered_html.replace(RLVR_LAB_MARKER, component_html), True
+
+
 def discover_notes() -> list[tuple[Path, dict[str, Any], str]]:
     notes: list[tuple[Path, dict[str, Any], str]] = []
     for source_root in (ROOT / "course-notes", ROOT / "notes"):
@@ -200,8 +211,19 @@ def render_note(path: Path, metadata: dict[str, Any], body: str) -> dict[str, An
     md = make_markdown()
     protected_body, math_tokens = protect_math(body)
     article_html = restore_math(md.convert(protected_body), math_tokens)
+    article_html, has_rlvr_lab = inject_interactive_components(article_html)
     toc_html = md.toc
     tags_html = "".join(f"<li>{plain(tag)}</li>" for tag in tags)
+    component_style = (
+        '\n  <link rel="stylesheet" href="../assets/rlvr-lab.css">'
+        if has_rlvr_lab
+        else ""
+    )
+    component_script = (
+        '  <script src="../assets/rlvr-lab.js" defer></script>\n'
+        if has_rlvr_lab
+        else ""
+    )
     page = f"""<!doctype html>
 <html lang="en">
 <head>
@@ -209,7 +231,7 @@ def render_note(path: Path, metadata: dict[str, Any], body: str) -> dict[str, An
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="{plain(summary)}">
   <title>{plain(title)} — CS 395T</title>
-  <link rel="stylesheet" href="../assets/styles.css">
+  <link rel="stylesheet" href="../assets/styles.css">{component_style}
   <script>
     window.MathJax = {{
       tex: {{
@@ -219,7 +241,7 @@ def render_note(path: Path, metadata: dict[str, Any], body: str) -> dict[str, An
     }};
   </script>
   <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js" defer></script>
-  <script src="../assets/app.js" defer></script>
+{component_script}  <script src="../assets/app.js" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to content</a>

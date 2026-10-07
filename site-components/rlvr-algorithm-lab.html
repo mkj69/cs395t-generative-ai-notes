@@ -1,0 +1,240 @@
+<div class="rlvr-lab" data-rlvr-lab>
+  <div class="rlvr-lab__header">
+    <div>
+      <p class="rlvr-lab__kicker">ONE PROMPT · FOUR SAMPLED RESPONSES</p>
+      <h3>Watch the update weights change</h3>
+    </div>
+    <p>Click a reward to toggle success or failure. The bars show the scalar multiplying each response score before any shared batch factor.</p>
+  </div>
+
+  <div class="rlvr-lab__tabs" role="group" aria-label="Choose a policy-gradient estimator">
+    <button type="button" class="rlvr-lab__tab" data-algorithm="reinforce" aria-pressed="false">REINFORCE</button>
+    <button type="button" class="rlvr-lab__tab is-active" data-algorithm="rloo" aria-pressed="true">RLOO</button>
+    <button type="button" class="rlvr-lab__tab" data-algorithm="drgrpo" aria-pressed="false">Dr. GRPO</button>
+    <button type="button" class="rlvr-lab__tab" data-algorithm="grpo" aria-pressed="false">GRPO</button>
+    <button type="button" class="rlvr-lab__tab" data-algorithm="maxrl" aria-pressed="false">MaxRL</button>
+  </div>
+
+  <div class="rlvr-lab__metrics" aria-label="Current group statistics">
+    <div>
+      <span>Group rewards</span>
+      <strong data-reward-vector>1, 0, 0, 0</strong>
+    </div>
+    <div>
+      <span>Group mean</span>
+      <strong data-group-mean>0.25</strong>
+    </div>
+    <div>
+      <span>Normalizer</span>
+      <strong data-normalizer>leave-one-out</strong>
+    </div>
+  </div>
+
+  <div class="rlvr-lab__responses" aria-label="Sampled responses and update coefficients">
+    <article class="rlvr-response" data-response data-index="0">
+      <div class="rlvr-response__top">
+        <div><span>Response</span><strong>y¹</strong></div>
+        <button type="button" class="rlvr-reward is-success" data-reward-toggle aria-pressed="true" aria-label="Response 1 verifier reward: success">
+          <span>reward</span><strong data-reward>1</strong>
+        </button>
+      </div>
+      <div class="rlvr-response__tokens" aria-label="Response length 4 tokens">
+        <span>4 tokens</span><i style="--token-width:25%"></i>
+      </div>
+      <div class="rlvr-coefficient">
+        <div class="rlvr-coefficient__label"><span>score coefficient</span><output data-coefficient>+1.000</output></div>
+        <div class="rlvr-coefficient__track" data-coefficient-track role="img" aria-label="Coefficient bar">
+          <span class="rlvr-coefficient__zero" aria-hidden="true"></span>
+          <span class="rlvr-coefficient__fill" data-coefficient-fill aria-hidden="true"></span>
+        </div>
+      </div>
+    </article>
+
+    <article class="rlvr-response" data-response data-index="1">
+      <div class="rlvr-response__top">
+        <div><span>Response</span><strong>y²</strong></div>
+        <button type="button" class="rlvr-reward" data-reward-toggle aria-pressed="false" aria-label="Response 2 verifier reward: failure">
+          <span>reward</span><strong data-reward>0</strong>
+        </button>
+      </div>
+      <div class="rlvr-response__tokens" aria-label="Response length 8 tokens">
+        <span>8 tokens</span><i style="--token-width:50%"></i>
+      </div>
+      <div class="rlvr-coefficient">
+        <div class="rlvr-coefficient__label"><span>score coefficient</span><output data-coefficient>-0.333</output></div>
+        <div class="rlvr-coefficient__track" data-coefficient-track role="img" aria-label="Coefficient bar">
+          <span class="rlvr-coefficient__zero" aria-hidden="true"></span>
+          <span class="rlvr-coefficient__fill" data-coefficient-fill aria-hidden="true"></span>
+        </div>
+      </div>
+    </article>
+
+    <article class="rlvr-response" data-response data-index="2">
+      <div class="rlvr-response__top">
+        <div><span>Response</span><strong>y³</strong></div>
+        <button type="button" class="rlvr-reward" data-reward-toggle aria-pressed="false" aria-label="Response 3 verifier reward: failure">
+          <span>reward</span><strong data-reward>0</strong>
+        </button>
+      </div>
+      <div class="rlvr-response__tokens" aria-label="Response length 12 tokens">
+        <span>12 tokens</span><i style="--token-width:75%"></i>
+      </div>
+      <div class="rlvr-coefficient">
+        <div class="rlvr-coefficient__label"><span>score coefficient</span><output data-coefficient>-0.333</output></div>
+        <div class="rlvr-coefficient__track" data-coefficient-track role="img" aria-label="Coefficient bar">
+          <span class="rlvr-coefficient__zero" aria-hidden="true"></span>
+          <span class="rlvr-coefficient__fill" data-coefficient-fill aria-hidden="true"></span>
+        </div>
+      </div>
+    </article>
+
+    <article class="rlvr-response" data-response data-index="3">
+      <div class="rlvr-response__top">
+        <div><span>Response</span><strong>y⁴</strong></div>
+        <button type="button" class="rlvr-reward" data-reward-toggle aria-pressed="false" aria-label="Response 4 verifier reward: failure">
+          <span>reward</span><strong data-reward>0</strong>
+        </button>
+      </div>
+      <div class="rlvr-response__tokens" aria-label="Response length 16 tokens">
+        <span>16 tokens</span><i style="--token-width:100%"></i>
+      </div>
+      <div class="rlvr-coefficient">
+        <div class="rlvr-coefficient__label"><span>score coefficient</span><output data-coefficient>-0.333</output></div>
+        <div class="rlvr-coefficient__track" data-coefficient-track role="img" aria-label="Coefficient bar">
+          <span class="rlvr-coefficient__zero" aria-hidden="true"></span>
+          <span class="rlvr-coefficient__fill" data-coefficient-fill aria-hidden="true"></span>
+        </div>
+      </div>
+    </article>
+  </div>
+
+  <div class="rlvr-lab__actions">
+    <button type="button" class="rlvr-lab__button rlvr-lab__button--primary" data-replay>Replay update</button>
+    <button type="button" class="rlvr-lab__button" data-next-scenario>Next reward pattern</button>
+  </div>
+
+  <div class="rlvr-lab__detail" aria-live="polite">
+    <div class="rlvr-lab__formula">
+      <span data-algorithm-name>RLOO</span>
+      <code data-formula>Rᵢ − mean(Rⱼ, j ≠ i)</code>
+      <p data-explanation>The current response is excluded from its own baseline, so the estimator remains unbiased for the expected-reward gradient.</p>
+    </div>
+    <div class="rlvr-lab__code">
+      <div><span>Minimal PyTorch-style sketch</span><small>response_logp already sums token log-probabilities</small></div>
+      <pre><code data-code-snippet>G = rewards.numel()
+loo_baseline = (rewards.sum() - rewards) / (G - 1)
+advantage = rewards - loo_baseline
+loss = -(advantage.detach() * response_logp).mean()</code></pre>
+    </div>
+  </div>
+
+  <section class="training-trace" data-training-trace aria-labelledby="training-trace-title">
+    <div class="training-trace__header">
+      <div>
+        <p class="rlvr-lab__kicker">ONE TRAINING STEP · UNFOLDED</p>
+        <h3 id="training-trace-title">Follow the tensors into the optimizer</h3>
+      </div>
+      <p>The coefficient above is only one intermediate value. Step through the full path from sampled tokens to a parameter update.</p>
+    </div>
+
+    <div class="training-trace__steps" role="group" aria-label="Training step">
+      <button type="button" class="is-active" data-trace-stage="0" aria-pressed="true"><span>01</span>Roll out</button>
+      <button type="button" data-trace-stage="1" aria-pressed="false"><span>02</span>Verify</button>
+      <button type="button" data-trace-stage="2" aria-pressed="false"><span>03</span>Advantage</button>
+      <button type="button" data-trace-stage="3" aria-pressed="false"><span>04</span>Token loss</button>
+      <button type="button" data-trace-stage="4" aria-pressed="false"><span>05</span>Clip + KL</button>
+      <button type="button" data-trace-stage="5" aria-pressed="false"><span>06</span>Update</button>
+    </div>
+
+    <div class="training-trace__stage" aria-live="polite">
+      <div class="training-trace__explanation">
+        <p class="training-trace__eyebrow" data-stage-eyebrow>STEP 01 · DATA COLLECTION</p>
+        <h4 data-stage-title>Sample several continuations from a frozen policy</h4>
+        <p data-stage-description>The same prompt is repeated four times. Sampling uses π_old, which stays fixed while this batch is reused.</p>
+
+        <div class="tensor-flow" aria-label="Tensor transformation in the current training stage">
+          <div><span>input</span><strong data-stage-input>prompt_ids [B, L]</strong></div>
+          <i aria-hidden="true">→</i>
+          <div><span>operation</span><strong data-stage-operation>sample G responses</strong></div>
+          <i aria-hidden="true">→</i>
+          <div><span>output</span><strong data-stage-output>tokens, mask, old_logp [B, G, T]</strong></div>
+        </div>
+
+        <p class="training-trace__algorithm-note"><span data-stage-algorithm>RLOO</span><strong data-stage-note>The estimator has not acted yet; every method begins from the same sampled group.</strong></p>
+      </div>
+
+      <div class="training-trace__code">
+        <div><span>PyTorch-style implementation slice</span><small data-stage-shape>G responses per prompt</small></div>
+        <pre><code data-stage-code>with torch.no_grad():
+    tokens = policy_old.generate(prompt_ids, num_return_sequences=G)
+    old_logp = policy_old.log_probs(tokens)
+mask = tokens.ne(pad_token_id)</code></pre>
+      </div>
+    </div>
+
+    <div class="token-loss-view" data-token-loss-view hidden>
+      <div>
+        <span>Broadcast from response to tokens</span>
+        <p>Each colored token receives its response's coefficient. GRPO additionally divides by the number of valid tokens.</p>
+      </div>
+      <div class="token-loss-view__rows" data-token-rows aria-label="Token-level coefficient rows"></div>
+      <p class="token-loss-view__legend"><span class="is-positive"></span>increase log-probability <span class="is-negative"></span>decrease log-probability <span class="is-zero"></span>no reward gradient</p>
+    </div>
+
+    <div class="training-trace__nav">
+      <button type="button" data-stage-previous disabled>Previous step</button>
+      <span data-stage-progress>1 / 6</span>
+      <button type="button" data-stage-next>Next step</button>
+    </div>
+  </section>
+
+  <section class="ppo-explorer" data-ppo-explorer aria-labelledby="ppo-explorer-title">
+    <div class="ppo-explorer__header">
+      <div>
+        <p class="rlvr-lab__kicker">PPO CLIPPING</p>
+        <h3 id="ppo-explorer-title">Move the probability ratio</h3>
+      </div>
+      <p>The marker is the new-to-old token probability ratio. The shaded band is the unclipped trust region.</p>
+    </div>
+
+    <div class="ppo-explorer__controls">
+      <label>
+        <span>Ratio ρ <output data-ratio-output>1.00</output></span>
+        <input type="range" min="0.50" max="1.50" step="0.01" value="1.00" data-ratio>
+      </label>
+      <label>
+        <span>Clip width ε <output data-epsilon-output>0.20</output></span>
+        <input type="range" min="0.05" max="0.40" step="0.05" value="0.20" data-epsilon>
+      </label>
+      <div class="ppo-explorer__advantage" role="group" aria-label="Advantage sign">
+        <span>Advantage</span>
+        <button type="button" data-advantage="1" aria-pressed="true" class="is-active">A = +1</button>
+        <button type="button" data-advantage="-1" aria-pressed="false">A = −1</button>
+      </div>
+    </div>
+
+    <div class="ppo-ratio" data-ppo-track role="img" aria-label="PPO probability ratio and clipping region">
+      <div class="ppo-ratio__axis">
+        <span>0.5</span><span>1.0</span><span>1.5</span>
+      </div>
+      <div class="ppo-ratio__track">
+        <span class="ppo-ratio__band" data-clip-band aria-hidden="true"></span>
+        <span class="ppo-ratio__center" aria-hidden="true"></span>
+        <span class="ppo-ratio__marker" data-ratio-marker aria-hidden="true"></span>
+      </div>
+    </div>
+
+    <div class="ppo-explorer__result" aria-live="polite">
+      <div><span>unclipped ρA</span><strong data-unclipped>1.000</strong></div>
+      <div><span>PPO objective</span><strong data-ppo-objective>1.000</strong></div>
+      <div><span>local gradient</span><strong data-clip-status>active</strong></div>
+    </div>
+
+    <pre class="ppo-explorer__code"><code>ratio = torch.exp(new_logp - old_logp.detach())
+unclipped = ratio * advantage
+clipped = ratio.clamp(1 - eps, 1 + eps) * advantage
+policy_loss = -torch.minimum(unclipped, clipped).mean()</code></pre>
+  </section>
+
+  <p class="rlvr-lab__caveat">These snippets isolate the mathematics shown in the lecture. A production trainer must also handle masks, distributed batches, KL terms, optimizer steps, numerical stability, and frozen sampling policies.</p>
+</div>

@@ -1,0 +1,1103 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="An AI-assisted reconstruction of RLVR from REINFORCE and PPO through RLOO, Dr. GRPO, GRPO, and MaxRL, with explicit derivations of their baselines, biases, normalization effects, and implicit objectives.">
+  <title>Lecture 13 — Reinforcement Learning with Verifiable Rewards — CS 395T</title>
+  <link rel="stylesheet" href="../assets/styles.css">
+  <link rel="stylesheet" href="../assets/rlvr-lab.css">
+  <script>
+    window.MathJax = {
+      tex: {
+        processEscapes: true
+      },
+      svg: { fontCache: 'global' }
+    };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js" defer></script>
+  <script src="../assets/rlvr-lab.js" defer></script>
+  <script src="../assets/app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header">
+    <a class="wordmark" href="../index.html"><span>CS 395T</span><small>Learning &amp; research notebook</small></a>
+    <button class="menu-button" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button>
+    <nav id="site-nav" class="site-nav" aria-label="Primary navigation">
+      <a href="../structure.html">Structure</a>
+      <a href="../index.html#notes">Index</a>
+      <a href="../method.html">Writing guide</a>
+      <a href="../index.html#about">About</a>
+    </nav>
+  </header>
+
+  <main id="main" class="note-shell">
+    <header class="note-hero">
+      <div class="template-banner learning-banner">
+        <strong>LEARNING NOTE · DRAFT</strong>
+        <span>Work in progress</span>
+      </div>
+      <p class="eyebrow">07 OCT 2026 · DRAFT</p>
+      <h1>Lecture 13 — Reinforcement Learning with Verifiable Rewards</h1>
+      <p class="note-abstract">An AI-assisted reconstruction of RLVR from REINFORCE and PPO through RLOO, Dr. GRPO, GRPO, and MaxRL, with explicit derivations of their baselines, biases, normalization effects, and implicit objectives.</p>
+      <ul class="tag-list" aria-label="Topics"><li>RLVR</li><li>policy gradients</li><li>REINFORCE</li><li>PPO</li><li>RLOO</li><li>GRPO</li><li>MaxRL</li><li>pass@k</li></ul>
+    </header>
+
+    <div class="note-layout">
+      <aside class="note-toc" aria-label="On this page">
+        <p class="aside-label">ON THIS PAGE</p>
+        <div class="toc">
+<ul>
+<li><a href="#lecture-context">Lecture context</a></li>
+<li><a href="#reading-map">Reading map</a></li>
+<li><a href="#1-rlvr-as-a-sequence-level-policy-gradient-problem">1. RLVR as a sequence-level policy-gradient problem</a><ul>
+<li><a href="#11-generation-trajectories-and-rewards">1.1 Generation, trajectories, and rewards</a></li>
+<li><a href="#12-the-response-score-decomposes-over-tokens">1.2 The response score decomposes over tokens</a></li>
+<li><a href="#13-reinforce-from-the-log-derivative-identity">1.3 REINFORCE from the log-derivative identity</a></li>
+</ul>
+</li>
+<li><a href="#2-values-advantages-and-baselines">2. Values, advantages, and baselines</a><ul>
+<li><a href="#21-prefix-values-and-token-advantages">2.1 Prefix values and token advantages</a></li>
+<li><a href="#22-why-a-valid-baseline-leaves-the-gradient-unchanged">2.2 Why a valid baseline leaves the gradient unchanged</a></li>
+<li><a href="#23-which-scalar-baseline-minimizes-variance">2.3 Which scalar baseline minimizes variance?</a></li>
+<li><a href="#24-ppo-and-sample-reuse">2.4 PPO and sample reuse</a></li>
+</ul>
+</li>
+<li><a href="#3-group-based-estimators">3. Group-based estimators</a><ul>
+<li><a href="#31-replacing-a-value-model-with-same-prompt-comparisons">3.1 Replacing a value model with same-prompt comparisons</a></li>
+<li><a href="#32-rloo-leave-the-current-response-out">3.2 RLOO: leave the current response out</a></li>
+<li><a href="#33-dr-grpo-include-the-response-in-the-group-mean">3.3 Dr. GRPO: include the response in the group mean</a></li>
+<li><a href="#34-grpo-standardization-length-normalization-and-kl">3.4 GRPO: standardization, length normalization, and KL</a></li>
+<li><a href="#35-what-grpos-two-normalizations-change">3.5 What GRPO's two normalizations change</a></li>
+</ul>
+</li>
+<li><a href="#4-maximum-likelihood-reinforcement-learning">4. Maximum-likelihood reinforcement learning</a><ul>
+<li><a href="#41-change-the-objective-not-merely-the-estimator">4.1 Change the objective, not merely the estimator</a></li>
+<li><a href="#42-passk-and-a-finite-order-approximation">4.2 pass@k and a finite-order approximation</a></li>
+<li><a href="#43-how-the-truncation-reweights-difficulty">4.3 How the truncation reweights difficulty</a></li>
+<li><a href="#44-the-conditional-maximum-likelihood-gradient">4.4 The conditional maximum-likelihood gradient</a></li>
+<li><a href="#45-a-fixed-group-estimates-an-exact-truncated-objective">4.5 A fixed group estimates an exact truncated objective</a></li>
+<li><a href="#46-the-practical-centered-maxrl-update">4.6 The practical centered MaxRL update</a></li>
+</ul>
+</li>
+<li><a href="#5-algorithm-comparison">5. Algorithm comparison</a></li>
+<li><a href="#6-interactive-algorithm-lab">6. Interactive algorithm lab</a></li>
+<li><a href="#7-claims-to-verify-manually">7. Claims to verify manually</a></li>
+<li><a href="#8-questions-to-carry-into-study">8. Questions to carry into study</a></li>
+<li><a href="#9-what-i-can-now-explain">9. What I can now explain</a></li>
+<li><a href="#references-recorded-from-the-supplied-lecture">References recorded from the supplied lecture</a></li>
+</ul>
+</div>
+
+      </aside>
+      <article class="prose note-prose markdown-body">
+        <blockquote>
+<p><strong>AI-assisted first draft.</strong> This note reconstructs the supplied Lecture 13 PDF and expands its estimators and proofs into step-by-step derivations. It has not yet been manually verified or rewritten by the author. Statements tagged <code>[DIRECT]</code> follow the lecture; <code>[DERIVATION]</code>, <code>[EXPLANATION]</code>, and <code>[SYNTHESIS]</code> make the reasoning explicit.</p>
+</blockquote>
+<h2 id="lecture-context">Lecture context</h2>
+<ul>
+<li><code>[DIRECT]</code> Source: <a href="https://noahgol.github.io/teaching/cs395t-f26/lecture13-v2.pdf">https://noahgol.github.io/teaching/cs395t-f26/lecture13-v2.pdf</a></li>
+<li><code>[DIRECT]</code> The supplied PDF is ten pages long. Its substantive sections develop reinforcement learning with verifiable rewards (RLVR), review REINFORCE and PPO, compare three group-based estimators, and derive maximum-likelihood reinforcement learning (MaxRL).</li>
+<li><code>[SOURCE BOUNDARY]</code> The lecture assumes an outcome-level binary verifier <span class="math-inline">\(R(x,y)\in\{0,1\}\)</span> and no intermediate rewards. Some arguments extend beyond this setting, but this draft does not silently generalize binary-reward identities to arbitrary rewards.</li>
+<li><code>[SYNTHESIS]</code> The central question is not merely how to reduce the variance of policy gradients. It is: <strong>when an implementation changes a baseline, normalization, sampling rule, or denominator, is it still estimating the gradient of the same objective?</strong></li>
+<li><code>[SYNTHESIS]</code> The lecture's four named algorithms form a useful progression. RLOO supplies an unbiased group baseline; Dr. GRPO introduces a harmless constant scaling; GRPO changes the relative weighting of response lengths and prompt difficulties; MaxRL intentionally changes the objective from success probability to log success probability.</li>
+</ul>
+<h2 id="reading-map">Reading map</h2>
+<table>
+<thead>
+<tr>
+<th>Part</th>
+<th>Central question</th>
+<th>Main conclusion</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>RLVR setup</td>
+<td>What exactly is the policy and reward?</td>
+<td>A complete response is a trajectory; the verifier rewards only the terminal response.</td>
+</tr>
+<tr>
+<td>REINFORCE</td>
+<td>How do we differentiate success probability?</td>
+<td>The reward-weighted response score is an unbiased policy-gradient estimator.</td>
+</tr>
+<tr>
+<td>Values and baselines</td>
+<td>What may be subtracted without changing the gradient?</td>
+<td>A baseline independent of the sampled continuation has zero expected score contribution.</td>
+</tr>
+<tr>
+<td>PPO</td>
+<td>How can sampled responses be reused?</td>
+<td>Token ratios and clipping create a practical surrogate that is exact only at the sampling policy.</td>
+</tr>
+<tr>
+<td>RLOO</td>
+<td>Can a group replace a learned value model?</td>
+<td>Leave-one-out rewards give an unbiased prompt-level baseline.</td>
+</tr>
+<tr>
+<td>Dr. GRPO</td>
+<td>What happens if a response enters its own baseline?</td>
+<td>The RLOO gradient is scaled by <span class="math-inline">\((G-1)/G\)</span> but keeps its direction.</td>
+</tr>
+<tr>
+<td>GRPO</td>
+<td>What do its normalizations do?</td>
+<td>Length and reward-standard-deviation factors reweight responses and prompts.</td>
+</tr>
+<tr>
+<td>MaxRL</td>
+<td>How can training emphasize hard prompts?</td>
+<td>Optimize <span class="math-inline">\(\log p_\theta(x)\)</span>, or a finite pass@k-based approximation, instead of <span class="math-inline">\(p_\theta(x)\)</span>.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="1-rlvr-as-a-sequence-level-policy-gradient-problem">1. RLVR as a sequence-level policy-gradient problem</h2>
+<h3 id="11-generation-trajectories-and-rewards">1.1 Generation, trajectories, and rewards</h3>
+<ul>
+<li><code>[DIRECT]</code> Draw a training prompt <span class="math-inline">\(x\sim\mathcal D\)</span>. The language model generates a response <span class="math-inline">\(y=(y_1,\ldots,y_T)\)</span> autoregressively:</li>
+</ul>
+<div class="math-display">\[y_t\sim\pi_\theta(\cdot\mid x,y_{1:t-1}),
+\qquad t=1,\ldots,T.\]</div>
+<ul>
+<li><code>[DIRECT]</code> Generation stops at an end-of-sequence token or a fixed maximum length <span class="math-inline">\(T_{\max}\)</span>. The response length <span class="math-inline">\(T=T(y)\)</span> is therefore random but bounded.</li>
+<li><code>[DERIVATION]</code> The chain rule gives the probability of the complete response:</li>
+</ul>
+<div class="math-display">\[\pi_\theta(y\mid x)
+=\prod_{t=1}^{T}
+\pi_\theta(y_t\mid x,y_{1:t-1}).\]</div>
+<ul>
+<li><code>[EXPLANATION]</code> This is a token-level Markov decision process. The state is the prompt plus the generated prefix, the action is the next token, and the transition appends that token. Once <span class="math-inline">\(x\)</span> is fixed, the policy is the only source of randomness.</li>
+<li><code>[DIRECT]</code> A verifier observes the completed response and returns</li>
+</ul>
+<div class="math-display">\[R(x,y)\in\{0,1\}.\]</div>
+<ul>
+<li><code>[EXPLANATION]</code> Examples include checking a final numerical answer or running a generated program against tests. The verifier does not need to provide a target reasoning trace.</li>
+<li><code>[DIRECT]</code> Define the success probability for one prompt and the population objective by</li>
+</ul>
+<div class="math-display">\[p_\theta(x)
+:=\mathbb E_{y\sim\pi_\theta(\cdot\mid x)}[R(x,y)],
+\qquad
+J(\theta)
+:=\mathbb E_{x\sim\mathcal D}[p_\theta(x)].\]</div>
+<ul>
+<li><code>[SYNTHESIS]</code> <span class="math-inline">\(p_\theta(x)\)</span> is the probability that one sampled response passes the verifier. <span class="math-inline">\(J(\theta)\)</span> averages absolute improvements in this probability across the prompt distribution.</li>
+</ul>
+<h3 id="12-the-response-score-decomposes-over-tokens">1.2 The response score decomposes over tokens</h3>
+<ul>
+<li><code>[DERIVATION · Step 1]</code> Take logs of the response probability:</li>
+</ul>
+<div class="math-display">\[\log\pi_\theta(y\mid x)
+=\sum_{t=1}^{T}
+\log\pi_\theta(y_t\mid x,y_{1:t-1}).\]</div>
+<ul>
+<li><code>[DERIVATION · Step 2]</code> Differentiate:</li>
+</ul>
+<div class="math-display">\[\nabla_\theta\log\pi_\theta(y\mid x)
+=\sum_{t=1}^{T}
+\nabla_\theta\log\pi_\theta(y_t\mid x,y_{1:t-1}).\]</div>
+<ul>
+<li><code>[EXPLANATION]</code> The gradient of a complete response's log-probability is the sum of its token-level score vectors. This is why one outcome-level reward can be applied to every token in the response.</li>
+</ul>
+<h3 id="13-reinforce-from-the-log-derivative-identity">1.3 REINFORCE from the log-derivative identity</h3>
+<ul>
+<li><code>[DERIVATION · Step 1]</code> Expand success probability as a sum over all possible completed responses:</li>
+</ul>
+<div class="math-display">\[p_\theta(x)
+=\sum_y R(x,y)\pi_\theta(y\mid x).\]</div>
+<ul>
+<li><code>[DERIVATION · Step 2]</code> Differentiate term by term:</li>
+</ul>
+<div class="math-display">\[\nabla_\theta p_\theta(x)
+=\sum_y R(x,y)\nabla_\theta\pi_\theta(y\mid x).\]</div>
+<ul>
+<li><code>[DERIVATION · Step 3]</code> Use <span class="math-inline">\(\nabla p=p\nabla\log p\)</span>:</li>
+</ul>
+<div class="math-display">\[\nabla_\theta p_\theta(x)
+=\sum_y R(x,y)\pi_\theta(y\mid x)
+\nabla_\theta\log\pi_\theta(y\mid x).\]</div>
+<ul>
+<li><code>[DERIVATION · Step 4]</code> Recognize an expectation:</li>
+</ul>
+<div class="math-display">\[\nabla_\theta p_\theta(x)
+=\mathbb E_{y\sim\pi_\theta(\cdot\mid x)}
+\left[R(x,y)\nabla_\theta\log\pi_\theta(y\mid x)\right].\]</div>
+<ul>
+<li><code>[DERIVATION · Step 5]</code> Average over prompts and substitute the token-score decomposition:</li>
+</ul>
+<div class="math-display">\[\nabla_\theta J(\theta)
+=\mathbb E_{x,y}
+\left[
+\sum_{t=1}^{T}
+R(x,y)
+\nabla_\theta\log\pi_\theta(y_t\mid x,y_{1:t-1})
+\right].\]</div>
+<ul>
+<li><code>[CONCLUSION]</code> A sampled prompt-response pair gives an unbiased gradient estimator. A successful response contributes the sum of its token scores; a failed response contributes zero in the uncentered estimator.</li>
+<li><code>[LIMIT]</code> “A failed response contributes zero” describes the raw REINFORCE estimator. Once a baseline is subtracted, a failed response can carry a negative coefficient and therefore affect the update.</li>
+</ul>
+<h2 id="2-values-advantages-and-baselines">2. Values, advantages, and baselines</h2>
+<h3 id="21-prefix-values-and-token-advantages">2.1 Prefix values and token advantages</h3>
+<ul>
+<li><code>[DIRECT]</code> For any policy <span class="math-inline">\(\pi\)</span>, define the value of a prefix as the probability of eventual success when the continuation is sampled from <span class="math-inline">\(\pi\)</span>:</li>
+</ul>
+<div class="math-display">\[V^\pi(x,y_{1:t-1})
+:=\mathbb E_{\text{continuation from }\pi}
+[R(x,y)\mid x,y_{1:t-1}].\]</div>
+<ul>
+<li><code>[DIRECT]</code> Define the advantage of choosing token <span class="math-inline">\(a\)</span> next by</li>
+</ul>
+<div class="math-display">\[A^\pi(x,y_{1:t-1},a)
+:=
+\mathbb E[R(x,y)\mid x,y_{1:t-1},y_t=a]
+-V^\pi(x,y_{1:t-1}).\]</div>
+<ul>
+<li><code>[EXPLANATION]</code> The value asks “how likely is success from here?” The advantage asks “how much does this particular next token change that chance compared with sampling the next token normally?”</li>
+<li><code>[CHECK]</code> Averaging the advantage over <span class="math-inline">\(a\sim\pi(\cdot\mid x,y_{1:t-1})\)</span> gives zero by construction.</li>
+</ul>
+<h3 id="22-why-a-valid-baseline-leaves-the-gradient-unchanged">2.2 Why a valid baseline leaves the gradient unchanged</h3>
+<ul>
+<li><code>[DERIVATION · Step 1]</code> Fix a prefix. The expected next-token score is</li>
+</ul>
+<div class="math-display">\[\begin{aligned}
+&amp;\mathbb E_{y_t\sim\pi_\theta}
+[\nabla_\theta\log\pi_\theta(y_t\mid x,y_{1:t-1})]\\
+&amp;\quad=
+\sum_{a\in\mathcal V}
+\pi_\theta(a\mid x,y_{1:t-1})
+\nabla_\theta\log\pi_\theta(a\mid x,y_{1:t-1})\\
+&amp;\quad=
+\nabla_\theta
+\sum_{a\in\mathcal V}
+\pi_\theta(a\mid x,y_{1:t-1})
+=\nabla_\theta 1=0.
+\end{aligned}\]</div>
+<ul>
+<li><code>[DERIVATION · Step 2]</code> If <span class="math-inline">\(b(x,y_{1:t-1})\)</span> is fixed once the prefix is known, it can be taken outside the conditional expectation:</li>
+</ul>
+<div class="math-display">\[\mathbb E
+\left[
+b(x,y_{1:t-1})
+\nabla_\theta\log\pi_\theta(y_t\mid x,y_{1:t-1})
+\mid x,y_{1:t-1}
+\right]=0.\]</div>
+<ul>
+<li><code>[DERIVATION · Step 3]</code> Subtracting the baseline therefore gives the same expected gradient:</li>
+</ul>
+<div class="math-display">\[\nabla_\theta J(\theta)
+=\mathbb E
+\left[
+\sum_{t=1}^{T}
+\bigl(R(x,y)-b(x,y_{1:t-1})\bigr)
+\nabla_\theta\log\pi_\theta(y_t\mid x,y_{1:t-1})
+\right].\]</div>
+<ul>
+<li><code>[DIRECT]</code> With <span class="math-inline">\(b=V^{\pi_\theta}\)</span>, the Monte Carlo weight <span class="math-inline">\(R-V^{\pi_\theta}\)</span> has conditional expectation equal to the token advantage.</li>
+<li><code>[LIMIT]</code> The independence condition matters. Fitting a baseline on the same sampled continuation can make the baseline depend on the action noise whose score it multiplies; the zero-mean argument does not automatically cover that case.</li>
+</ul>
+<h3 id="23-which-scalar-baseline-minimizes-variance">2.3 Which scalar baseline minimizes variance?</h3>
+<ul>
+<li><code>[DIRECT]</code> At a fixed prefix, the trace of the covariance of one token's centered estimator depends on the scalar <span class="math-inline">\(b\)</span> through</li>
+</ul>
+<div class="math-display">\[\mathbb E
+\left[
+(R-b)^2
+\left\|\nabla_\theta\log\pi_\theta(y_t\mid x,y_{1:t-1})\right\|_2^2
+\right].\]</div>
+<ul>
+<li><code>[DERIVATION · Step 1]</code> Let</li>
+</ul>
+<div class="math-display">\[S=
+\left\|\nabla_\theta\log\pi_\theta(y_t\mid x,y_{1:t-1})\right\|_2^2.\]</div>
+<ul>
+<li><code>[DERIVATION · Step 1 continued]</code> Expanding the quadratic gives <span class="math-inline">\(\mathbb E[R^2S]-2b\mathbb E[RS]+b^2\mathbb E[S]\)</span>.</li>
+<li><code>[DERIVATION · Step 2]</code> Differentiate with respect to <span class="math-inline">\(b\)</span> and set the derivative to zero:</li>
+</ul>
+<div class="math-display">\[-2\mathbb E[RS]+2b\mathbb E[S]=0.\]</div>
+<ul>
+<li><code>[DERIVATION · Step 3]</code> The minimizing baseline is therefore</li>
+</ul>
+<div class="math-display">\[b^*
+=
+\frac{
+\mathbb E\left[R
+\left\|\nabla_\theta\log\pi_\theta(y_t\mid x,y_{1:t-1})\right\|_2^2\right]
+}{
+\mathbb E\left[
+\left\|\nabla_\theta\log\pi_\theta(y_t\mid x,y_{1:t-1})\right\|_2^2\right]
+}.\]</div>
+<ul>
+<li><code>[EXPLANATION]</code> The value function is exactly optimal only in the special case where the score norm is constant across possible next tokens. In general, it is a useful approximation, not a universal variance minimizer.</li>
+<li><code>[LIMIT]</code> This calculation concerns one token term. The variance of the sum over tokens also includes cross-token covariance.</li>
+</ul>
+<h3 id="24-ppo-and-sample-reuse">2.4 PPO and sample reuse</h3>
+<ul>
+<li><code>[DIRECT]</code> REINFORCE is on-policy. PPO instead samples responses from a frozen policy <span class="math-inline">\(\pi_{\mathrm{old}}\)</span> and takes several updates before drawing a new batch.</li>
+<li><code>[DIRECT]</code> For token <span class="math-inline">\(t\)</span>, define the probability ratio</li>
+</ul>
+<div class="math-display">\[\rho_t(\theta;x,y)
+:=
+\frac{
+\pi_\theta(y_t\mid x,y_{1:t-1})
+}{
+\pi_{\mathrm{old}}(y_t\mid x,y_{1:t-1})
+}.\]</div>
+<ul>
+<li><code>[EXPLANATION]</code> Exact trajectory-level importance sampling would multiply all token ratios. That product can become extremely variable for long responses, so PPO uses a local token-level surrogate instead.</li>
+<li><code>[DIRECT]</code> With clipping width <span class="math-inline">\(\epsilon\)</span>, define</li>
+</ul>
+<div class="math-display">\[\ell_\epsilon(\rho,A)
+=\min\{\rho A,\operatorname{clip}(\rho,1-\epsilon,1+\epsilon)A\}.\]</div>
+<ul>
+<li><code>[DIRECT]</code> A response-level reward with a frozen value baseline gives the surrogate</li>
+</ul>
+<div class="math-display">\[L_{\mathrm{PPO}}(\theta)
+=
+\mathbb E_{x,y\sim\pi_{\mathrm{old}}}
+\left[
+\sum_{t=1}^{T}
+\ell_\epsilon
+\left(
+\rho_t(\theta;x,y),
+R(x,y)-V_\phi(x,y_{1:t-1})
+\right)
+\right].\]</div>
+<ul>
+<li><code>[DERIVATION]</code> At <span class="math-inline">\(\theta=\theta_{\mathrm{old}}\)</span>, every ratio equals one, clipping is inactive, and</li>
+</ul>
+<div class="math-display">\[\nabla_\theta\rho_t(\theta;x,y)
+\big|_{\theta=\theta_{\mathrm{old}}}
+=
+\nabla_\theta\log\pi_\theta(y_t\mid x,y_{1:t-1})
+\big|_{\theta=\theta_{\mathrm{old}}}.\]</div>
+<ul>
+<li><code>[CONCLUSION]</code> The surrogate gradient matches the baseline REINFORCE gradient at the sampling policy. After several updates, the data still come from <span class="math-inline">\(\pi_{\mathrm{old}}\)</span> and clipping modifies the gradient, so the surrogate is generally biased for the current policy's exact expected-reward gradient.</li>
+</ul>
+<h2 id="3-group-based-estimators">3. Group-based estimators</h2>
+<h3 id="31-replacing-a-value-model-with-same-prompt-comparisons">3.1 Replacing a value model with same-prompt comparisons</h3>
+<ul>
+<li><code>[DIRECT]</code> Fix one prompt <span class="math-inline">\(x\)</span> and sample <span class="math-inline">\(G\ge2\)</span> independent responses</li>
+</ul>
+<div class="math-display">\[y^{(1)},\ldots,y^{(G)}
+\overset{\mathrm{iid}}{\sim}
+\pi_\theta(\cdot\mid x).\]</div>
+<ul>
+<li><code>[DIRECT]</code> Write</li>
+</ul>
+<div class="math-display">\[R_i:=R(x,y^{(i)}),
+\qquad
+\bar R:=\frac1G\sum_{j=1}^{G}R_j.\]</div>
+<ul>
+<li><code>[SYNTHESIS]</code> The group estimates how difficult the prompt is for the current policy. It avoids training a separate prefix-level value model, but it supplies only a prompt-level comparison: the same scalar multiplies every token of one response.</li>
+</ul>
+<h3 id="32-rloo-leave-the-current-response-out">3.2 RLOO: leave the current response out</h3>
+<ul>
+<li><code>[DIRECT]</code> REINFORCE leave-one-out uses the mean reward of the other <span class="math-inline">\(G-1\)</span> responses as response <span class="math-inline">\(i\)</span>'s baseline:</li>
+</ul>
+<div class="math-display">\[\widehat g_{\mathrm{RLOO}}(x)
+=
+\frac1G\sum_{i=1}^{G}
+\left(
+R_i-
+\frac1{G-1}\sum_{j\ne i}R_j
+\right)
+\nabla_\theta\log\pi_\theta(y^{(i)}\mid x).\]</div>
+<ul>
+<li><code>[DERIVATION · Step 1]</code> For <span class="math-inline">\(j\ne i\)</span>, <span class="math-inline">\(y^{(i)}\)</span> and <span class="math-inline">\(y^{(j)}\)</span> are independent conditional on <span class="math-inline">\(x\)</span>.</li>
+<li><code>[DERIVATION · Step 2]</code> The response score has conditional mean zero:</li>
+</ul>
+<div class="math-display">\[\mathbb E
+[\nabla_\theta\log\pi_\theta(y^{(i)}\mid x)\mid x]=0.\]</div>
+<ul>
+<li><code>[DERIVATION · Step 3]</code> Therefore every cross-response baseline term has zero expectation:</li>
+</ul>
+<div class="math-display">\[\mathbb E
+\left[
+R_j\nabla_\theta\log\pi_\theta(y^{(i)}\mid x)
+\mid x
+\right]
+=
+\mathbb E[R_j\mid x]\cdot0=0.\]</div>
+<ul>
+<li><code>[DERIVATION · Step 4]</code> The remaining own-reward terms are ordinary REINFORCE terms, so</li>
+</ul>
+<div class="math-display">\[\mathbb E[\widehat g_{\mathrm{RLOO}}(x)\mid x]
+=\nabla_\theta p_\theta(x).\]</div>
+<ul>
+<li><code>[CONCLUSION]</code> RLOO is unbiased for the per-prompt expected-reward gradient.</li>
+<li><code>[EXPLANATION]</code> Leaving <span class="math-inline">\(R_i\)</span> out is essential. <span class="math-inline">\(R_i\)</span> and the score of <span class="math-inline">\(y^{(i)}\)</span> are generated by the same response and are generally dependent.</li>
+<li><code>[DIRECT]</code> Because the leave-one-out baseline averages <span class="math-inline">\(G-1\)</span> independent Bernoulli rewards, its conditional variance is</li>
+</ul>
+<div class="math-display">\[\frac{p_\theta(x)(1-p_\theta(x))}{G-1}.\]</div>
+<ul>
+<li><code>[LIMIT]</code> The <span class="math-inline">\(G\)</span> response terms are not independent because every response appears in the baselines of the others. The estimator's variance is therefore not obtained by simply dividing one term's variance by <span class="math-inline">\(G\)</span>.</li>
+</ul>
+<h3 id="33-dr-grpo-include-the-response-in-the-group-mean">3.3 Dr. GRPO: include the response in the group mean</h3>
+<ul>
+<li><code>[DIRECT]</code> Dr. GRPO uses</li>
+</ul>
+<div class="math-display">\[\widehat g_{\mathrm{Dr}}(x)
+=
+\frac1G\sum_{i=1}^{G}
+(R_i-\bar R)
+\nabla_\theta\log\pi_\theta(y^{(i)}\mid x).\]</div>
+<ul>
+<li><code>[DERIVATION · Step 1]</code> Split the group mean into the current reward and the other rewards:</li>
+</ul>
+<div class="math-display">\[\bar R
+=\frac1G R_i+
+\frac{G-1}{G}
+\left(\frac1{G-1}\sum_{j\ne i}R_j\right).\]</div>
+<ul>
+<li><code>[DERIVATION · Step 2]</code> Subtract from <span class="math-inline">\(R_i\)</span>:</li>
+</ul>
+<div class="math-display">\[R_i-\bar R
+=
+\frac{G-1}{G}
+\left(
+R_i-\frac1{G-1}\sum_{j\ne i}R_j
+\right).\]</div>
+<ul>
+<li><code>[DERIVATION · Step 3]</code> Therefore, sample by sample,</li>
+</ul>
+<div class="math-display">\[\widehat g_{\mathrm{Dr}}(x)
+=\frac{G-1}{G}
+\widehat g_{\mathrm{RLOO}}(x),\]</div>
+<p>and hence</p>
+<div class="math-display">\[\mathbb E[\widehat g_{\mathrm{Dr}}(x)\mid x]
+=\frac{G-1}{G}\nabla_\theta p_\theta(x).\]</div>
+<ul>
+<li><code>[CONCLUSION]</code> Including the response in its own baseline introduces a constant multiplicative bias, but no change of direction. Multiplying by <span class="math-inline">\(G/(G-1)\)</span> removes it; with fixed <span class="math-inline">\(G\)</span>, a learning-rate change can absorb it.</li>
+<li><code>[DIRECT]</code> In practical off-policy training, groups are sampled from <span class="math-inline">\(\pi_{\mathrm{old}}\)</span>, the coefficients <span class="math-inline">\(R_i-\bar R\)</span> are frozen, and PPO-style token clipping is used. At <span class="math-inline">\(\theta_{\mathrm{old}}\)</span> the surrogate differentiates to the on-policy Dr. GRPO estimator; later steps inherit off-policy and clipping bias.</li>
+</ul>
+<h3 id="34-grpo-standardization-length-normalization-and-kl">3.4 GRPO: standardization, length normalization, and KL</h3>
+<ul>
+<li><code>[DIRECT]</code> In the binary-reward setting, the group reward standard deviation is</li>
+</ul>
+<div class="math-display">\[\sqrt{\frac1G\sum_{j=1}^{G}(R_j-\bar R)^2}
+=\sqrt{\bar R(1-\bar R)}.\]</div>
+<ul>
+<li><code>[DIRECT]</code> When the group contains both successes and failures, GRPO assigns response <span class="math-inline">\(i\)</span> the standardized group advantage</li>
+</ul>
+<div class="math-display">\[\frac{R_i-\bar R}{\sqrt{\bar R(1-\bar R)}}.\]</div>
+<ul>
+<li><code>[DIRECT]</code> When all group rewards agree, the standard deviation is zero and the reward advantages are defined to be zero.</li>
+<li><code>[DIRECT]</code> The original GRPO objective also averages over the response length <span class="math-inline">\(T(y^{(i)})\)</span> and penalizes divergence from a fixed reference policy <span class="math-inline">\(\pi_{\mathrm{ref}}\)</span>.</li>
+<li><code>[EXPLANATION]</code> <span class="math-inline">\(\pi_{\mathrm{old}}\)</span> and <span class="math-inline">\(\pi_{\mathrm{ref}}\)</span> have different roles. The former generated the current batch; the latter anchors the updated policy.</li>
+</ul>
+<h4 id="why-the-sampled-kl-term-represents-a-forward-kl">Why the sampled KL term represents a forward KL</h4>
+<ul>
+<li><code>[DIRECT]</code> For a next token sampled on-policy, let</li>
+</ul>
+<div class="math-display">\[u(a)=
+\frac{\pi_{\mathrm{ref}}(a\mid s)}
+{\pi_\theta(a\mid s)},\]</div>
+<ul>
+<li><code>[EXPLANATION]</code> Here <span class="math-inline">\(s=(x,y_{1:t-1})\)</span> is a fixed prefix. GRPO uses the nonnegative expression <span class="math-inline">\(u-\log u-1\)</span>.</li>
+<li><code>[DERIVATION]</code> Taking expectation under <span class="math-inline">\(a\sim\pi_\theta(\cdot\mid s)\)</span> gives</li>
+</ul>
+<div class="math-display">\[\begin{aligned}
+&amp;\sum_a\pi_\theta(a\mid s)
+\left[
+\frac{\pi_{\mathrm{ref}}(a\mid s)}{\pi_\theta(a\mid s)}
+-1+
+\log\frac{\pi_\theta(a\mid s)}{\pi_{\mathrm{ref}}(a\mid s)}
+\right]\\
+&amp;\quad=
+1-1+
+\sum_a\pi_\theta(a\mid s)
+\log\frac{\pi_\theta(a\mid s)}{\pi_{\mathrm{ref}}(a\mid s)}\\
+&amp;\quad=
+D_{\mathrm{KL}}
+\left(
+\pi_\theta(\cdot\mid s)
+\|\pi_{\mathrm{ref}}(\cdot\mid s)
+\right).
+\end{aligned}\]</div>
+<ul>
+<li><code>[LIMIT]</code> This identity assumes the next token is sampled from <span class="math-inline">\(\pi_\theta\)</span>. When a stored batch comes from <span class="math-inline">\(\pi_{\mathrm{old}}\)</span>, the unweighted penalty is a surrogate rather than an exact on-policy KL expectation.</li>
+<li><code>[DIRECT]</code> Even when every reward in a group agrees and the reward update vanishes, the KL penalty can still generate an update.</li>
+</ul>
+<h3 id="35-what-grpos-two-normalizations-change">3.5 What GRPO's two normalizations change</h3>
+<ul>
+<li><code>[DIRECT]</code> Ignoring KL and evaluating at the sampling policy, the token coefficient is proportional to</li>
+</ul>
+<div class="math-display">\[\frac{R_i-\bar R}
+{G\,T(y^{(i)})\sqrt{\bar R(1-\bar R)}}
+\quad\text{for GRPO},\]</div>
+<p>versus</p>
+<div class="math-display">\[\frac{R_i-\bar R}{G}
+\quad\text{for Dr. GRPO}.\]</div>
+<h4 id="length-normalization">Length normalization</h4>
+<ul>
+<li><code>[DERIVATION]</code> The log-probability of a complete response is a <strong>sum</strong> of token scores. Dividing by <span class="math-inline">\(T(y^{(i)})\)</span> replaces that sum with an average token score.</li>
+<li><code>[CONSEQUENCE]</code> Among successful responses, each token in a short response receives a larger positive coefficient than each token in a long response.</li>
+<li><code>[CONSEQUENCE]</code> Among failed responses, each token in a long response receives a smaller negative coefficient. This can weaken the penalty on long incorrect responses.</li>
+<li><code>[SYNTHESIS]</code> The length factor is not a neutral scale shared by the batch. Because it varies across responses, it changes their relative influence.</li>
+</ul>
+<h4 id="reward-standard-deviation-normalization">Reward-standard-deviation normalization</h4>
+<ul>
+<li><code>[DIRECT]</code> For large groups, <span class="math-inline">\(\bar R\approx p_\theta(x)\)</span>, so the prompt-level multiplier behaves like</li>
+</ul>
+<div class="math-display">\[\frac1{\sqrt{p_\theta(x)(1-p_\theta(x))}}.\]</div>
+<ul>
+<li><code>[CONSEQUENCE]</code> This multiplier is large for very easy and very hard prompts and smaller for prompts near <span class="math-inline">\(p_\theta(x)=1/2\)</span>. GRPO therefore changes how prompt difficulties are weighted relative to the original objective <span class="math-inline">\(\mathbb E_x[p_\theta(x)]\)</span>.</li>
+<li><code>[LIMIT]</code> A finite group with all successes or all failures still produces zero centered reward update, even though the limiting normalization factor would be large.</li>
+</ul>
+<h4 id="four-response-numerical-check">Four-response numerical check</h4>
+<ul>
+<li><code>[EXAMPLE]</code> Let <span class="math-inline">\(G=4\)</span> and rewards be <span class="math-inline">\((1,0,0,0)\)</span>. Then</li>
+</ul>
+<div class="math-display">\[\bar R=\frac14,
+\qquad
+\sqrt{\bar R(1-\bar R)}
+=\frac{\sqrt3}{4}.\]</div>
+<ul>
+<li><code>[DERIVATION]</code> Dr. GRPO's centered coefficients before the common <span class="math-inline">\(1/G\)</span> factor are</li>
+</ul>
+<div class="math-display">\[\frac34,-\frac14,-\frac14,-\frac14.\]</div>
+<ul>
+<li><code>[DERIVATION]</code> GRPO's standardized advantages are</li>
+</ul>
+<div class="math-display">\[\sqrt3,
+-\frac1{\sqrt3},
+-\frac1{\sqrt3},
+-\frac1{\sqrt3}.\]</div>
+<ul>
+<li><code>[CHECK]</code> Both sets sum to zero, but GRPO has rescaled the whole prompt according to its observed success rate. Response-length normalization can then further change the ratios between individual response contributions.</li>
+</ul>
+<h2 id="4-maximum-likelihood-reinforcement-learning">4. Maximum-likelihood reinforcement learning</h2>
+<h3 id="41-change-the-objective-not-merely-the-estimator">4.1 Change the objective, not merely the estimator</h3>
+<ul>
+<li><code>[DIRECT]</code> MaxRL replaces the success-probability objective with</li>
+</ul>
+<div class="math-display">\[J_{\mathrm{ML}}(\theta)
+:=\mathbb E_{x\sim\mathcal D}[\log p_\theta(x)],\]</div>
+<ul>
+<li><code>[ASSUMPTION]</code> This section assumes <span class="math-inline">\(p_\theta(x)&gt;0\)</span> for the prompts under consideration.</li>
+<li><code>[EXPLANATION]</code> If the verifier extracts and checks a final answer, <span class="math-inline">\(p_\theta(x)\)</span> is the marginal likelihood of producing an accepted answer, summed over every reasoning trace that leads to acceptance.</li>
+<li><code>[DERIVATION]</code> The two prompt-level gradients are</li>
+</ul>
+<div class="math-display">\[\nabla_\theta p_\theta(x)
+\quad\text{and}\quad
+\nabla_\theta\log p_\theta(x)
+=\frac1{p_\theta(x)}\nabla_\theta p_\theta(x).\]</div>
+<ul>
+<li><code>[CONCLUSION]</code> Expected reward values the same absolute probability improvement equally across prompts. Log success probability values relative improvement and therefore upweights prompts with small <span class="math-inline">\(p_\theta(x)\)</span>.</li>
+<li><code>[EXAMPLE]</code> Increasing success probability from <span class="math-inline">\(0.01\)</span> to <span class="math-inline">\(0.02\)</span> and from <span class="math-inline">\(0.50\)</span> to <span class="math-inline">\(0.51\)</span> both add <span class="math-inline">\(0.01\)</span> to expected reward. The corresponding log improvements are <span class="math-inline">\(\log 2\)</span> and <span class="math-inline">\(\log(1.02)\)</span>, so MaxRL strongly prefers the first improvement.</li>
+</ul>
+<h3 id="42-passk-and-a-finite-order-approximation">4.2 pass@k and a finite-order approximation</h3>
+<ul>
+<li><code>[DIRECT]</code> For <span class="math-inline">\(k\)</span> independent responses, the probability that at least one succeeds is</li>
+</ul>
+<div class="math-display">\[\operatorname{pass@}k_\theta(x)
+=1-(1-p_\theta(x))^k.\]</div>
+<ul>
+<li><code>[DERIVATION · Step 1]</code> Write</li>
+</ul>
+<div class="math-display">\[\log p_\theta(x)
+=\log\bigl(1-(1-p_\theta(x))\bigr).\]</div>
+<ul>
+<li><code>[DERIVATION · Step 2]</code> Apply <span class="math-inline">\(\log(1-z)=-\sum_{k=1}^{\infty}z^k/k\)</span> with <span class="math-inline">\(z=1-p_\theta(x)\)</span>:</li>
+</ul>
+<div class="math-display">\[\log p_\theta(x)
+=-
+\sum_{k=1}^{\infty}
+\frac{(1-p_\theta(x))^k}{k}.\]</div>
+<ul>
+<li><code>[DERIVATION · Step 3]</code> Since <span class="math-inline">\((1-p_\theta(x))^k=1-\operatorname{pass@}k_\theta(x)\)</span>,</li>
+</ul>
+<div class="math-display">\[\log p_\theta(x)
+=-
+\sum_{k=1}^{\infty}
+\frac{1-\operatorname{pass@}k_\theta(x)}{k}.\]</div>
+<ul>
+<li><code>[DIRECT]</code> Truncate after order <span class="math-inline">\(m\)</span>:</li>
+</ul>
+<div class="math-display">\[F_m(\theta;x)
+:=-
+\sum_{k=1}^{m}
+\frac{(1-p_\theta(x))^k}{k}.\]</div>
+<ul>
+<li><code>[CHECK]</code> At <span class="math-inline">\(m=1\)</span>, <span class="math-inline">\(F_1(\theta;x)=p_\theta(x)-1\)</span>, so its gradient is exactly the expected-reward gradient.</li>
+<li><code>[DIRECT]</code> As <span class="math-inline">\(m\to\infty\)</span>, <span class="math-inline">\(F_m(\theta;x)\to\log p_\theta(x)\)</span>.</li>
+</ul>
+<h3 id="43-how-the-truncation-reweights-difficulty">4.3 How the truncation reweights difficulty</h3>
+<ul>
+<li><code>[DERIVATION · Step 1]</code> Differentiate each term:</li>
+</ul>
+<div class="math-display">\[\nabla_\theta F_m(\theta;x)
+=\sum_{k=1}^{m}
+(1-p_\theta(x))^{k-1}
+\nabla_\theta p_\theta(x).\]</div>
+<ul>
+<li><code>[DERIVATION · Step 2]</code> Sum the finite geometric series:</li>
+</ul>
+<div class="math-display">\[\nabla_\theta F_m(\theta;x)
+=
+\frac{1-(1-p_\theta(x))^m}{p_\theta(x)}
+\nabla_\theta p_\theta(x).\]</div>
+<ul>
+<li><code>[EXPLANATION]</code> The multiplier is at most <span class="math-inline">\(\min\{m,1/p_\theta(x)\}\)</span>. For extremely hard prompts with <span class="math-inline">\(p_\theta(x)\ll1/m\)</span>, it is approximately <span class="math-inline">\(m\)</span>. As <span class="math-inline">\(m\)</span> grows, it approaches the maximum-likelihood weight <span class="math-inline">\(1/p_\theta(x)\)</span>.</li>
+<li><code>[SYNTHESIS]</code> The finite order prevents the weight on an extremely hard prompt from becoming arbitrarily large. Sampling budget therefore acts as an implicit cap on difficulty reweighting.</li>
+</ul>
+<h3 id="44-the-conditional-maximum-likelihood-gradient">4.4 The conditional maximum-likelihood gradient</h3>
+<ul>
+<li><code>[DIRECT]</code> For a fixed prompt with <span class="math-inline">\(p_\theta(x)&gt;0\)</span>,</li>
+</ul>
+<div class="math-display">\[\nabla_\theta\log p_\theta(x)
+=
+\mathbb E_{y\sim\pi_\theta(\cdot\mid x)}
+\left[
+\nabla_\theta\log\pi_\theta(y\mid x)
+\mid R(x,y)=1
+\right].\]</div>
+<ul>
+<li><code>[DERIVATION · Step 1]</code> From REINFORCE and <span class="math-inline">\(\nabla\log p=\nabla p/p\)</span>,</li>
+</ul>
+<div class="math-display">\[\nabla_\theta\log p_\theta(x)
+=
+\frac1{p_\theta(x)}
+\sum_{y:R(x,y)=1}
+\pi_\theta(y\mid x)
+\nabla_\theta\log\pi_\theta(y\mid x).\]</div>
+<ul>
+<li><code>[DERIVATION · Step 2]</code> Conditional on success, an accepted response has probability</li>
+</ul>
+<div class="math-display">\[\Pr_\theta(y\mid x,R=1)
+=\frac{\pi_\theta(y\mid x)}{p_\theta(x)}.\]</div>
+<ul>
+<li><code>[CONCLUSION]</code> The sum is exactly the expected response score under the policy conditioned on verifier success.</li>
+<li><code>[LIMIT]</code> Sampling until one success would give an unbiased estimator, but it needs <span class="math-inline">\(1/p_\theta(x)\)</span> trials on average. This is prohibitive on hard prompts and motivates fixed-budget estimators.</li>
+</ul>
+<h3 id="45-a-fixed-group-estimates-an-exact-truncated-objective">4.5 A fixed group estimates an exact truncated objective</h3>
+<ul>
+<li><code>[DIRECT]</code> Draw <span class="math-inline">\(G\)</span> responses and let the number of successes be <span class="math-inline">\(G\bar R=\sum_iR_i\)</span>. Define</li>
+</ul>
+<div class="math-display">\[\widehat g_G(x)
+=
+\begin{cases}
+\displaystyle
+\frac1{G\bar R}
+\sum_{i=1}^{G}
+R_i\nabla_\theta\log\pi_\theta(y^{(i)}\mid x),
+&amp;\bar R&gt;0,\\[1.1em]
+0,&amp;\bar R=0.
+\end{cases}\]</div>
+<ul>
+<li><code>[EXPLANATION]</code> When the group contains successes, this is simply the average score of its successful responses.</li>
+<li><code>[DERIVATION · Step 1]</code> Condition on a particular success-indicator vector with at least one success. Each successful response is distributed as <span class="math-inline">\(\pi_\theta(\cdot\mid x)\)</span> conditioned on success.</li>
+<li><code>[DERIVATION · Step 2]</code> By the conditional-gradient identity, the conditional expectation of every successful score is <span class="math-inline">\(\nabla_\theta\log p_\theta(x)\)</span>. Averaging the successful scores leaves the same expectation.</li>
+<li><code>[DERIVATION · Step 3]</code> The probability that the group contains at least one success is</li>
+</ul>
+<div class="math-display">\[1-(1-p_\theta(x))^G.\]</div>
+<ul>
+<li><code>[DERIVATION · Step 4]</code> Therefore</li>
+</ul>
+<div class="math-display">\[\begin{aligned}
+\mathbb E[\widehat g_G(x)\mid x]
+&amp;=\bigl(1-(1-p_\theta(x))^G\bigr)
+\nabla_\theta\log p_\theta(x)\\
+&amp;=
+\frac{1-(1-p_\theta(x))^G}{p_\theta(x)}
+\nabla_\theta p_\theta(x)\\
+&amp;=\nabla_\theta F_G(\theta;x).
+\end{aligned}\]</div>
+<ul>
+<li><code>[CONCLUSION]</code> The estimator is biased for the infinite-order log-success gradient, but exactly unbiased for the order-<span class="math-inline">\(G\)</span> truncated MaxRL objective.</li>
+<li><code>[LIMIT]</code> If <span class="math-inline">\(p_\theta(x)=0\)</span> for every possible parameter value, the log-likelihood and conditioning-on-success statements are undefined. The finite-order gradient and the estimator are still zero.</li>
+</ul>
+<h3 id="46-the-practical-centered-maxrl-update">4.6 The practical centered MaxRL update</h3>
+<ul>
+<li><code>[DIRECT]</code> A zero-mean control variate is the average score of all responses:</li>
+</ul>
+<div class="math-display">\[\mathbb E
+\left[
+\frac1G\sum_{i=1}^{G}
+\nabla_\theta\log\pi_\theta(y^{(i)}\mid x)
+\mid x
+\right]=0.\]</div>
+<ul>
+<li><code>[DIRECT]</code> Practical MaxRL performs the centered update only when the group has at least one success:</li>
+</ul>
+<div class="math-display">\[\widehat g_{\mathrm{practical}}(x)
+=
+\begin{cases}
+\displaystyle
+\frac1G\sum_{i=1}^{G}
+\frac{R_i-\bar R}{\bar R}
+\nabla_\theta\log\pi_\theta(y^{(i)}\mid x),
+&amp;\bar R&gt;0,\\[1.1em]
+0,&amp;\bar R=0.
+\end{cases}\]</div>
+<ul>
+<li><code>[COMPARISON]</code> Dr. GRPO uses <span class="math-inline">\(R_i-\bar R\)</span>. Practical MaxRL divides this centered reward by <span class="math-inline">\(\bar R\)</span>, amplifying groups with a low observed success rate.</li>
+<li><code>[COMPARISON]</code> GRPO divides by <span class="math-inline">\(\sqrt{\bar R(1-\bar R)}\)</span> and by response length. Practical MaxRL divides by <span class="math-inline">\(\bar R\)</span> and does not normalize by response length.</li>
+<li><code>[DIRECT]</code> Because practical MaxRL skips the all-failure group instead of applying the control variate there, its expectation changes:</li>
+</ul>
+<div class="math-display">\[\mathbb E[\widehat g_{\mathrm{practical}}(x)\mid x]
+=\nabla_\theta F_{G-1}(\theta;x),
+\qquad G\ge2.\]</div>
+<ul>
+<li><code>[SYNTHESIS]</code> The uncentered successful-score estimator targets order <span class="math-inline">\(G\)</span>. The commonly implemented centered-and-skipped update targets order <span class="math-inline">\(G-1\)</span>. A seemingly small implementation decision changes the exact objective.</li>
+</ul>
+<h4 id="four-response-coefficient-check">Four-response coefficient check</h4>
+<ul>
+<li><code>[EXAMPLE]</code> Again take <span class="math-inline">\((R_1,R_2,R_3,R_4)=(1,0,0,0)\)</span>, so <span class="math-inline">\(\bar R=1/4\)</span>.</li>
+<li><code>[DERIVATION]</code> Practical MaxRL's per-response coefficients before the common <span class="math-inline">\(1/G\)</span> factor are</li>
+</ul>
+<div class="math-display">\[\frac{R_i-\bar R}{\bar R}
+=3,-1,-1,-1.\]</div>
+<ul>
+<li><code>[CHECK]</code> These are exactly four times the Dr. GRPO coefficients <span class="math-inline">\((3/4,-1/4,-1/4,-1/4)\)</span>. The factor <span class="math-inline">\(1/\bar R=4\)</span> is prompt-dependent, so unlike the constant Dr.-to-RLOO scaling, it cannot be absorbed globally into one learning rate.</li>
+</ul>
+<h2 id="5-algorithm-comparison">5. Algorithm comparison</h2>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Response coefficient, ignoring shared factors</th>
+<th>Target at the on-policy point</th>
+<th>Main source of changed weighting</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>REINFORCE</td>
+<td><span class="math-inline">\(R_i\)</span></td>
+<td><span class="math-inline">\(\nabla p_\theta(x)\)</span></td>
+<td>No baseline; high variance</td>
+</tr>
+<tr>
+<td>RLOO</td>
+<td><span class="math-inline">\(R_i-\frac1{G-1}\sum_{j\ne i}R_j\)</span></td>
+<td><span class="math-inline">\(\nabla p_\theta(x)\)</span></td>
+<td>Unbiased leave-one-out baseline</td>
+</tr>
+<tr>
+<td>Dr. GRPO</td>
+<td><span class="math-inline">\(R_i-\bar R\)</span></td>
+<td><span class="math-inline">\(\frac{G-1}{G}\nabla p_\theta(x)\)</span></td>
+<td>Only a constant scale for fixed <span class="math-inline">\(G\)</span></td>
+</tr>
+<tr>
+<td>GRPO</td>
+<td><span class="math-inline">\(\frac{R_i-\bar R}{T(y^{(i)})\sqrt{\bar R(1-\bar R)}}\)</span></td>
+<td>Reweighted surrogate</td>
+<td>Response length and observed prompt difficulty</td>
+</tr>
+<tr>
+<td>MaxRL, successful-score form</td>
+<td>Average scores of successes</td>
+<td><span class="math-inline">\(\nabla F_G(\theta;x)\)</span></td>
+<td>Finite-order approximation to <span class="math-inline">\(\nabla\log p_\theta(x)\)</span></td>
+</tr>
+<tr>
+<td>Practical MaxRL</td>
+<td><span class="math-inline">\((R_i-\bar R)/\bar R\)</span>, skip all-failure groups</td>
+<td><span class="math-inline">\(\nabla F_{G-1}(\theta;x)\)</span></td>
+<td>Inverse group success rate and skip rule</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><code>[SYNTHESIS]</code> “Biased” is incomplete without naming the target. Dr. GRPO is biased for the unscaled expected-reward gradient but keeps its direction. The fixed-budget MaxRL estimator is biased for <span class="math-inline">\(\nabla\log p\)</span> but unbiased for a precise truncated objective. PPO and clipped group surrogates are exact at the policy that generated the data but not after multiple reuse steps.</li>
+</ul>
+<h2 id="6-interactive-algorithm-lab">6. Interactive algorithm lab</h2>
+<ul>
+<li><code>[EXPLANATION]</code> The simulator below applies several estimators to the same four sampled responses. Toggle verifier outcomes and switch algorithms to see which changes are a baseline, a global scale, a length-dependent weight, or a prompt-difficulty weight.</li>
+</ul>
+<div class="rlvr-lab" data-rlvr-lab>
+  <div class="rlvr-lab__header">
+    <div>
+      <p class="rlvr-lab__kicker">ONE PROMPT · FOUR SAMPLED RESPONSES</p>
+      <h3>Watch the update weights change</h3>
+    </div>
+    <p>Click a reward to toggle success or failure. The bars show the scalar multiplying each response score before any shared batch factor.</p>
+  </div>
+
+  <div class="rlvr-lab__tabs" role="group" aria-label="Choose a policy-gradient estimator">
+    <button type="button" class="rlvr-lab__tab" data-algorithm="reinforce" aria-pressed="false">REINFORCE</button>
+    <button type="button" class="rlvr-lab__tab is-active" data-algorithm="rloo" aria-pressed="true">RLOO</button>
+    <button type="button" class="rlvr-lab__tab" data-algorithm="drgrpo" aria-pressed="false">Dr. GRPO</button>
+    <button type="button" class="rlvr-lab__tab" data-algorithm="grpo" aria-pressed="false">GRPO</button>
+    <button type="button" class="rlvr-lab__tab" data-algorithm="maxrl" aria-pressed="false">MaxRL</button>
+  </div>
+
+  <div class="rlvr-lab__metrics" aria-label="Current group statistics">
+    <div>
+      <span>Group rewards</span>
+      <strong data-reward-vector>1, 0, 0, 0</strong>
+    </div>
+    <div>
+      <span>Group mean</span>
+      <strong data-group-mean>0.25</strong>
+    </div>
+    <div>
+      <span>Normalizer</span>
+      <strong data-normalizer>leave-one-out</strong>
+    </div>
+  </div>
+
+  <div class="rlvr-lab__responses" aria-label="Sampled responses and update coefficients">
+    <article class="rlvr-response" data-response data-index="0">
+      <div class="rlvr-response__top">
+        <div><span>Response</span><strong>y¹</strong></div>
+        <button type="button" class="rlvr-reward is-success" data-reward-toggle aria-pressed="true" aria-label="Response 1 verifier reward: success">
+          <span>reward</span><strong data-reward>1</strong>
+        </button>
+      </div>
+      <div class="rlvr-response__tokens" aria-label="Response length 4 tokens">
+        <span>4 tokens</span><i style="--token-width:25%"></i>
+      </div>
+      <div class="rlvr-coefficient">
+        <div class="rlvr-coefficient__label"><span>score coefficient</span><output data-coefficient>+1.000</output></div>
+        <div class="rlvr-coefficient__track" data-coefficient-track role="img" aria-label="Coefficient bar">
+          <span class="rlvr-coefficient__zero" aria-hidden="true"></span>
+          <span class="rlvr-coefficient__fill" data-coefficient-fill aria-hidden="true"></span>
+        </div>
+      </div>
+    </article>
+
+    <article class="rlvr-response" data-response data-index="1">
+      <div class="rlvr-response__top">
+        <div><span>Response</span><strong>y²</strong></div>
+        <button type="button" class="rlvr-reward" data-reward-toggle aria-pressed="false" aria-label="Response 2 verifier reward: failure">
+          <span>reward</span><strong data-reward>0</strong>
+        </button>
+      </div>
+      <div class="rlvr-response__tokens" aria-label="Response length 8 tokens">
+        <span>8 tokens</span><i style="--token-width:50%"></i>
+      </div>
+      <div class="rlvr-coefficient">
+        <div class="rlvr-coefficient__label"><span>score coefficient</span><output data-coefficient>-0.333</output></div>
+        <div class="rlvr-coefficient__track" data-coefficient-track role="img" aria-label="Coefficient bar">
+          <span class="rlvr-coefficient__zero" aria-hidden="true"></span>
+          <span class="rlvr-coefficient__fill" data-coefficient-fill aria-hidden="true"></span>
+        </div>
+      </div>
+    </article>
+
+    <article class="rlvr-response" data-response data-index="2">
+      <div class="rlvr-response__top">
+        <div><span>Response</span><strong>y³</strong></div>
+        <button type="button" class="rlvr-reward" data-reward-toggle aria-pressed="false" aria-label="Response 3 verifier reward: failure">
+          <span>reward</span><strong data-reward>0</strong>
+        </button>
+      </div>
+      <div class="rlvr-response__tokens" aria-label="Response length 12 tokens">
+        <span>12 tokens</span><i style="--token-width:75%"></i>
+      </div>
+      <div class="rlvr-coefficient">
+        <div class="rlvr-coefficient__label"><span>score coefficient</span><output data-coefficient>-0.333</output></div>
+        <div class="rlvr-coefficient__track" data-coefficient-track role="img" aria-label="Coefficient bar">
+          <span class="rlvr-coefficient__zero" aria-hidden="true"></span>
+          <span class="rlvr-coefficient__fill" data-coefficient-fill aria-hidden="true"></span>
+        </div>
+      </div>
+    </article>
+
+    <article class="rlvr-response" data-response data-index="3">
+      <div class="rlvr-response__top">
+        <div><span>Response</span><strong>y⁴</strong></div>
+        <button type="button" class="rlvr-reward" data-reward-toggle aria-pressed="false" aria-label="Response 4 verifier reward: failure">
+          <span>reward</span><strong data-reward>0</strong>
+        </button>
+      </div>
+      <div class="rlvr-response__tokens" aria-label="Response length 16 tokens">
+        <span>16 tokens</span><i style="--token-width:100%"></i>
+      </div>
+      <div class="rlvr-coefficient">
+        <div class="rlvr-coefficient__label"><span>score coefficient</span><output data-coefficient>-0.333</output></div>
+        <div class="rlvr-coefficient__track" data-coefficient-track role="img" aria-label="Coefficient bar">
+          <span class="rlvr-coefficient__zero" aria-hidden="true"></span>
+          <span class="rlvr-coefficient__fill" data-coefficient-fill aria-hidden="true"></span>
+        </div>
+      </div>
+    </article>
+  </div>
+
+  <div class="rlvr-lab__actions">
+    <button type="button" class="rlvr-lab__button rlvr-lab__button--primary" data-replay>Replay update</button>
+    <button type="button" class="rlvr-lab__button" data-next-scenario>Next reward pattern</button>
+  </div>
+
+  <div class="rlvr-lab__detail" aria-live="polite">
+    <div class="rlvr-lab__formula">
+      <span data-algorithm-name>RLOO</span>
+      <code data-formula>Rᵢ − mean(Rⱼ, j ≠ i)</code>
+      <p data-explanation>The current response is excluded from its own baseline, so the estimator remains unbiased for the expected-reward gradient.</p>
+    </div>
+    <div class="rlvr-lab__code">
+      <div><span>Minimal PyTorch-style sketch</span><small>response_logp already sums token log-probabilities</small></div>
+      <pre><code data-code-snippet>G = rewards.numel()
+loo_baseline = (rewards.sum() - rewards) / (G - 1)
+advantage = rewards - loo_baseline
+loss = -(advantage.detach() * response_logp).mean()</code></pre>
+    </div>
+  </div>
+
+  <section class="training-trace" data-training-trace aria-labelledby="training-trace-title">
+    <div class="training-trace__header">
+      <div>
+        <p class="rlvr-lab__kicker">ONE TRAINING STEP · UNFOLDED</p>
+        <h3 id="training-trace-title">Follow the tensors into the optimizer</h3>
+      </div>
+      <p>The coefficient above is only one intermediate value. Step through the full path from sampled tokens to a parameter update.</p>
+    </div>
+
+    <div class="training-trace__steps" role="group" aria-label="Training step">
+      <button type="button" class="is-active" data-trace-stage="0" aria-pressed="true"><span>01</span>Roll out</button>
+      <button type="button" data-trace-stage="1" aria-pressed="false"><span>02</span>Verify</button>
+      <button type="button" data-trace-stage="2" aria-pressed="false"><span>03</span>Advantage</button>
+      <button type="button" data-trace-stage="3" aria-pressed="false"><span>04</span>Token loss</button>
+      <button type="button" data-trace-stage="4" aria-pressed="false"><span>05</span>Clip + KL</button>
+      <button type="button" data-trace-stage="5" aria-pressed="false"><span>06</span>Update</button>
+    </div>
+
+    <div class="training-trace__stage" aria-live="polite">
+      <div class="training-trace__explanation">
+        <p class="training-trace__eyebrow" data-stage-eyebrow>STEP 01 · DATA COLLECTION</p>
+        <h4 data-stage-title>Sample several continuations from a frozen policy</h4>
+        <p data-stage-description>The same prompt is repeated four times. Sampling uses π_old, which stays fixed while this batch is reused.</p>
+
+        <div class="tensor-flow" aria-label="Tensor transformation in the current training stage">
+          <div><span>input</span><strong data-stage-input>prompt_ids [B, L]</strong></div>
+          <i aria-hidden="true">→</i>
+          <div><span>operation</span><strong data-stage-operation>sample G responses</strong></div>
+          <i aria-hidden="true">→</i>
+          <div><span>output</span><strong data-stage-output>tokens, mask, old_logp [B, G, T]</strong></div>
+        </div>
+
+        <p class="training-trace__algorithm-note"><span data-stage-algorithm>RLOO</span><strong data-stage-note>The estimator has not acted yet; every method begins from the same sampled group.</strong></p>
+      </div>
+
+      <div class="training-trace__code">
+        <div><span>PyTorch-style implementation slice</span><small data-stage-shape>G responses per prompt</small></div>
+        <pre><code data-stage-code>with torch.no_grad():
+    tokens = policy_old.generate(prompt_ids, num_return_sequences=G)
+    old_logp = policy_old.log_probs(tokens)
+mask = tokens.ne(pad_token_id)</code></pre>
+      </div>
+    </div>
+
+    <div class="token-loss-view" data-token-loss-view hidden>
+      <div>
+        <span>Broadcast from response to tokens</span>
+        <p>Each colored token receives its response's coefficient. GRPO additionally divides by the number of valid tokens.</p>
+      </div>
+      <div class="token-loss-view__rows" data-token-rows aria-label="Token-level coefficient rows"></div>
+      <p class="token-loss-view__legend"><span class="is-positive"></span>increase log-probability <span class="is-negative"></span>decrease log-probability <span class="is-zero"></span>no reward gradient</p>
+    </div>
+
+    <div class="training-trace__nav">
+      <button type="button" data-stage-previous disabled>Previous step</button>
+      <span data-stage-progress>1 / 6</span>
+      <button type="button" data-stage-next>Next step</button>
+    </div>
+  </section>
+
+  <section class="ppo-explorer" data-ppo-explorer aria-labelledby="ppo-explorer-title">
+    <div class="ppo-explorer__header">
+      <div>
+        <p class="rlvr-lab__kicker">PPO CLIPPING</p>
+        <h3 id="ppo-explorer-title">Move the probability ratio</h3>
+      </div>
+      <p>The marker is the new-to-old token probability ratio. The shaded band is the unclipped trust region.</p>
+    </div>
+
+    <div class="ppo-explorer__controls">
+      <label>
+        <span>Ratio ρ <output data-ratio-output>1.00</output></span>
+        <input type="range" min="0.50" max="1.50" step="0.01" value="1.00" data-ratio>
+      </label>
+      <label>
+        <span>Clip width ε <output data-epsilon-output>0.20</output></span>
+        <input type="range" min="0.05" max="0.40" step="0.05" value="0.20" data-epsilon>
+      </label>
+      <div class="ppo-explorer__advantage" role="group" aria-label="Advantage sign">
+        <span>Advantage</span>
+        <button type="button" data-advantage="1" aria-pressed="true" class="is-active">A = +1</button>
+        <button type="button" data-advantage="-1" aria-pressed="false">A = −1</button>
+      </div>
+    </div>
+
+    <div class="ppo-ratio" data-ppo-track role="img" aria-label="PPO probability ratio and clipping region">
+      <div class="ppo-ratio__axis">
+        <span>0.5</span><span>1.0</span><span>1.5</span>
+      </div>
+      <div class="ppo-ratio__track">
+        <span class="ppo-ratio__band" data-clip-band aria-hidden="true"></span>
+        <span class="ppo-ratio__center" aria-hidden="true"></span>
+        <span class="ppo-ratio__marker" data-ratio-marker aria-hidden="true"></span>
+      </div>
+    </div>
+
+    <div class="ppo-explorer__result" aria-live="polite">
+      <div><span>unclipped ρA</span><strong data-unclipped>1.000</strong></div>
+      <div><span>PPO objective</span><strong data-ppo-objective>1.000</strong></div>
+      <div><span>local gradient</span><strong data-clip-status>active</strong></div>
+    </div>
+
+    <pre class="ppo-explorer__code"><code>ratio = torch.exp(new_logp - old_logp.detach())
+unclipped = ratio * advantage
+clipped = ratio.clamp(1 - eps, 1 + eps) * advantage
+policy_loss = -torch.minimum(unclipped, clipped).mean()</code></pre>
+  </section>
+
+  <p class="rlvr-lab__caveat">These snippets isolate the mathematics shown in the lecture. A production trainer must also handle masks, distributed batches, KL terms, optimizer steps, numerical stability, and frozen sampling policies.</p>
+</div>
+
+
+<h2 id="7-claims-to-verify-manually">7. Claims to verify manually</h2>
+<ul>
+<li>[ ] Re-derive the response-level REINFORCE gradient without looking at the note.</li>
+<li>[ ] State exactly what independence condition a baseline needs.</li>
+<li>[ ] Verify that the optimal scalar baseline is score-norm weighted and need not equal the value function.</li>
+<li>[ ] Prove that the RLOO cross-response terms have zero expectation.</li>
+<li>[ ] Recover the factor <span class="math-inline">\((G-1)/G\)</span> relating Dr. GRPO to RLOO.</li>
+<li>[ ] Explain separately how GRPO's <span class="math-inline">\(1/T(y)\)</span> and <span class="math-inline">\(1/\sqrt{\bar R(1-\bar R)}\)</span> factors change weighting.</li>
+<li>[ ] Derive the sampled GRPO penalty's on-policy expectation as <span class="math-inline">\(D_{\mathrm{KL}}(\pi_\theta\|\pi_{\mathrm{ref}})\)</span>.</li>
+<li>[ ] Derive <span class="math-inline">\(\log p\)</span> as an infinite weighted sum of pass@k terms.</li>
+<li>[ ] Prove the conditional maximum-likelihood gradient identity.</li>
+<li>[ ] Explain why <span class="math-inline">\(G\)</span> samples yield the order-<span class="math-inline">\(G\)</span> MaxRL objective, while the practical centered update yields order <span class="math-inline">\(G-1\)</span>.</li>
+</ul>
+<h2 id="8-questions-to-carry-into-study">8. Questions to carry into study</h2>
+<ul>
+<li><code>[QUESTION]</code> In a real language model, how large are the covariance terms between token-score contributions, and when does a prefix-level value model outperform a group baseline at equal compute?</li>
+<li><code>[QUESTION]</code> How much of GRPO's empirical behavior comes from its intended comparison-based baseline versus its length and standard-deviation normalizations?</li>
+<li><code>[QUESTION]</code> What happens when reward is graded rather than binary? Which derivations survive, and which identities rely specifically on Bernoulli rewards?</li>
+<li><code>[QUESTION]</code> MaxRL emphasizes relative improvement on difficult prompts, but how should prompts with effectively zero success probability be handled without wasting most of the sampling budget?</li>
+<li><code>[QUESTION]</code> How do KL regularization, off-policy sample reuse, and MaxRL-style difficulty weighting interact when combined in one practical training system?</li>
+<li><code>[QUESTION]</code> Is pass@k the right deployment-aligned target when inference uses a verifier to select among multiple responses, or should training model the selection rule explicitly?</li>
+</ul>
+<h2 id="9-what-i-can-now-explain">9. What I can now explain</h2>
+<ul>
+<li><code>[RECONSTRUCTION]</code> RLVR treats the full generated response as a trajectory and a verifier result as a terminal reward. REINFORCE differentiates the probability of success using reward-weighted response scores.</li>
+<li><code>[RECONSTRUCTION]</code> A baseline is safe when its score contribution has conditional expectation zero. RLOO obtains such a baseline from independent responses to the same prompt; Dr. GRPO includes the current response and therefore introduces only a known constant scaling.</li>
+<li><code>[RECONSTRUCTION]</code> GRPO is not just RLOO with lower variance. Its length and standard-deviation normalizations change the relative influence of responses and prompts, while its reference-policy term adds a separate regularization force.</li>
+<li><code>[RECONSTRUCTION]</code> MaxRL deliberately optimizes log success probability, which emphasizes relative improvement on hard prompts. A finite response budget corresponds to an exact truncated pass@k objective rather than an informal approximation with no target.</li>
+</ul>
+<h2 id="references-recorded-from-the-supplied-lecture">References recorded from the supplied lecture</h2>
+<ul>
+<li><code>[DIRECT]</code> Ronald J. Williams, “Simple Statistical Gradient-Following Algorithms for Connectionist Reinforcement Learning,” <em>Machine Learning</em>, 1992. <a href="https://doi.org/10.1007/BF00992696">https://doi.org/10.1007/BF00992696</a></li>
+<li><code>[DIRECT]</code> John Schulman et al., “Proximal Policy Optimization Algorithms,” 2017. <a href="https://arxiv.org/abs/1707.06347">https://arxiv.org/abs/1707.06347</a></li>
+<li><code>[DIRECT]</code> Arash Ahmadian et al., “Back to Basics: Revisiting REINFORCE Style Optimization for Learning from Human Feedback in LLMs,” 2024. <a href="https://arxiv.org/abs/2402.14740">https://arxiv.org/abs/2402.14740</a></li>
+<li><code>[DIRECT]</code> Zichen Liu et al., “Understanding R1-Zero-Like Training: A Critical Perspective,” COLM 2025. <a href="https://arxiv.org/abs/2503.20783">https://arxiv.org/abs/2503.20783</a></li>
+<li><code>[DIRECT]</code> Zhihong Shao et al., “DeepSeekMath: Pushing the Limits of Mathematical Reasoning in Open Language Models,” 2024. <a href="https://arxiv.org/abs/2402.03300">https://arxiv.org/abs/2402.03300</a></li>
+<li><code>[DIRECT]</code> Fahim Tajwar et al., “Maximum Likelihood Reinforcement Learning,” 2026. <a href="https://arxiv.org/abs/2602.02710">https://arxiv.org/abs/2602.02710</a></li>
+</ul>
+      </article>
+    </div>
+  </main>
+
+  <footer class="site-footer section-shell">
+    <div><strong>CS 395T</strong><span>Learning note</span></div>
+    <p>Markdown source · draft</p>
+    <a href="../index.html#notes">Return to index ←</a>
+  </footer>
+</body>
+</html>
