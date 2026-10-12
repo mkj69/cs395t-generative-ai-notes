@@ -1,0 +1,745 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="An AI-assisted reconstruction of pre-Transformer deep learning, from convolutional vision and VAEs/GANs through recurrent language models, attention, and adversarial robustness.">
+  <title>Lecture 02 — Deep Learning Before Transformers — CS 395T</title>
+  <link rel="stylesheet" href="../assets/styles.css">
+  <script>
+    window.MathJax = {
+      tex: {
+        processEscapes: true
+      },
+      svg: { fontCache: 'global' }
+    };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js" defer></script>
+  <script src="../assets/app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header">
+    <a class="wordmark" href="../index.html"><span>CS 395T</span><small>Learning &amp; research notebook</small></a>
+    <button class="menu-button" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button>
+    <nav id="site-nav" class="site-nav" aria-label="Primary navigation">
+      <a href="../structure.html">Structure</a>
+      <a href="../index.html#notes">Index</a>
+      <a href="../method.html">Writing guide</a>
+      <a href="../index.html#about">About</a>
+    </nav>
+  </header>
+
+  <main id="main" class="note-shell">
+    <header class="note-hero">
+      <div class="template-banner learning-banner">
+        <strong>LEARNING NOTE · DRAFT</strong>
+        <span>Work in progress</span>
+      </div>
+      <p class="eyebrow">26 AUG 2026 · DRAFT</p>
+      <h1>Lecture 02 — Deep Learning Before Transformers</h1>
+      <p class="note-abstract">An AI-assisted reconstruction of pre-Transformer deep learning, from convolutional vision and VAEs/GANs through recurrent language models, attention, and adversarial robustness.</p>
+      <ul class="tag-list" aria-label="Topics"><li>convolutional networks</li><li>image generation</li><li>VAE</li><li>GAN</li><li>recurrent neural networks</li><li>LSTM</li><li>attention</li><li>adversarial examples</li></ul>
+    </header>
+
+    <div class="note-layout">
+      <aside class="note-toc" aria-label="On this page">
+        <p class="aside-label">ON THIS PAGE</p>
+        <div class="toc">
+<ul>
+<li><a href="#source-boundary">Source boundary</a></li>
+<li><a href="#reading-map">Reading map</a></li>
+<li><a href="#1-why-images-need-structural-priors">1. Why images need structural priors</a></li>
+<li><a href="#2-convolution-and-equivariance">2. Convolution and equivariance</a><ul>
+<li><a href="#21-single-channel-discrete-convolution">2.1 Single-channel discrete convolution</a></li>
+<li><a href="#22-stride-padding-and-output-size">2.2 Stride, padding, and output size</a></li>
+<li><a href="#23-multi-channel-convolutional-layer">2.3 Multi-channel convolutional layer</a></li>
+<li><a href="#24-translation-equivariance">2.4 Translation equivariance</a></li>
+</ul>
+</li>
+<li><a href="#3-from-feature-maps-to-classification">3. From feature maps to classification</a><ul>
+<li><a href="#31-cross-entropy-gradient">3.1 Cross-entropy gradient</a></li>
+<li><a href="#32-maximum-likelihood-interpretation">3.2 Maximum-likelihood interpretation</a></li>
+</ul>
+</li>
+<li><a href="#4-the-path-from-lenet-to-resnet">4. The path from LeNet to ResNet</a><ul>
+<li><a href="#41-scaling-data-and-compute">4.1 Scaling data and compute</a></li>
+<li><a href="#42-vgg-and-repeated-small-kernels">4.2 VGG and repeated small kernels</a></li>
+<li><a href="#43-the-degradation-problem">4.3 The degradation problem</a></li>
+<li><a href="#44-residual-learning">4.4 Residual learning</a></li>
+<li><a href="#45-gradient-path-through-a-residual-block">4.5 Gradient path through a residual block</a></li>
+</ul>
+</li>
+<li><a href="#5-from-classification-to-generation">5. From classification to generation</a></li>
+<li><a href="#6-variational-autoencoders">6. Variational autoencoders</a><ul>
+<li><a href="#61-latent-variable-model">6.1 Latent-variable model</a></li>
+<li><a href="#62-deriving-the-elbo">6.2 Deriving the ELBO</a></li>
+<li><a href="#63-exact-gap-to-log-likelihood">6.3 Exact gap to log likelihood</a></li>
+<li><a href="#64-reparameterization-trick">6.4 Reparameterization trick</a></li>
+</ul>
+</li>
+<li><a href="#7-generative-adversarial-networks">7. Generative adversarial networks</a><ul>
+<li><a href="#71-two-player-objective">7.1 Two-player objective</a></li>
+<li><a href="#72-optimal-discriminator-for-a-fixed-generator">7.2 Optimal discriminator for a fixed generator</a></li>
+<li><a href="#73-why-the-ideal-game-matches-distributions">7.3 Why the ideal game matches distributions</a></li>
+<li><a href="#74-saturation-and-non-saturating-generator-loss">7.4 Saturation and non-saturating generator loss</a></li>
+<li><a href="#75-mode-collapse">7.5 Mode collapse</a></li>
+</ul>
+</li>
+<li><a href="#8-evaluating-generated-images">8. Evaluating generated images</a><ul>
+<li><a href="#81-inception-score">8.1 Inception Score</a></li>
+<li><a href="#82-frechet-inception-distance">8.2 Fréchet Inception Distance</a></li>
+</ul>
+</li>
+<li><a href="#9-tokens-and-embeddings">9. Tokens and embeddings</a><ul>
+<li><a href="#91-word-character-and-subword-units">9.1 Word, character, and subword units</a></li>
+<li><a href="#92-byte-pair-encoding">9.2 Byte-pair encoding</a></li>
+</ul>
+</li>
+<li><a href="#10-recurrent-neural-networks">10. Recurrent neural networks</a></li>
+<li><a href="#11-backpropagation-through-time">11. Backpropagation through time</a><ul>
+<li><a href="#111-vanishing-and-exploding-gradients">11.1 Vanishing and exploding gradients</a></li>
+</ul>
+</li>
+<li><a href="#12-lstm-memory-path">12. LSTM memory path</a><ul>
+<li><a href="#121-gradient-through-the-cell">12.1 Gradient through the cell</a></li>
+</ul>
+</li>
+<li><a href="#13-autoregressive-language-modeling">13. Autoregressive language modeling</a></li>
+<li><a href="#14-encoder-decoder-sequence-models">14. Encoder-decoder sequence models</a><ul>
+<li><a href="#141-fixed-vector-bottleneck">14.1 Fixed-vector bottleneck</a></li>
+</ul>
+</li>
+<li><a href="#15-additive-attention">15. Additive attention</a><ul>
+<li><a href="#151-interpretation">15.1 Interpretation</a></li>
+<li><a href="#152-dot-product-and-general-scoring">15.2 Dot-product and general scoring</a></li>
+</ul>
+</li>
+<li><a href="#16-dataset-scale-shapes-architecture-conclusions">16. Dataset scale shapes architecture conclusions</a></li>
+<li><a href="#17-threat-model">17. Threat model</a></li>
+<li><a href="#18-fast-gradient-sign-method">18. Fast Gradient Sign Method</a></li>
+<li><a href="#19-adversarial-training">19. Adversarial training</a><ul>
+<li><a href="#191-projected-gradient-descent-attack">19.1 Projected gradient descent attack</a></li>
+<li><a href="#192-training-loop">19.2 Training loop</a></li>
+</ul>
+</li>
+<li><a href="#20-unifying-lessons-from-the-pre-transformer-era">20. Unifying lessons from the pre-Transformer era</a><ul>
+<li><a href="#201-inductive-bias-controls-efficiency">20.1 Inductive bias controls efficiency</a></li>
+<li><a href="#202-gradient-paths-control-trainability">20.2 Gradient paths control trainability</a></li>
+<li><a href="#203-objectives-define-what-good-means">20.3 Objectives define what “good” means</a></li>
+<li><a href="#204-evaluation-metrics-are-partial-views">20.4 Evaluation metrics are partial views</a></li>
+</ul>
+</li>
+<li><a href="#21-common-confusions">21. Common confusions</a><ul>
+<li><a href="#convolution-is-not-automatically-invariant">Convolution is not automatically invariant</a></li>
+<li><a href="#the-elbo-is-not-the-log-likelihood">The ELBO is not the log likelihood</a></li>
+<li><a href="#the-gan-equilibrium-is-not-a-training-guarantee">The GAN equilibrium is not a training guarantee</a></li>
+<li><a href="#lstm-does-not-eliminate-all-long-context-problems">LSTM does not eliminate all long-context problems</a></li>
+<li><a href="#attention-weights-are-not-automatically-causal-explanations">Attention weights are not automatically causal explanations</a></li>
+<li><a href="#adversarial-robustness-is-local-and-specified">Adversarial robustness is local and specified</a></li>
+</ul>
+</li>
+<li><a href="#22-open-questions">22. Open questions</a></li>
+<li><a href="#23-what-to-verify-manually">23. What to verify manually</a></li>
+<li><a href="#source-trail">Source trail</a></li>
+</ul>
+</div>
+
+      </aside>
+      <article class="prose note-prose markdown-body">
+        <blockquote>
+<p><strong>AI-assisted first draft.</strong> This note reconstructs the official 139-slide Lecture 2 deck and expands its equations into a connected study narrative. It is not a slide transcript and has not yet been manually verified or rewritten by the author. Statements tagged <code>[DIRECT]</code> follow the deck; <code>[DERIVATION]</code>, <code>[EXPLANATION]</code>, and <code>[SYNTHESIS]</code> make the reasoning explicit.</p>
+</blockquote>
+<h2 id="source-boundary">Source boundary</h2>
+<p><code>[DIRECT]</code> Official slides: <a href="https://noahgol.github.io/teaching/cs395t-f26/lecture02.pdf">https://noahgol.github.io/teaching/cs395t-f26/lecture02.pdf</a>.</p>
+<p><code>[DIRECT]</code> The deck is organized into three broad parts:</p>
+<ol>
+<li>image modeling: convolutional networks, classification, VAEs, GANs, and generative metrics;</li>
+<li>language modeling before Transformers: tokenization, RNNs, LSTMs, encoder-decoder models, and attention;</li>
+<li>adversarial examples and adversarial training.</li>
+</ol>
+<p><code>[SOURCE BOUNDARY]</code> The slide deck uses repeated build slides, so its 139 pages contain fewer than 139 distinct conceptual units. This note consolidates those builds into one derivation per idea. It does not reproduce the deck's images.</p>
+<h2 id="reading-map">Reading map</h2>
+<table>
+<thead>
+<tr>
+<th>Part</th>
+<th>Representation</th>
+<th>Training signal</th>
+<th>Central limitation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Convnets</td>
+<td>Spatial feature maps</td>
+<td>Cross-entropy</td>
+<td>Locality helps, but depth must remain trainable</td>
+</tr>
+<tr>
+<td>VAE</td>
+<td>Probabilistic latent variable</td>
+<td>ELBO</td>
+<td>Likelihood approximation can produce smooth samples</td>
+</tr>
+<tr>
+<td>GAN</td>
+<td>Implicit generator and discriminator</td>
+<td>Minimax game</td>
+<td>Training instability and mode coverage</td>
+</tr>
+<tr>
+<td>RNN/LSTM</td>
+<td>Recurrent hidden state</td>
+<td>Token cross-entropy</td>
+<td>Long-range gradients and fixed-state bottlenecks</td>
+</tr>
+<tr>
+<td>Attention</td>
+<td>Weighted access to all source states</td>
+<td>End-to-end likelihood</td>
+<td>Still sequential when coupled to an RNN</td>
+</tr>
+<tr>
+<td>Adversarial training</td>
+<td>Worst-case neighborhood</td>
+<td>Min-max loss</td>
+<td>Robustness is threat-model-specific and expensive</td>
+</tr>
+</tbody>
+</table>
+<h1 id="part-i-image-modeling">Part I — Image modeling</h1>
+<h2 id="1-why-images-need-structural-priors">1. Why images need structural priors</h2>
+<p>An image of height <span class="math-inline">\(H\)</span>, width <span class="math-inline">\(W\)</span>, and <span class="math-inline">\(C\)</span> channels can be flattened into</p>
+<div class="math-display">\[x\in\mathbb R^{HWC}.\]</div>
+<p>A dense layer with <span class="math-inline">\(m\)</span> outputs requires</p>
+<div class="math-display">\[mHWC\]</div>
+<p>weights.</p>
+<p>For a <span class="math-inline">\(224\times224\times3\)</span> image and <span class="math-inline">\(m=4096\)</span> hidden units, this is approximately</p>
+<div class="math-display">\[224\cdot224\cdot3\cdot4096
+\approx 6.17\times10^8\]</div>
+<p>weights in one layer.</p>
+<p><code>[EXPLANATION]</code> Flattening also discards the fact that nearby pixels are related and that a useful local pattern may appear anywhere in the image.</p>
+<p>Convolution builds in two priors:</p>
+<ul>
+<li><strong>locality:</strong> nearby pixels are processed together;</li>
+<li><strong>weight sharing:</strong> the same detector is applied across spatial positions.</li>
+</ul>
+<h2 id="2-convolution-and-equivariance">2. Convolution and equivariance</h2>
+<h3 id="21-single-channel-discrete-convolution">2.1 Single-channel discrete convolution</h3>
+<p>For image <span class="math-inline">\(x\in\mathbb R^{n\times n}\)</span> and kernel <span class="math-inline">\(w\in\mathbb R^{k\times k}\)</span>, a valid cross-correlation-style operation is</p>
+<div class="math-display">\[z_{i,j}
+=
+\sum_{a=0}^{k-1}
+\sum_{b=0}^{k-1}
+w_{a,b}x_{i+a,j+b}.\]</div>
+<p>Deep-learning libraries usually call this operation convolution even when the kernel is not spatially flipped.</p>
+<h3 id="22-stride-padding-and-output-size">2.2 Stride, padding, and output size</h3>
+<p>With input width <span class="math-inline">\(n\)</span>, kernel width <span class="math-inline">\(k\)</span>, padding <span class="math-inline">\(p\)</span>, and stride <span class="math-inline">\(s\)</span>, output width is</p>
+<div class="math-display">\[n_{mathrm{out}}
+=
+\left\lfloor
+\frac{n+2p-k}{s}
+\right\rfloor+1.\]</div>
+<p><code>[CHECK]</code> This shape formula should be verified for every network stage; off-by-one padding mistakes silently alter feature-map sizes.</p>
+<h3 id="23-multi-channel-convolutional-layer">2.3 Multi-channel convolutional layer</h3>
+<p>For input</p>
+<div class="math-display">\[h^{(\ell-1)}\in\mathbb R^{n\times n\times C}\]</div>
+<p>and <span class="math-inline">\(F\)</span> learned filters</p>
+<div class="math-display">\[W^{(\ell)}\in\mathbb R^{k\times k\times C\times F},\]</div>
+<p>the preactivation of output channel <span class="math-inline">\(f\)</span> is</p>
+<div class="math-display">\[z_{i,j,f}^{(\ell)}
+=
+\sum_{a,b,c}
+W_{a,b,c,f}^{(\ell)}
+h_{i+a,j+b,c}^{(\ell-1)}
++b_f^{(\ell)}.\]</div>
+<p>Then</p>
+<div class="math-display">\[h^{(\ell)}=\sigma(z^{(\ell)}).\]</div>
+<p>Parameter count is</p>
+<div class="math-display">\[k^2CF+F,\]</div>
+<p>independent of the spatial image size.</p>
+<h3 id="24-translation-equivariance">2.4 Translation equivariance</h3>
+<p>Let <span class="math-inline">\(T_\delta\)</span> translate an image and let <span class="math-inline">\(K*x\)</span> denote convolution. Ignoring boundaries,</p>
+<div class="math-display">\[K*(T_\delta x)
+=T_\delta(K*x).\]</div>
+<p><code>[EXPLANATION]</code> Moving an object moves its feature response; the same detector need not be relearned at every pixel. Equivariance is not invariance. Pooling or aggregation can make the final prediction less sensitive to position.</p>
+<h2 id="3-from-feature-maps-to-classification">3. From feature maps to classification</h2>
+<p>Let a backbone produce representation</p>
+<div class="math-display">\[h=f_\theta(x)\in\mathbb R^d.\]</div>
+<p>A linear classifier gives logits</p>
+<div class="math-display">\[z=Wh+b\in\mathbb R^K.\]</div>
+<p>Softmax probabilities are</p>
+<div class="math-display">\[p_k
+=
+\frac{e^{z_k}}
+{\sum_{j=1}^{K}e^{z_j}}.\]</div>
+<p>For label <span class="math-inline">\(y\)</span>, cross-entropy is</p>
+<div class="math-display">\[L=-\log p_y.\]</div>
+<h3 id="31-cross-entropy-gradient">3.1 Cross-entropy gradient</h3>
+<p><code>[DERIVATION]</code> Since</p>
+<div class="math-display">\[\log p_y=z_y-\log\sum_j e^{z_j},\]</div>
+<p>we have</p>
+<div class="math-display">\[\frac{\partial L}{\partial z_k}
+=p_k-\mathbf1\{k=y\}.\]</div>
+<p><code>[EXPLANATION]</code> The correct logit receives gradient <span class="math-inline">\(p_y-1\)</span>, while every incorrect logit receives <span class="math-inline">\(p_k\)</span>. Confidently wrong predictions produce large correction.</p>
+<h3 id="32-maximum-likelihood-interpretation">3.2 Maximum-likelihood interpretation</h3>
+<p>For dataset <span class="math-inline">\(\{(x_i,y_i)\}_{i=1}^{n}\)</span>,</p>
+<div class="math-display">\[\min_\theta
+-\sum_i\log p_\theta(y_i\mid x_i)\]</div>
+<p>is equivalent to maximum conditional likelihood.</p>
+<p><code>[SYNTHESIS]</code> Convolution specifies the architecture's spatial bias; cross-entropy specifies the statistical fitting objective; SGD and backpropagation perform optimization. These are separate design choices.</p>
+<h2 id="4-the-path-from-lenet-to-resnet">4. The path from LeNet to ResNet</h2>
+<h3 id="41-scaling-data-and-compute">4.1 Scaling data and compute</h3>
+<p><code>[DIRECT]</code> The slides use MNIST, CIFAR, and ImageNet to illustrate increasing resolution, dataset scale, and class complexity. LeNet established convolutional digit recognition; AlexNet demonstrated the impact of scaling convnets on ImageNet with GPUs and modern training choices.</p>
+<p><code>[SYNTHESIS]</code> Architectural progress cannot be separated cleanly from data, hardware, implementation, and optimization. Historical benchmark jumps bundle these factors together.</p>
+<h3 id="42-vgg-and-repeated-small-kernels">4.2 VGG and repeated small kernels</h3>
+<p>Two <span class="math-inline">\(3\times3\)</span> convolution layers have an effective receptive field of <span class="math-inline">\(5\times5\)</span> but introduce a nonlinearity between them. With equal channel count <span class="math-inline">\(C\)</span>, their weight count is roughly</p>
+<div class="math-display">\[2\cdot9C^2=18C^2,\]</div>
+<p>versus</p>
+<div class="math-display">\[25C^2\]</div>
+<p>for one <span class="math-inline">\(5\times5\)</span> layer.</p>
+<p><code>[EXPLANATION]</code> Repeated small kernels can be more parameter-efficient and more expressive because of the intermediate activation.</p>
+<h3 id="43-the-degradation-problem">4.3 The degradation problem</h3>
+<p><code>[DIRECT]</code> Very deep plain networks can have higher <em>training</em> error than shallower ones. This is not ordinary overfitting because optimization itself becomes worse.</p>
+<h3 id="44-residual-learning">4.4 Residual learning</h3>
+<p>A residual block computes</p>
+<div class="math-display">\[y=x+F(x;\theta).\]</div>
+<p>Instead of directly learning desired map <span class="math-inline">\(H(x)\)</span>, the branch learns</p>
+<div class="math-display">\[F(x)=H(x)-x.\]</div>
+<p>If the identity is appropriate, setting <span class="math-inline">\(F\approx0\)</span> is easy in principle.</p>
+<h3 id="45-gradient-path-through-a-residual-block">4.5 Gradient path through a residual block</h3>
+<p>For loss <span class="math-inline">\(L(y)\)</span>,</p>
+<div class="math-display">\[\frac{\partial L}{\partial x}
+=
+\frac{\partial L}{\partial y}
+\left(I+J_F(x)\right),\]</div>
+<p>where <span class="math-inline">\(J_F\)</span> is the Jacobian of the residual branch.</p>
+<p><code>[EXPLANATION]</code> The identity term supplies a direct gradient path even when <span class="math-inline">\(J_F\)</span> is small. Residual connections do not eliminate every optimization problem, but they change both representation and gradient flow.</p>
+<h2 id="5-from-classification-to-generation">5. From classification to generation</h2>
+<p>Classification models</p>
+<div class="math-display">\[p(y\mid x),\]</div>
+<p>while unconditional generation models a high-dimensional distribution</p>
+<div class="math-display">\[p(x).\]</div>
+<p><code>[EXPLANATION]</code> A classifier only needs to separate a finite set of labels. A generator must assign coherent probability across the space of possible images and provide a procedure for sampling new ones.</p>
+<h2 id="6-variational-autoencoders">6. Variational autoencoders</h2>
+<h3 id="61-latent-variable-model">6.1 Latent-variable model</h3>
+<p>Let</p>
+<div class="math-display">\[z\sim p(z),
+\qquad
+x\sim p_\theta(x\mid z).\]</div>
+<p>The marginal likelihood is</p>
+<div class="math-display">\[p_\theta(x)
+=\int p(z)p_\theta(x\mid z)\,dz,\]</div>
+<p>which can be difficult to evaluate and differentiate exactly.</p>
+<p>Introduce an encoder</p>
+<div class="math-display">\[q_\phi(z\mid x)\]</div>
+<p>to approximate the posterior.</p>
+<h3 id="62-deriving-the-elbo">6.2 Deriving the ELBO</h3>
+<p><code>[DERIVATION · Step 1]</code> Multiply and divide inside the integral:</p>
+<div class="math-display">\[\begin{aligned}
+\log p_\theta(x)
+&amp;=\log
+\int q_\phi(z\mid x)
+\frac{p(z)p_\theta(x\mid z)}{q_\phi(z\mid x)}\,dz.
+\end{aligned}\]</div>
+<p><code>[DERIVATION · Step 2]</code> Jensen's inequality gives</p>
+<div class="math-display">\[\log p_\theta(x)
+\ge
+\mathbb E_{q_\phi(z\mid x)}
+\left[
+\log\frac{p(z)p_\theta(x\mid z)}{q_\phi(z\mid x)}
+\right].\]</div>
+<p>Therefore the evidence lower bound is</p>
+<div class="math-display">\[\boxed{
+\mathcal L_{\mathrm{ELBO}}
+=
+\mathbb E_{q_\phi(z\mid x)}
+[\log p_\theta(x\mid z)]
+-
+D_{\mathrm{KL}}
+(q_\phi(z\mid x)\|p(z)).
+}\]</div>
+<p>The first term rewards reconstruction. The second regularizes the approximate posterior toward the prior.</p>
+<h3 id="63-exact-gap-to-log-likelihood">6.3 Exact gap to log likelihood</h3>
+<p>Another identity is</p>
+<div class="math-display">\[\log p_\theta(x)
+=mathcal L_{\mathrm{ELBO}}
++D_{\mathrm{KL}}
+\left(
+q_\phi(z\mid x)
+\|p_\theta(z\mid x)
+\right).\]</div>
+<p>Because KL is nonnegative, the ELBO is indeed a lower bound. It is tight exactly when the approximate posterior equals the true posterior almost everywhere.</p>
+<h3 id="64-reparameterization-trick">6.4 Reparameterization trick</h3>
+<p>For a diagonal Gaussian encoder,</p>
+<div class="math-display">\[q_\phi(z\mid x)
+=\mathcal N
+(\mu_\phi(x),\operatorname{diag}(\sigma_\phi^2(x))).\]</div>
+<p>Sample</p>
+<div class="math-display">\[\varepsilon\sim\mathcal N(0,I),\]</div>
+<p>and set</p>
+<div class="math-display">\[z=\mu_\phi(x)+\sigma_\phi(x)\odot\varepsilon.\]</div>
+<p><code>[EXPLANATION]</code> Randomness is moved into <span class="math-inline">\(\varepsilon\)</span>, whose distribution is independent of <span class="math-inline">\(\phi\)</span>. The sampled <span class="math-inline">\(z\)</span> becomes a differentiable function of encoder outputs.</p>
+<p>For standard normal prior, the KL has closed form</p>
+<div class="math-display">\[D_{\mathrm{KL}}(q_\phi\|p)
+=\frac12\sum_j
+\left(
+\mu_j^2+\sigma_j^2-\log\sigma_j^2-1
+\right).\]</div>
+<h2 id="7-generative-adversarial-networks">7. Generative adversarial networks</h2>
+<h3 id="71-two-player-objective">7.1 Two-player objective</h3>
+<p>Let generator <span class="math-inline">\(G\)</span> transform noise <span class="math-inline">\(z\sim p_z\)</span> into samples, and discriminator <span class="math-inline">\(D(x)\in(0,1)\)</span> estimate whether <span class="math-inline">\(x\)</span> came from the data.</p>
+<p>The original minimax objective is</p>
+<div class="math-display">\[\min_G\max_D
+V(D,G)
+=
+\mathbb E_{x\sim p_{\mathrm{data}}}[\log D(x)]
++
+\mathbb E_{z\sim p_z}
+[\log(1-D(G(z)))].\]</div>
+<h3 id="72-optimal-discriminator-for-a-fixed-generator">7.2 Optimal discriminator for a fixed generator</h3>
+<p>Let <span class="math-inline">\(p_g\)</span> be the generator distribution. For each <span class="math-inline">\(x\)</span>, maximize</p>
+<div class="math-display">\[p_{\mathrm{data}}(x)\log D(x)
++p_g(x)\log(1-D(x)).\]</div>
+<p>Differentiate with respect to <span class="math-inline">\(D(x)\)</span>:</p>
+<div class="math-display">\[\frac{p_{\mathrm{data}}(x)}{D(x)}
+-
+\frac{p_g(x)}{1-D(x)}=0.\]</div>
+<p>Solving gives</p>
+<div class="math-display">\[\boxed{
+D^*(x)
+=
+\frac{p_{\mathrm{data}}(x)}
+{p_{\mathrm{data}}(x)+p_g(x)}.
+}\]</div>
+<h3 id="73-why-the-ideal-game-matches-distributions">7.3 Why the ideal game matches distributions</h3>
+<p>Substituting <span class="math-inline">\(D^*\)</span> into the value function yields</p>
+<div class="math-display">\[V(D^*,G)
+=-log4
++2\,D_{\mathrm{JS}}
+(p_{\mathrm{data}}\|p_g).\]</div>
+<p>Jensen-Shannon divergence is nonnegative and zero exactly when the distributions match, so the idealized global optimum satisfies</p>
+<div class="math-display">\[p_g=p_{\mathrm{data}}.\]</div>
+<p><code>[LIMIT]</code> This equilibrium argument assumes an optimal discriminator and distribution-level optimization. Finite networks and alternating stochastic updates need not behave like the ideal game.</p>
+<h3 id="74-saturation-and-non-saturating-generator-loss">7.4 Saturation and non-saturating generator loss</h3>
+<p>Early in training, <span class="math-inline">\(D(G(z))\)</span> may be near zero. Minimizing</p>
+<div class="math-display">\[\log(1-D(G(z)))\]</div>
+<p>can yield weak gradients. A common alternative maximizes</p>
+<div class="math-display">\[\log D(G(z)),\]</div>
+<p>which has the same desired fixed point but stronger early gradients.</p>
+<h3 id="75-mode-collapse">7.5 Mode collapse</h3>
+<p><code>[EXPLANATION]</code> The generator may map many noise values to a small collection of plausible outputs. Sample fidelity can look high while diversity is poor.</p>
+<p><code>[SYNTHESIS]</code> A generative metric must measure both fidelity and coverage; either one alone can be gamed.</p>
+<h2 id="8-evaluating-generated-images">8. Evaluating generated images</h2>
+<h3 id="81-inception-score">8.1 Inception Score</h3>
+<p>Inception Score uses a pretrained classifier:</p>
+<div class="math-display">\[\operatorname{IS}
+=exp
+\left(
+\mathbb E_x
+D_{\mathrm{KL}}(p(y\mid x)\|p(y))
+\right).\]</div>
+<p>Low entropy <span class="math-inline">\(p(y\mid x)\)</span> rewards individually recognizable images; high entropy marginal <span class="math-inline">\(p(y)\)</span> rewards class diversity.</p>
+<p><code>[LIMIT]</code> IS does not compare directly with real data and inherits the classifier's biases.</p>
+<h3 id="82-frechet-inception-distance">8.2 Fréchet Inception Distance</h3>
+<p>Embed real and generated images into feature vectors. Approximate each feature distribution as Gaussian:</p>
+<div class="math-display">\[\mathcal N(\mu_r,\Sigma_r),
+\qquad
+\mathcal N(\mu_g,\Sigma_g).\]</div>
+<p>FID is</p>
+<div class="math-display">\[\operatorname{FID}
+=
+\|\mu_r-\mu_g\|_2^2
++
+\operatorname{Tr}
+\left(
+\Sigma_r+\Sigma_g
+-2(\Sigma_r\Sigma_g)^{1/2}
+\right).\]</div>
+<p>Lower is better.</p>
+<p><code>[LIMIT]</code> Finite-sample estimation is biased; scores depend on the feature extractor and preprocessing; matching two moments does not imply matching full distributions.</p>
+<h1 id="part-ii-language-modeling-before-transformers">Part II — Language modeling before Transformers</h1>
+<h2 id="9-tokens-and-embeddings">9. Tokens and embeddings</h2>
+<p>A tokenizer maps text to symbols</p>
+<div class="math-display">\[w_1,\ldots,w_T,
+\qquad
+w_t\in\{1,\ldots,|\mathcal V|\}.\]</div>
+<p>An embedding matrix</p>
+<div class="math-display">\[E\in\mathbb R^{|\mathcal V|\times d}\]</div>
+<p>maps a token ID to</p>
+<div class="math-display">\[x_t=E_{w_t,:}.\]</div>
+<p><code>[SYNTHESIS]</code> Tokenization defines the atomic prediction problem. It changes sequence length, vocabulary size, softmax cost, and which strings share statistical strength.</p>
+<h3 id="91-word-character-and-subword-units">9.1 Word, character, and subword units</h3>
+<ul>
+<li>Word tokenization produces shorter sequences but suffers from unknown words and a large vocabulary.</li>
+<li>Character tokenization avoids unknown words but produces much longer sequences.</li>
+<li>Subword tokenization interpolates between them.</li>
+</ul>
+<h3 id="92-byte-pair-encoding">9.2 Byte-pair encoding</h3>
+<p>A basic BPE training procedure is:</p>
+<ol>
+<li>begin with characters or bytes as symbols;</li>
+<li>count adjacent symbol pairs in a corpus;</li>
+<li>merge the most frequent pair;</li>
+<li>replace its occurrences;</li>
+<li>repeat for a fixed number of merges.</li>
+</ol>
+<p><code>[EXPLANATION]</code> Frequent strings become single tokens while rare words remain decomposable. The learned vocabulary is a compression code shaped by the training corpus.</p>
+<h2 id="10-recurrent-neural-networks">10. Recurrent neural networks</h2>
+<p>A simple RNN updates</p>
+<div class="math-display">\[h_t
+=\sigma(W_{hh}h_{t-1}+W_{xh}x_t+b_h),\]</div>
+<p>and predicts</p>
+<div class="math-display">\[\hat y_t
+=\operatorname{softmax}(W_{hy}h_t+b_y).\]</div>
+<p>The same matrices are reused for every time step.</p>
+<p><code>[EXPLANATION]</code> Parameter sharing allows variable sequence length and expresses a time-homogeneous transition rule. The hidden state is a fixed-size summary of the prefix.</p>
+<h2 id="11-backpropagation-through-time">11. Backpropagation through time</h2>
+<p>Unrolling the recurrence produces a depth-<span class="math-inline">\(T\)</span> computational graph with tied parameters.</p>
+<p>For a final-time loss <span class="math-inline">\(L_T\)</span>, the sensitivity to an earlier state is</p>
+<div class="math-display">\[\frac{\partial L_T}{\partial h_t}
+=
+\frac{\partial L_T}{\partial h_T}
+\prod_{k=t+1}^{T}
+\frac{\partial h_k}{\partial h_{k-1}}.\]</div>
+<p>For the simple RNN,</p>
+<div class="math-display">\[\frac{\partial h_k}{\partial h_{k-1}}
+=
+\operatorname{diag}(\sigma&#x27;(a_k))W_{hh}.\]</div>
+<h3 id="111-vanishing-and-exploding-gradients">11.1 Vanishing and exploding gradients</h3>
+<p>If relevant Jacobian singular values behave roughly like <span class="math-inline">\(\lambda\)</span>, then</p>
+<div class="math-display">\[\left\|
+\prod_{k=t+1}^{T}
+\frac{\partial h_k}{\partial h_{k-1}}
+\right\|
+\approx
+\lambda^{T-t}.\]</div>
+<ul>
+<li><span class="math-inline">\(\lambda&lt;1\)</span>: gradients vanish exponentially;</li>
+<li><span class="math-inline">\(\lambda&gt;1\)</span>: gradients explode exponentially.</li>
+</ul>
+<p>Gradient clipping controls explosion:</p>
+<div class="math-display">\[g\leftarrow
+g\cdot
+\min\left(1,\frac{c}{\|g\|}
+\right).\]</div>
+<p><code>[LIMIT]</code> Clipping does not fix vanishing gradients. Truncated BPTT reduces cost but prevents gradients from crossing the truncation boundary.</p>
+<h2 id="12-lstm-memory-path">12. LSTM memory path</h2>
+<p>An LSTM computes gates</p>
+<div class="math-display">\[i_t=\sigma(W_i[h_{t-1},x_t]+b_i),\]</div>
+<div class="math-display">\[f_t=\sigma(W_f[h_{t-1},x_t]+b_f),\]</div>
+<div class="math-display">\[o_t=\sigma(W_o[h_{t-1},x_t]+b_o),\]</div>
+<p>and candidate</p>
+<div class="math-display">\[g_t=\tanh(W_g[h_{t-1},x_t]+b_g).\]</div>
+<p>The cell and hidden state update as</p>
+<div class="math-display">\[c_t=f_t\odot c_{t-1}+i_t\odot g_t,\]</div>
+<div class="math-display">\[h_t=o_t\odot\tanh(c_t).\]</div>
+<h3 id="121-gradient-through-the-cell">12.1 Gradient through the cell</h3>
+<p>Holding gate values fixed for the local derivative,</p>
+<div class="math-display">\[\frac{\partial c_t}{\partial c_{t-1}}
+=\operatorname{diag}(f_t).\]</div>
+<p>Across many steps,</p>
+<div class="math-display">\[\frac{\partial c_T}{\partial c_t}
+\approx
+\prod_{k=t+1}^{T}
+\operatorname{diag}(f_k).\]</div>
+<p><code>[EXPLANATION]</code> When forget gates stay near one, the cell provides an approximately additive path along which information and gradients can persist. The network learns when to remember, overwrite, or expose memory.</p>
+<h2 id="13-autoregressive-language-modeling">13. Autoregressive language modeling</h2>
+<p>By the chain rule,</p>
+<div class="math-display">\[p_\theta(w_{1:T})
+=\prod_{t=1}^{T}
+p_\theta(w_t\mid w_{&lt;t}).\]</div>
+<p>Training minimizes token negative log likelihood:</p>
+<div class="math-display">\[L(\theta)
+=-
+\sum_{t=1}^{T}
+\log p_\theta(w_t\mid w_{&lt;t}).\]</div>
+<p>Average per-token NLL is</p>
+<div class="math-display">\[\overline L
+=-rac1T\sum_t
+\log p_\theta(w_t\mid w_{&lt;t}).\]</div>
+<p>Perplexity is</p>
+<div class="math-display">\[\boxed{
+\operatorname{PPL}=\exp(\overline L).
+}\]</div>
+<p><code>[EXPLANATION]</code> If the model assigned equal probability to <span class="math-inline">\(m\)</span> choices at every position, perplexity would be <span class="math-inline">\(m\)</span>. This interpretation is only approximate for nonuniform distributions.</p>
+<p><code>[CHECK]</code> Perplexities are comparable only under the same tokenization and evaluation protocol.</p>
+<h2 id="14-encoder-decoder-sequence-models">14. Encoder-decoder sequence models</h2>
+<p>For source sequence <span class="math-inline">\(x_{1:T}\)</span>, an encoder produces a fixed vector</p>
+<div class="math-display">\[c=h_T.\]</div>
+<p>A decoder defines</p>
+<div class="math-display">\[p(y_{1:T&#x27;}\mid x_{1:T})
+=
+\prod_{t=1}^{T&#x27;}
+p(y_t\mid c,y_{&lt;t}).\]</div>
+<p><code>[DIRECT]</code> Early sequence-to-sequence systems showed that recurrent encoder-decoder models could learn translation end to end.</p>
+<h3 id="141-fixed-vector-bottleneck">14.1 Fixed-vector bottleneck</h3>
+<p>Every source detail must pass through one vector <span class="math-inline">\(c\)</span>. As source length grows, the encoder must compress more information into the same dimensionality, and the decoder cannot directly revisit individual source positions.</p>
+<p><code>[SYNTHESIS]</code> Attention solves an information-access problem: instead of requiring one vector to contain every detail equally, let the decoder retrieve different source states at different output steps.</p>
+<h2 id="15-additive-attention">15. Additive attention</h2>
+<p>Let bidirectional encoder annotations be</p>
+<div class="math-display">\[h_j=[\overrightarrow h_j;\overleftarrow h_j].\]</div>
+<p>At decoder step <span class="math-inline">\(i\)</span>, compute scores</p>
+<div class="math-display">\[e_{ij}
+=v^\top
+\tanh(Ws_{i-1}+Uh_j).\]</div>
+<p>Normalize across source positions:</p>
+<div class="math-display">\[\alpha_{ij}
+=
+\frac{\exp(e_{ij})}
+{\sum_{k=1}^{T}\exp(e_{ik})}.\]</div>
+<p>The context is</p>
+<div class="math-display">\[c_i
+=\sum_{j=1}^{T}
+\alpha_{ij}h_j.\]</div>
+<h3 id="151-interpretation">15.1 Interpretation</h3>
+<ul>
+<li><span class="math-inline">\(e_{ij}\)</span> measures compatibility between decoder state and source position.</li>
+<li><span class="math-inline">\(\alpha_{ij}\)</span> is a probability distribution over source positions.</li>
+<li><span class="math-inline">\(c_i\)</span> is a differentiable weighted retrieval from encoder memory.</li>
+</ul>
+<p><code>[EXPLANATION]</code> The same mechanism can attend over spatial CNN locations for image captioning. “Position” need not mean a word; it can mean any indexed collection of feature vectors.</p>
+<h3 id="152-dot-product-and-general-scoring">15.2 Dot-product and general scoring</h3>
+<p>Other scores include</p>
+<div class="math-display">\[\operatorname{score}(s,h)=s^\top h,\]</div>
+<p>or</p>
+<div class="math-display">\[\operatorname{score}(s,h)=s^\top Wh.\]</div>
+<p><code>[CONNECTION TO LECTURE 3]</code> Transformer attention removes recurrence from the main sequence-mixing operation and computes many query-key interactions in parallel, but the normalize-and-weight pattern is already visible here.</p>
+<h2 id="16-dataset-scale-shapes-architecture-conclusions">16. Dataset scale shapes architecture conclusions</h2>
+<p><code>[DIRECT]</code> The slides review early language-modeling, translation, and vision-language datasets, ranging from small Penn Treebank-scale corpora to the One Billion Word Benchmark, WMT translation pairs, and MSCOCO captions.</p>
+<p><code>[SYNTHESIS]</code> A model result is conditional on dataset scale and preprocessing. Word-level unknown tokens, sentence-length distributions, and benchmark reuse can dominate apparent architectural differences.</p>
+<h1 id="part-iii-adversarial-examples">Part III — Adversarial examples</h1>
+<h2 id="17-threat-model">17. Threat model</h2>
+<p>Given correctly classified <span class="math-inline">\((x,y)\)</span> and classifier logits <span class="math-inline">\(f_\theta(x)\)</span>, find perturbation <span class="math-inline">\(\delta\)</span> such that</p>
+<div class="math-display">\[\|\delta\|_\infty\le\varepsilon\]</div>
+<p>but</p>
+<div class="math-display">\[\arg\max_k f_\theta(x+\delta)_k\ne y.\]</div>
+<p><code>[EXPLANATION]</code> Robustness is defined relative to a norm, radius, attack knowledge, and allowed computation. “Adversarially robust” without a threat model is incomplete.</p>
+<h2 id="18-fast-gradient-sign-method">18. Fast Gradient Sign Method</h2>
+<p>Linearize the loss around <span class="math-inline">\(x\)</span>:</p>
+<div class="math-display">\[L(\theta,x+\delta,y)
+\approx
+L(\theta,x,y)
++\nabla_xL(\theta,x,y)^\top\delta.\]</div>
+<p>To maximize this linear term under <span class="math-inline">\(\|\delta\|_\infty\le\varepsilon\)</span>, choose each coordinate at its bound with matching sign:</p>
+<div class="math-display">\[\boxed{
+\delta_{\mathrm{FGSM}}
+=\varepsilon\operatorname{sign}
+(\nabla_xL(\theta,x,y)).
+}\]</div>
+<p>Thus</p>
+<div class="math-display">\[x&#x27;=x+delta_{\mathrm{FGSM}}.\]</div>
+<p><code>[DERIVATION]</code> Hölder's inequality gives</p>
+<div class="math-display">\[g^\top\delta
+\le\|g\|_1\|\delta\|_\infty
+\le\varepsilon\|g\|_1,\]</div>
+<p>and the sign choice achieves equality.</p>
+<h2 id="19-adversarial-training">19. Adversarial training</h2>
+<p>Replace ordinary empirical risk with the robust objective</p>
+<div class="math-display">\[\boxed{
+\min_\theta
+\mathbb E_{(x,y)\sim\mathcal D}
+\left[
+\max_{\delta\in\mathcal S}
+L(\theta,x+\delta,y)
+\right].
+}\]</div>
+<ul>
+<li>The inner problem searches for a damaging allowed perturbation.</li>
+<li>The outer problem updates parameters to reduce loss on those perturbations.</li>
+</ul>
+<h3 id="191-projected-gradient-descent-attack">19.1 Projected gradient descent attack</h3>
+<p>Initialize within the threat set and iterate</p>
+<div class="math-display">\[\delta^{k+1}
+=
+\Pi_{\mathcal S}
+\left(
+\delta^k
++\alpha
+\operatorname{sign}
+(\nabla_\delta L(\theta,x+\delta^k,y))
+\right).\]</div>
+<p>For an <span class="math-inline">\(\ell_\infty\)</span> ball, projection clips each coordinate to <span class="math-inline">\([-\varepsilon,\varepsilon]\)</span> and usually also clips <span class="math-inline">\(x+\delta\)</span> to the valid input range.</p>
+<h3 id="192-training-loop">19.2 Training loop</h3>
+<pre><code class="language-python">for x, y in loader:
+    delta = uniform(-epsilon, epsilon, shape=x.shape)
+
+    for _ in range(attack_steps):
+        delta.requires_grad_(True)
+        attack_loss = cross_entropy(model(x + delta), y)
+        grad = gradient(attack_loss, delta)
+        delta = clip(delta + step_size * sign(grad), -epsilon, epsilon)
+        delta = clip(x + delta, 0, 1) - x
+
+    robust_loss = cross_entropy(model(x + stop_gradient(delta)), y)
+    optimizer.zero_grad()
+    robust_loss.backward()
+    optimizer.step()
+</code></pre>
+<p><code>[LIMIT]</code> PGD is an approximate inner maximizer. Robustness to one attack is not proof of robustness to every attack, norm, or larger radius.</p>
+<h2 id="20-unifying-lessons-from-the-pre-transformer-era">20. Unifying lessons from the pre-Transformer era</h2>
+<h3 id="201-inductive-bias-controls-efficiency">20.1 Inductive bias controls efficiency</h3>
+<p>Convolution shares spatial detectors; recurrence shares a transition across time; attention provides content-dependent access. Each architecture makes some functions easier to represent than a generic dense network.</p>
+<h3 id="202-gradient-paths-control-trainability">20.2 Gradient paths control trainability</h3>
+<p>Residual identities, LSTM cells, and attention shortcuts all create alternative information and gradient routes. Expressivity alone does not explain optimization.</p>
+<h3 id="203-objectives-define-what-good-means">20.3 Objectives define what “good” means</h3>
+<ul>
+<li>Cross-entropy rewards conditional likelihood.</li>
+<li>ELBO trades reconstruction against latent regularization.</li>
+<li>GAN training seeks an adversarial equilibrium.</li>
+<li>Adversarial training optimizes worst-case neighborhood loss.</li>
+</ul>
+<h3 id="204-evaluation-metrics-are-partial-views">20.4 Evaluation metrics are partial views</h3>
+<p>Accuracy, perplexity, IS, FID, and robust accuracy measure different projections of model behavior. No one scalar captures fidelity, diversity, calibration, efficiency, and robustness simultaneously.</p>
+<h2 id="21-common-confusions">21. Common confusions</h2>
+<h3 id="convolution-is-not-automatically-invariant">Convolution is not automatically invariant</h3>
+<p>It is equivariant before pooling or aggregation.</p>
+<h3 id="the-elbo-is-not-the-log-likelihood">The ELBO is not the log likelihood</h3>
+<p>Its gap is the posterior KL. A flexible decoder can also ignore the latent variable.</p>
+<h3 id="the-gan-equilibrium-is-not-a-training-guarantee">The GAN equilibrium is not a training guarantee</h3>
+<p>The divergence result assumes an optimal discriminator for each generator.</p>
+<h3 id="lstm-does-not-eliminate-all-long-context-problems">LSTM does not eliminate all long-context problems</h3>
+<p>It creates a controllable memory path, but gates can still forget and the state has fixed size.</p>
+<h3 id="attention-weights-are-not-automatically-causal-explanations">Attention weights are not automatically causal explanations</h3>
+<p>They are learned mixture weights in the computation. Their interpretability depends on the question and model.</p>
+<h3 id="adversarial-robustness-is-local-and-specified">Adversarial robustness is local and specified</h3>
+<p>Robustness inside one norm ball does not imply robustness to other perturbations or natural distribution shifts.</p>
+<h2 id="22-open-questions">22. Open questions</h2>
+<ol>
+<li>Which image symmetries should be built in, and which should be learned from augmentation?</li>
+<li>When do likelihood-based and perceptual-quality objectives disagree most strongly?</li>
+<li>How should diversity be measured without relying on a fixed pretrained classifier?</li>
+<li>Which properties of residual networks made scaling depth practical beyond simple gradient flow?</li>
+<li>What information is systematically lost in a fixed-dimensional recurrent state?</li>
+<li>When do attention weights correspond to stable alignments rather than brittle correlations?</li>
+<li>Can one threat model predict robustness under another?</li>
+<li>Which historical limitations were architectural and which were consequences of data or hardware?</li>
+</ol>
+<h2 id="23-what-to-verify-manually">23. What to verify manually</h2>
+<ul>
+<li>Compute convolution output shapes for several stride and padding choices.</li>
+<li>Re-derive the softmax-cross-entropy gradient.</li>
+<li>Derive the ELBO both with Jensen's inequality and with the posterior-KL identity.</li>
+<li>Re-derive the optimal GAN discriminator and the Jensen-Shannon objective.</li>
+<li>Trace one RNN gradient through three time steps and inspect the Jacobian product.</li>
+<li>Explain how the LSTM forget gate changes the cell-state derivative.</li>
+<li>Derive FGSM from the duality between <span class="math-inline">\(\ell_\infty\)</span> and <span class="math-inline">\(\ell_1\)</span> norms.</li>
+<li>Replace the synthesis sections with your own connections after reviewing the official slides.</li>
+</ul>
+<h2 id="source-trail">Source trail</h2>
+<ul>
+<li>Official Lecture 2 slides: <a href="https://noahgol.github.io/teaching/cs395t-f26/lecture02.pdf">https://noahgol.github.io/teaching/cs395t-f26/lecture02.pdf</a></li>
+<li>Course schedule and suggested readings: <a href="https://noahgol.github.io/teaching/cs395t-f26/">https://noahgol.github.io/teaching/cs395t-f26/</a></li>
+</ul>
+      </article>
+    </div>
+  </main>
+
+  <footer class="site-footer section-shell">
+    <div><strong>CS 395T</strong><span>Learning note</span></div>
+    <p>Markdown source · draft</p>
+    <a href="../index.html#notes">Return to index ←</a>
+  </footer>
+</body>
+</html>

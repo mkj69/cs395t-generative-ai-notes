@@ -2,7 +2,7 @@
   title: "Lecture 03 — Transformer Architecture"
   slug: "lecture-03"
   date: "2026-09-25"
-  updated: "2026-09-25"
+  updated: "2026-10-12"
   status: "draft"
   type: "learning-note"
   course: "CS 395T"
@@ -39,6 +39,11 @@
   | MLP | one vector per position | features are transformed locally | updated vectors |
   | Unembedding | final contextual vector | vector becomes vocabulary logits | $z\in\mathbb{R}^{N_V}$ |
   | Softmax | logits | scores become probabilities | $p(\cdot\mid v_{\le t})$ |
+- ## Interactive Transformer visual lab
+- `[SYNTHESIS]` The two animations below use a deliberately tiny decoder-only model. The first traces one token through the complete residual stream; the second exposes every step of scaled dot-product attention. The numerical vectors are pedagogical toy values, not activations from a trained language model.
+
+<!-- component:transformer-visual-lab -->
+
 - ## Learning goals
 - After working through the note manually, I should be able to:
 - [ ] explain why BPE keeps open-vocabulary coverage without using a word-sized vocabulary;

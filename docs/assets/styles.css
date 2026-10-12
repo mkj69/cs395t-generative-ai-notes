@@ -369,7 +369,8 @@ button, input, select { font: inherit; }
 .markdown-body pre code { padding: 0; background: transparent; }
 .markdown-body mjx-container[jax="SVG"][display="true"] { overflow-x: auto; overflow-y: hidden; margin: 1.5rem 0 !important; padding: 0.4rem 0; }
 .markdown-body mjx-container[jax="SVG"][display="true"] > svg { min-width: max-content; }
-.markdown-body table { width: 100%; margin: 2rem 0; border-collapse: collapse; font-size: 0.9rem; }
+.markdown-body a { overflow-wrap: anywhere; }
+.markdown-body table { display: block; width: 100%; max-width: 100%; overflow-x: auto; margin: 2rem 0; border-collapse: collapse; font-size: 0.9rem; }
 .markdown-body th,
 .markdown-body td { border-bottom: 1px solid var(--line); padding: 0.75rem; text-align: left; vertical-align: top; }
 .markdown-body img { max-width: 100%; height: auto; }
@@ -429,9 +430,12 @@ button, input, select { font: inherit; }
   .note-controls { grid-template-columns: 1fr 1fr; }
   .note-count { grid-column: 1 / -1; text-align: left; }
   .article-layout,
-  .note-layout { grid-template-columns: 1fr; gap: 3rem; }
+  .note-layout { grid-template-columns: minmax(0, 1fr); gap: 3rem; }
   .article-aside,
   .note-toc { position: static; }
+  .article-aside,
+  .note-toc,
+  .markdown-body { min-width: 0; }
   .site-footer { grid-template-columns: 1fr 1fr; }
   .site-footer p { display: none; }
   .unit-flow { grid-template-columns: repeat(5, minmax(125px, 1fr)); overflow-x: auto; padding-bottom: 1rem; }

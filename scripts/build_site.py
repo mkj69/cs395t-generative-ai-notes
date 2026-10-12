@@ -19,6 +19,7 @@ DOCS = ROOT / "docs"
 INDEX_PATH = DOCS / "data" / "notes.json"
 PUBLIC_TYPES = {"learning-note", "research-note"}
 RLVR_LAB_MARKER = "<!-- component:rlvr-algorithm-lab -->"
+TRANSFORMER_LAB_MARKER = "<!-- component:transformer-visual-lab -->"
 
 
 def normalize_logseq_body(body: str) -> str:
@@ -147,14 +148,23 @@ def restore_math(rendered_html: str, tokens: list[tuple[str, str, str]]) -> str:
     return restored
 
 
-def inject_interactive_components(rendered_html: str) -> tuple[str, bool]:
+def inject_interactive_components(rendered_html: str) -> tuple[str, set[str]]:
     """Replace opt-in component markers after Markdown rendering."""
-    if RLVR_LAB_MARKER not in rendered_html:
-        return rendered_html, False
+    components: set[str] = set()
 
-    component_path = ROOT / "site-components" / "rlvr-algorithm-lab.html"
-    component_html = component_path.read_text(encoding="utf-8")
-    return rendered_html.replace(RLVR_LAB_MARKER, component_html), True
+    if RLVR_LAB_MARKER in rendered_html:
+        component_path = ROOT / "site-components" / "rlvr-algorithm-lab.html"
+        component_html = component_path.read_text(encoding="utf-8")
+        rendered_html = rendered_html.replace(RLVR_LAB_MARKER, component_html)
+        components.add("rlvr")
+
+    if TRANSFORMER_LAB_MARKER in rendered_html:
+        component_path = ROOT / "site-components" / "transformer-visual-lab.html"
+        component_html = component_path.read_text(encoding="utf-8")
+        rendered_html = rendered_html.replace(TRANSFORMER_LAB_MARKER, component_html)
+        components.add("transformer")
+
+    return rendered_html, components
 
 
 def discover_notes() -> list[tuple[Path, dict[str, Any], str]]:
@@ -211,19 +221,23 @@ def render_note(path: Path, metadata: dict[str, Any], body: str) -> dict[str, An
     md = make_markdown()
     protected_body, math_tokens = protect_math(body)
     article_html = restore_math(md.convert(protected_body), math_tokens)
-    article_html, has_rlvr_lab = inject_interactive_components(article_html)
+    article_html, components = inject_interactive_components(article_html)
     toc_html = md.toc
     tags_html = "".join(f"<li>{plain(tag)}</li>" for tag in tags)
     component_style = (
         '\n  <link rel="stylesheet" href="../assets/rlvr-lab.css">'
-        if has_rlvr_lab
+        if "rlvr" in components
         else ""
     )
+    if "transformer" in components:
+        component_style += '\n  <link rel="stylesheet" href="../assets/transformer-lab.css">'
     component_script = (
         '  <script src="../assets/rlvr-lab.js" defer></script>\n'
-        if has_rlvr_lab
+        if "rlvr" in components
         else ""
     )
+    if "transformer" in components:
+        component_script += '  <script src="../assets/transformer-lab.js" defer></script>\n'
     page = f"""<!doctype html>
 <html lang="en">
 <head>

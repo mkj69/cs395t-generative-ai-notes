@@ -1,0 +1,1090 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A detailed AI-assisted reconstruction of finite-horizon policy gradients, REINFORCE, the performance-difference lemma, trust-region guarantees, TRPO, PPO clipping, value learning, entropy regularization, and GAE.">
+  <title>Lecture 11 — Policy Gradients, TRPO, and PPO — CS 395T</title>
+  <link rel="stylesheet" href="../assets/styles.css">
+  <script>
+    window.MathJax = {
+      tex: {
+        processEscapes: true
+      },
+      svg: { fontCache: 'global' }
+    };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js" defer></script>
+  <script src="../assets/app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header">
+    <a class="wordmark" href="../index.html"><span>CS 395T</span><small>Learning &amp; research notebook</small></a>
+    <button class="menu-button" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button>
+    <nav id="site-nav" class="site-nav" aria-label="Primary navigation">
+      <a href="../structure.html">Structure</a>
+      <a href="../index.html#notes">Index</a>
+      <a href="../method.html">Writing guide</a>
+      <a href="../index.html#about">About</a>
+    </nav>
+  </header>
+
+  <main id="main" class="note-shell">
+    <header class="note-hero">
+      <div class="template-banner learning-banner">
+        <strong>LEARNING NOTE · DRAFT</strong>
+        <span>Work in progress</span>
+      </div>
+      <p class="eyebrow">30 SEP 2026 · DRAFT</p>
+      <h1>Lecture 11 — Policy Gradients, TRPO, and PPO</h1>
+      <p class="note-abstract">A detailed AI-assisted reconstruction of finite-horizon policy gradients, REINFORCE, the performance-difference lemma, trust-region guarantees, TRPO, PPO clipping, value learning, entropy regularization, and GAE.</p>
+      <ul class="tag-list" aria-label="Topics"><li>reinforcement learning</li><li>policy gradients</li><li>REINFORCE</li><li>performance difference lemma</li><li>TRPO</li><li>PPO</li><li>GAE</li><li>RLHF</li></ul>
+    </header>
+
+    <div class="note-layout">
+      <aside class="note-toc" aria-label="On this page">
+        <p class="aside-label">ON THIS PAGE</p>
+        <div class="toc">
+<ul>
+<li><a href="#lecture-context">Lecture context</a></li>
+<li><a href="#reading-map">Reading map</a></li>
+<li><a href="#1-finite-horizon-markov-decision-processes">1. Finite-horizon Markov decision processes</a><ul>
+<li><a href="#11-objects-in-the-model">1.1 Objects in the model</a></li>
+<li><a href="#12-mapping-language-generation-into-the-mdp">1.2 Mapping language generation into the MDP</a></li>
+<li><a href="#13-value-action-value-and-advantage">1.3 Value, action-value, and advantage</a></li>
+<li><a href="#14-two-identities-used-repeatedly">1.4 Two identities used repeatedly</a></li>
+</ul>
+</li>
+<li><a href="#2-reinforce-from-the-score-function-identity">2. REINFORCE from the score-function identity</a><ul>
+<li><a href="#21-probability-of-a-trajectory">2.1 Probability of a trajectory</a></li>
+<li><a href="#22-deriving-the-policy-gradient-line-by-line">2.2 Deriving the policy gradient line by line</a></li>
+<li><a href="#23-the-monte-carlo-estimator">2.3 The Monte Carlo estimator</a></li>
+<li><a href="#24-why-an-action-independent-baseline-is-unbiased">2.4 Why an action-independent baseline is unbiased</a></li>
+<li><a href="#25-advantage-form-of-the-policy-gradient">2.5 Advantage form of the policy gradient</a></li>
+<li><a href="#26-why-the-data-must-be-on-policy">2.6 Why the data must be on-policy</a></li>
+</ul>
+</li>
+<li><a href="#3-the-performance-difference-lemma">3. The performance-difference lemma</a><ul>
+<li><a href="#31-exact-statement">3.1 Exact statement</a></li>
+<li><a href="#32-proof-by-telescoping-values">3.2 Proof by telescoping values</a></li>
+<li><a href="#33-occupancy-measures-expose-the-hard-part">3.3 Occupancy measures expose the hard part</a></li>
+</ul>
+</li>
+<li><a href="#4-freezing-the-state-distribution">4. Freezing the state distribution</a><ul>
+<li><a href="#41-the-surrogate-objective">4.1 The surrogate objective</a></li>
+<li><a href="#42-estimating-the-surrogate-with-old-policy-data">4.2 Estimating the surrogate with old-policy data</a></li>
+<li><a href="#43-first-order-agreement-with-the-true-objective">4.3 First-order agreement with the true objective</a></li>
+</ul>
+</li>
+<li><a href="#5-a-trust-region-policy-improvement-bound">5. A trust-region policy-improvement bound</a><ul>
+<li><a href="#51-measuring-policy-change">5.1 Measuring policy change</a></li>
+<li><a href="#52-the-finite-horizon-bound">5.2 The finite-horizon bound</a></li>
+<li><a href="#53-first-factor-action-distribution-change">5.3 First factor: action-distribution change</a></li>
+<li><a href="#54-second-factor-state-distribution-change-via-coupling">5.4 Second factor: state-distribution change via coupling</a></li>
+<li><a href="#55-from-total-variation-to-kl">5.5 From total variation to KL</a></li>
+<li><a href="#56-why-the-idealized-update-is-monotone">5.6 Why the idealized update is monotone</a></li>
+</ul>
+</li>
+<li><a href="#6-why-monotonic-improvement-does-not-solve-exploration">6. Why monotonic improvement does not solve exploration</a></li>
+<li><a href="#7-practical-trpo">7. Practical TRPO</a><ul>
+<li><a href="#71-the-population-surrogate">7.1 The population surrogate</a></li>
+<li><a href="#72-hard-constraint-and-soft-penalty">7.2 Hard constraint and soft penalty</a></li>
+<li><a href="#73-empirical-optimization">7.3 Empirical optimization</a></li>
+</ul>
+</li>
+<li><a href="#8-proximal-policy-optimization">8. Proximal policy optimization</a><ul>
+<li><a href="#81-the-probability-ratio">8.1 The probability ratio</a></li>
+<li><a href="#82-the-clipped-objective">8.2 The clipped objective</a></li>
+<li><a href="#83-why-the-minimum-is-essential">8.3 Why the minimum is essential</a></li>
+<li><a href="#84-numerical-check-for-a-clipping-width-of-02">8.4 Numerical check for a clipping width of 0.2</a></li>
+</ul>
+</li>
+<li><a href="#9-value-learning-entropy-and-advantage-estimation">9. Value learning, entropy, and advantage estimation</a><ul>
+<li><a href="#91-critic-loss">9.1 Critic loss</a></li>
+<li><a href="#92-entropy-bonus">9.2 Entropy bonus</a></li>
+<li><a href="#93-combined-ppo-objective">9.3 Combined PPO objective</a></li>
+<li><a href="#94-bootstrapped-advantage-estimates">9.4 Bootstrapped advantage estimates</a></li>
+<li><a href="#95-generalized-advantage-estimation">9.5 Generalized advantage estimation</a></li>
+<li><a href="#96-backward-computation-of-gae">9.6 Backward computation of GAE</a></li>
+</ul>
+</li>
+<li><a href="#10-the-ppo-training-loop">10. The PPO training loop</a><ul>
+<li><a href="#101-minimal-implementation-skeleton">10.1 Minimal implementation skeleton</a></li>
+</ul>
+</li>
+<li><a href="#11-connections-to-language-model-post-training">11. Connections to language-model post-training</a><ul>
+<li><a href="#111-ppo-for-language-model-alignment">11.1 PPO for language-model alignment</a></li>
+<li><a href="#112-removing-the-learned-critic">11.2 Removing the learned critic</a></li>
+<li><a href="#113-later-changes-to-regularization">11.3 Later changes to regularization</a></li>
+</ul>
+</li>
+<li><a href="#12-what-each-approximation-changes">12. What each approximation changes</a></li>
+<li><a href="#13-common-conceptual-and-implementation-mistakes">13. Common conceptual and implementation mistakes</a><ul>
+<li><a href="#131-confusing-old-and-reference-policies">13.1 Confusing old and reference policies</a></li>
+<li><a href="#132-recomputing-old-quantities-after-an-update">13.2 Recomputing “old” quantities after an update</a></li>
+<li><a href="#133-differentiating-through-the-advantage-target">13.3 Differentiating through the advantage target</a></li>
+<li><a href="#134-thinking-clipping-bounds-the-ratio-everywhere">13.4 Thinking clipping bounds the ratio everywhere</a></li>
+<li><a href="#135-assuming-a-small-average-kl-implies-every-state-is-safe">13.5 Assuming a small average KL implies every state is safe</a></li>
+<li><a href="#136-treating-monotone-local-improvement-as-global-optimization">13.6 Treating monotone local improvement as global optimization</a></li>
+</ul>
+</li>
+<li><a href="#14-compact-derivation-chain">14. Compact derivation chain</a></li>
+<li><a href="#15-open-questions-for-manual-study">15. Open questions for manual study</a></li>
+<li><a href="#16-source-trail">16. Source trail</a></li>
+<li><a href="#revision-log">Revision log</a></li>
+</ul>
+</div>
+
+      </aside>
+      <article class="prose note-prose markdown-body">
+        <blockquote>
+<p><strong>AI-assisted first draft.</strong> This note reconstructs the supplied Lecture 11 PDF and expands its equations and proofs step by step. It has not yet been manually verified or rewritten by the author. Statements tagged <code>[DIRECT]</code> track the lecture; <code>[DERIVATION]</code>, <code>[EXPLANATION]</code>, <code>[EXAMPLE]</code>, and <code>[SYNTHESIS]</code> make the reasoning explicit.</p>
+</blockquote>
+<h2 id="lecture-context">Lecture context</h2>
+<p><code>[DIRECT]</code> Source: <a href="https://noahgol.github.io/teaching/cs395t-f26/lecture11.pdf">https://noahgol.github.io/teaching/cs395t-f26/lecture11.pdf</a></p>
+<p><code>[DIRECT]</code> The supplied PDF is ten pages long. It develops policy gradients in a finite-horizon Markov decision process, derives REINFORCE, proves a performance-difference identity and a finite-horizon policy-improvement bound, and then uses those results to motivate TRPO and PPO.</p>
+<p><code>[SOURCE BOUNDARY]</code> This note follows the finite-state, finite-action, finite-horizon model used by the lecture. The practical algorithms are also used with large or continuous spaces, but this draft does not silently treat every finite-space proof as a theorem for arbitrary function approximation.</p>
+<p><code>[SYNTHESIS]</code> The lecture is organized around one tension:</p>
+<blockquote>
+<p>We can estimate the policy gradient from sampled trajectories, but the moment we update the policy, those trajectories describe the wrong state distribution.</p>
+</blockquote>
+<p>REINFORCE gives the exact gradient at the sampling policy. The performance-difference lemma tells us exactly how a new policy changes return. TRPO controls the error made when the new policy is evaluated using states from the old policy. PPO replaces TRPO's constrained optimization with a simpler clipped surrogate.</p>
+<h2 id="reading-map">Reading map</h2>
+<table>
+<thead>
+<tr>
+<th>Part</th>
+<th>Central question</th>
+<th>Main conclusion</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Finite-horizon MDP</td>
+<td>What is the object being optimized?</td>
+<td>A policy controls both immediate actions and the future states that become reachable.</td>
+</tr>
+<tr>
+<td>REINFORCE</td>
+<td>How can an expectation over trajectories be differentiated?</td>
+<td>The score-function identity turns the gradient into a sampleable reward-weighted log-policy gradient.</td>
+</tr>
+<tr>
+<td>Baselines</td>
+<td>What can be subtracted without bias?</td>
+<td>Any state-dependent, action-independent baseline has zero expected score contribution.</td>
+</tr>
+<tr>
+<td>Performance difference</td>
+<td>How does a candidate policy change return?</td>
+<td>The exact gap is the candidate trajectory's cumulative advantage measured under the old policy.</td>
+</tr>
+<tr>
+<td>Surrogate objective</td>
+<td>How can old-policy data evaluate a candidate?</td>
+<td>Freeze the old state distribution and correct only the action distribution with one-step ratios.</td>
+</tr>
+<tr>
+<td>Trust region</td>
+<td>When is that frozen-state approximation safe?</td>
+<td>Its error is second order in the largest policy change, yielding a conservative improvement bound.</td>
+</tr>
+<tr>
+<td>TRPO</td>
+<td>How is the guarantee approximated in practice?</td>
+<td>Optimize the surrogate under an average KL constraint or penalty.</td>
+</tr>
+<tr>
+<td>PPO</td>
+<td>How can the update be made simpler?</td>
+<td>Clip the probability-ratio incentive and use minibatch gradient ascent.</td>
+</tr>
+<tr>
+<td>Value, entropy, GAE</td>
+<td>What else is trained with the policy?</td>
+<td>A critic reduces variance, entropy delays collapse, and GAE trades estimator bias against variance.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="1-finite-horizon-markov-decision-processes">1. Finite-horizon Markov decision processes</h2>
+<h3 id="11-objects-in-the-model">1.1 Objects in the model</h3>
+<p><code>[DIRECT]</code> A finite-horizon Markov decision process contains:</p>
+<ul>
+<li>a finite state space <span class="math-inline">\(\mathcal S\)</span>;</li>
+<li>a finite action space <span class="math-inline">\(\mathcal A\)</span>;</li>
+<li>a horizon <span class="math-inline">\(T\ge 1\)</span>;</li>
+<li>an initial-state distribution <span class="math-inline">\(\rho_0\)</span>;</li>
+<li>transition probabilities <span class="math-inline">\(P_t(s&#x27;\mid s,a)\)</span>;</li>
+<li>bounded reward functions <span class="math-inline">\(r_t(s,a)\)</span>.</li>
+</ul>
+<p><code>[DIRECT]</code> A time-dependent Markov policy is</p>
+<div class="math-display">\[\pi=(\pi_0,\ldots,\pi_{T-1}),
+\qquad
+\pi_t(\cdot\mid s)\in\Delta(\mathcal A).\]</div>
+<p><code>[EXPLANATION]</code> The subscript <span class="math-inline">\(t\)</span> matters because the best decision may depend on how many steps remain. “Markov” means that the policy only needs the current state and time, not the full raw history. If the original problem is history-dependent, the history can be folded into the state.</p>
+<p><code>[DIRECT]</code> A trajectory</p>
+<div class="math-display">\[\tau=(s_0,a_0,s_1,a_1,\ldots,s_{T-1},a_{T-1},s_T)\]</div>
+<p>is sampled according to</p>
+<div class="math-display">\[s_0\sim\rho_0,
+\qquad
+a_t\sim\pi_t(\cdot\mid s_t),
+\qquad
+s_{t+1}\sim P_t(\cdot\mid s_t,a_t).\]</div>
+<p>The return and expected-return objective are</p>
+<div class="math-display">\[R(\tau)=\sum_{t=0}^{T-1}r_t(s_t,a_t),
+\qquad
+J(\pi)=\mathbb E_{\tau\sim\pi}[R(\tau)].\]</div>
+<p><code>[EXPLANATION]</code> An action affects two things at once:</p>
+<ol>
+<li>the reward received now;</li>
+<li>the distribution of states from which all future decisions will be made.</li>
+</ol>
+<p>The second effect is why simply choosing the action with the best immediate reward is not generally optimal.</p>
+<h3 id="12-mapping-language-generation-into-the-mdp">1.2 Mapping language generation into the MDP</h3>
+<p><code>[DIRECT]</code> For autoregressive language generation:</p>
+<ul>
+<li>the state is the prompt together with all tokens produced so far;</li>
+<li>an action is the next token;</li>
+<li>the transition appends that token to the prefix;</li>
+<li>a reward may be supplied only when the response ends.</li>
+</ul>
+<p><code>[EXPLANATION]</code> The environment transition is deterministic after a token is chosen, but the policy is stochastic. A terminal reward can encode preference-model score, a verifier result, or another response-level signal.</p>
+<p><code>[SYNTHESIS]</code> The state space is enormous, but the finite-horizon notation remains conceptually useful. It distinguishes a token probability at a particular prefix from the probability of ever reaching that prefix.</p>
+<h3 id="13-value-action-value-and-advantage">1.3 Value, action-value, and advantage</h3>
+<p><code>[DIRECT]</code> Suppose action <span class="math-inline">\(a\)</span> is taken from state <span class="math-inline">\(s\)</span> at time <span class="math-inline">\(t\)</span>, after which policy <span class="math-inline">\(\pi\)</span> is followed. Define</p>
+<div class="math-display">\[Q_t^\pi(s,a)
+:=
+\mathbb E
+\left[
+\sum_{u=t}^{T-1}r_u(s_u,a_u)
+\;\middle|\;
+s_t=s,\;a_t=a,\;a_u\sim\pi_u\text{ for }u&gt;t
+\right].\]</div>
+<p>The state value and terminal convention are</p>
+<div class="math-display">\[V_t^\pi(s)
+:=
+\sum_a\pi_t(a\mid s)Q_t^\pi(s,a),
+\qquad
+V_T^\pi(s):=0.\]</div>
+<p>The advantage is</p>
+<div class="math-display">\[A_t^\pi(s,a):=Q_t^\pi(s,a)-V_t^\pi(s).\]</div>
+<p><code>[EXPLANATION]</code> <span class="math-inline">\(Q_t^\pi(s,a)\)</span> asks: “what return should I expect if I force action <span class="math-inline">\(a\)</span> now and follow <span class="math-inline">\(\pi\)</span> afterward?” <span class="math-inline">\(V_t^\pi(s)\)</span> averages that quantity over the action that <span class="math-inline">\(\pi\)</span> would normally draw. The advantage therefore measures an action relative to the policy's own local behavior, not relative to an absolute zero.</p>
+<h3 id="14-two-identities-used-repeatedly">1.4 Two identities used repeatedly</h3>
+<p><code>[DERIVATION · Bellman identity]</code> Separate the reward at time <span class="math-inline">\(t\)</span> from later rewards:</p>
+<div class="math-display">\[\begin{aligned}
+Q_t^\pi(s,a)
+&amp;=
+r_t(s,a)
++\mathbb E
+\left[
+\sum_{u=t+1}^{T-1}r_u(s_u,a_u)
+\;\middle|\;s_t=s,a_t=a
+\right]\\
+&amp;=
+r_t(s,a)
++\mathbb E_{s&#x27;\sim P_t(\cdot\mid s,a)}[V_{t+1}^\pi(s&#x27;)].
+\end{aligned}\]</div>
+<p><code>[DERIVATION · Zero-mean advantage]</code> Average the advantage under the same policy:</p>
+<div class="math-display">\[\begin{aligned}
+\sum_a\pi_t(a\mid s)A_t^\pi(s,a)
+&amp;=
+\sum_a\pi_t(a\mid s)
+\bigl(Q_t^\pi(s,a)-V_t^\pi(s)\bigr)\\
+&amp;=
+V_t^\pi(s)-V_t^\pi(s)\sum_a\pi_t(a\mid s)\\
+&amp;=0.
+\end{aligned}\]</div>
+<p><code>[EXPLANATION]</code> This zero-mean property is the algebra behind both baseline subtraction and the first-order accuracy of the TRPO surrogate.</p>
+<p>Finally,</p>
+<div class="math-display">\[J(\pi)=\mathbb E_{s_0\sim\rho_0}[V_0^\pi(s_0)].\]</div>
+<h2 id="2-reinforce-from-the-score-function-identity">2. REINFORCE from the score-function identity</h2>
+<h3 id="21-probability-of-a-trajectory">2.1 Probability of a trajectory</h3>
+<p><code>[DIRECT]</code> Let <span class="math-inline">\(\pi=\pi_\theta\)</span> be differentiably parameterized by <span class="math-inline">\(\theta\in\mathbb R^d\)</span>. Assume that <span class="math-inline">\(\rho_0\)</span>, the rewards, and the transitions do not depend on <span class="math-inline">\(\theta\)</span>. Then</p>
+<div class="math-display">\[p_\theta(\tau)
+=
+\rho_0(s_0)
+\prod_{t=0}^{T-1}
+\pi_{\theta,t}(a_t\mid s_t)
+P_t(s_{t+1}\mid s_t,a_t).\]</div>
+<p>Taking logs converts the product into a sum. The terms unrelated to the policy disappear after differentiation:</p>
+<div class="math-display">\[\nabla_\theta\log p_\theta(\tau)
+=
+\sum_{t=0}^{T-1}
+\nabla_\theta\log\pi_{\theta,t}(a_t\mid s_t).\]</div>
+<p><code>[EXPLANATION]</code> We never need to differentiate the environment. The stochastic trajectory may pass through complicated dynamics, but the score only contains derivatives of the action probabilities chosen by the policy.</p>
+<h3 id="22-deriving-the-policy-gradient-line-by-line">2.2 Deriving the policy gradient line by line</h3>
+<p><code>[DERIVATION · Step 1]</code> Write the objective as a finite sum:</p>
+<div class="math-display">\[J(\theta)=\sum_\tau p_\theta(\tau)R(\tau).\]</div>
+<p><code>[DERIVATION · Step 2]</code> Differentiate:</p>
+<div class="math-display">\[\nabla_\theta J(\theta)
+=
+\sum_\tau R(\tau)\nabla_\theta p_\theta(\tau).\]</div>
+<p><code>[DERIVATION · Step 3]</code> Use the log-derivative identity</p>
+<div class="math-display">\[\nabla_\theta p_\theta(\tau)
+=
+p_\theta(\tau)\nabla_\theta\log p_\theta(\tau).\]</div>
+<p><code>[DERIVATION · Step 4]</code> Recognize an expectation and insert the trajectory score:</p>
+<div class="math-display">\[\boxed{
+\nabla_\theta J(\theta)
+=
+\mathbb E_{\tau\sim\pi_\theta}
+\left[
+R(\tau)
+\sum_{t=0}^{T-1}
+\nabla_\theta\log\pi_{\theta,t}(a_t\mid s_t)
+\right].
+}\]</div>
+<p><code>[CONCLUSION]</code> We can estimate the gradient without enumerating trajectories. Sample a trajectory, compute its return, and weight every visited action's log-probability gradient by that return.</p>
+<h3 id="23-the-monte-carlo-estimator">2.3 The Monte Carlo estimator</h3>
+<p>For <span class="math-inline">\(N\)</span> independent trajectories <span class="math-inline">\(\tau^{(1)},\ldots,\tau^{(N)}\sim\pi_\theta\)</span>, the REINFORCE estimator is</p>
+<div class="math-display">\[\widehat g(\theta)
+=
+\frac1N
+\sum_{n=1}^{N}
+\sum_{t=0}^{T-1}
+\nabla_\theta
+\log\pi_{\theta,t}
+\bigl(a_t^{(n)}\mid s_t^{(n)}\bigr)
+R\bigl(\tau^{(n)}\bigr).\]</div>
+<p><code>[DIRECT]</code> It is unbiased, and one gradient-ascent step is <span class="math-inline">\(\theta\leftarrow\theta+h\widehat g(\theta)\)</span> for step size <span class="math-inline">\(h&gt;0\)</span>.</p>
+<p><code>[EXPLANATION]</code> Unbiased does not mean low variance. A complete return mixes together randomness from many actions and transitions, so the update produced by one batch may fluctuate strongly.</p>
+<h3 id="24-why-an-action-independent-baseline-is-unbiased">2.4 Why an action-independent baseline is unbiased</h3>
+<p><code>[DERIVATION · Step 1]</code> Conditional on state <span class="math-inline">\(s_t\)</span>, the expected policy score is</p>
+<div class="math-display">\[\begin{aligned}
+\mathbb E_{a_t\sim\pi_{\theta,t}(\cdot\mid s_t)}
+[\nabla_\theta\log\pi_{\theta,t}(a_t\mid s_t)]
+&amp;=
+\sum_a\pi_{\theta,t}(a\mid s_t)
+\nabla_\theta\log\pi_{\theta,t}(a\mid s_t)\\
+&amp;=
+\sum_a\nabla_\theta\pi_{\theta,t}(a\mid s_t)\\
+&amp;=
+\nabla_\theta 1=0.
+\end{aligned}\]</div>
+<p><code>[DERIVATION · Step 2]</code> Let <span class="math-inline">\(b_t(s_t)\)</span> be fixed once the state is known. Then</p>
+<div class="math-display">\[\mathbb E
+\left[
+b_t(s_t)
+\nabla_\theta\log\pi_{\theta,t}(a_t\mid s_t)
+\mid s_t
+\right]
+=b_t(s_t)\cdot0=0.\]</div>
+<p><code>[CONCLUSION]</code> Replacing <span class="math-inline">\(R(\tau)\)</span> by <span class="math-inline">\(R(\tau)-b_t(s_t)\)</span> changes the sample variance but not the expected gradient.</p>
+<p><code>[CAUTION]</code> The baseline must not depend on the sampled action in a way that is differentiated through the policy loss. In implementations, sampled returns, advantages, and old-policy quantities are treated as constants during the policy update.</p>
+<h3 id="25-advantage-form-of-the-policy-gradient">2.5 Advantage form of the policy gradient</h3>
+<p><code>[DIRECT]</code> The gradient has the equivalent form</p>
+<div class="math-display">\[\boxed{
+\nabla_\theta J(\theta)
+=
+\mathbb E_{\tau\sim\pi_\theta}
+\left[
+\sum_{t=0}^{T-1}
+\nabla_\theta\log\pi_{\theta,t}(a_t\mid s_t)
+A_t^{\pi_\theta}(s_t,a_t)
+\right].
+}\]</div>
+<p><code>[EXPLANATION]</code> This is not a new objective. It is the same gradient written with a lower-variance learning signal. Positive advantage raises the sampled action's log-probability; negative advantage lowers it.</p>
+<h3 id="26-why-the-data-must-be-on-policy">2.6 Why the data must be on-policy</h3>
+<p><code>[DIRECT]</code> The expectation above is over trajectories from <span class="math-inline">\(\pi_\theta\)</span>. Once <span class="math-inline">\(\theta\)</span> changes, the stored trajectories are sampled from an older policy and are therefore off-policy.</p>
+<p><code>[EXPLANATION]</code> A full trajectory-level importance ratio would be</p>
+<div class="math-display">\[\frac{p_\theta(\tau)}{p_{\theta_{\mathrm{old}}}(\tau)}
+=
+\prod_{t=0}^{T-1}
+\frac{
+\pi_{\theta,t}(a_t\mid s_t)
+}{
+\pi_{\theta_{\mathrm{old}},t}(a_t\mid s_t)
+}.\]</div>
+<p>The product can have very high variance. TRPO and PPO instead build local surrogate objectives that remain useful while the candidate policy stays near the data-collecting policy.</p>
+<h2 id="3-the-performance-difference-lemma">3. The performance-difference lemma</h2>
+<h3 id="31-exact-statement">3.1 Exact statement</h3>
+<p><code>[DIRECT]</code> For any two policies <span class="math-inline">\(\pi\)</span> and <span class="math-inline">\(\widetilde\pi\)</span> in the same finite-horizon MDP,</p>
+<div class="math-display">\[\boxed{
+J(\widetilde\pi)-J(\pi)
+=
+\mathbb E_{\tau\sim\widetilde\pi}
+\left[
+\sum_{t=0}^{T-1}
+A_t^\pi(s_t,a_t)
+\right].
+}\]</div>
+<p><code>[EXPLANATION]</code> The advantages belong to the old/reference policy <span class="math-inline">\(\pi\)</span>, but the states and actions are visited by the candidate <span class="math-inline">\(\widetilde\pi\)</span>. The formula answers a counterfactual question: if the new policy follows its own trajectories, how favorable are its actions when judged using the old policy's continuation values?</p>
+<h3 id="32-proof-by-telescoping-values">3.2 Proof by telescoping values</h3>
+<p><code>[DERIVATION · Step 1]</code> Combine the Bellman identity with the definition of advantage:</p>
+<div class="math-display">\[A_t^\pi(s_t,a_t)
+=
+r_t(s_t,a_t)
++\mathbb E[V_{t+1}^\pi(s_{t+1})\mid s_t,a_t]
+-V_t^\pi(s_t).\]</div>
+<p><code>[DERIVATION · Step 2]</code> Take expectation over a trajectory generated by <span class="math-inline">\(\widetilde\pi\)</span>. The transition law conditioned on <span class="math-inline">\((s_t,a_t)\)</span> is the same under both policies, so</p>
+<div class="math-display">\[\mathbb E_{\widetilde\pi}[A_t^\pi(s_t,a_t)]
+=
+\mathbb E_{\widetilde\pi}
+[r_t(s_t,a_t)+V_{t+1}^\pi(s_{t+1})-V_t^\pi(s_t)].\]</div>
+<p><code>[DERIVATION · Step 3]</code> Sum over time:</p>
+<div class="math-display">\[\begin{aligned}
+\mathbb E_{\widetilde\pi}
+\left[\sum_{t=0}^{T-1}A_t^\pi(s_t,a_t)\right]
+&amp;=
+\mathbb E_{\widetilde\pi}
+\left[
+\sum_{t=0}^{T-1}r_t(s_t,a_t)
++\sum_{t=0}^{T-1}
+\bigl(V_{t+1}^\pi(s_{t+1})-V_t^\pi(s_t)\bigr)
+\right]\\
+&amp;=
+J(\widetilde\pi)
++\mathbb E_{\widetilde\pi}
+[V_T^\pi(s_T)-V_0^\pi(s_0)].
+\end{aligned}\]</div>
+<p><code>[DERIVATION · Step 4]</code> The terminal value is zero. Both policies share the same initial distribution, so</p>
+<div class="math-display">\[\mathbb E_{s_0\sim\rho_0}[V_0^\pi(s_0)]=J(\pi).\]</div>
+<p>Therefore</p>
+<div class="math-display">\[\mathbb E_{\widetilde\pi}
+\left[\sum_{t=0}^{T-1}A_t^\pi(s_t,a_t)\right]
+=J(\widetilde\pi)-J(\pi).\]</div>
+<p><code>[SYNTHESIS]</code> The proof works because the old value function acts like a potential: all intermediate values cancel, leaving only the candidate return and the old policy's initial value.</p>
+<h3 id="33-occupancy-measures-expose-the-hard-part">3.3 Occupancy measures expose the hard part</h3>
+<p>Define the time-state occupancy measure</p>
+<div class="math-display">\[\rho_\pi(t,s):=\Pr_{\tau\sim\pi}(s_t=s).\]</div>
+<p>For each <span class="math-inline">\(t\)</span>, <span class="math-inline">\(\sum_s\rho_\pi(t,s)=1\)</span>, so the total mass across all times is <span class="math-inline">\(T\)</span>.</p>
+<p>Expanding the performance-difference lemma gives</p>
+<div class="math-display">\[J(\widetilde\pi)
+=
+J(\pi)
++\sum_{t=0}^{T-1}
+\sum_s\rho_{\widetilde\pi}(t,s)
+\sum_a\widetilde\pi_t(a\mid s)A_t^\pi(s,a).\]</div>
+<p><code>[EXPLANATION]</code> The inner action expectation is easy to evaluate if advantages are known. The difficult term is <span class="math-inline">\(\rho_{\widetilde\pi}\)</span>: changing actions changes which states will later be visited.</p>
+<h2 id="4-freezing-the-state-distribution">4. Freezing the state distribution</h2>
+<h3 id="41-the-surrogate-objective">4.1 The surrogate objective</h3>
+<p><code>[DIRECT]</code> Replace the candidate occupancy <span class="math-inline">\(\rho_{\widetilde\pi}\)</span> with the old occupancy <span class="math-inline">\(\rho_\pi\)</span>:</p>
+<div class="math-display">\[L_\pi(\widetilde\pi)
+:=
+J(\pi)
++\sum_{t=0}^{T-1}
+\sum_s\rho_\pi(t,s)
+\sum_a\widetilde\pi_t(a\mid s)A_t^\pi(s,a).\]</div>
+<p><code>[EXPLANATION]</code> This surrogate asks what would happen if the candidate chose new actions at states distributed exactly as they were under the old policy. It corrects the action distribution but temporarily ignores the induced shift in state visitation.</p>
+<h3 id="42-estimating-the-surrogate-with-old-policy-data">4.2 Estimating the surrogate with old-policy data</h3>
+<p>When the old policy covers each candidate action used at sampled states,</p>
+<div class="math-display">\[L_\pi(\widetilde\pi)-J(\pi)
+=
+\mathbb E_{\tau\sim\pi}
+\left[
+\sum_{t=0}^{T-1}
+\frac{\widetilde\pi_t(a_t\mid s_t)}{\pi_t(a_t\mid s_t)}
+A_t^\pi(s_t,a_t)
+\right].\]</div>
+<p><code>[DERIVATION]</code> Conditional on <span class="math-inline">\(s_t=s\)</span>,</p>
+<div class="math-display">\[\begin{aligned}
+&amp;\mathbb E_{a_t\sim\pi_t(\cdot\mid s)}
+\left[
+\frac{\widetilde\pi_t(a_t\mid s)}{\pi_t(a_t\mid s)}
+A_t^\pi(s,a_t)
+\right]\\
+&amp;\quad=
+\sum_a\pi_t(a\mid s)
+\frac{\widetilde\pi_t(a\mid s)}{\pi_t(a\mid s)}
+A_t^\pi(s,a)\\
+&amp;\quad=
+\sum_a\widetilde\pi_t(a\mid s)A_t^\pi(s,a).
+\end{aligned}\]</div>
+<p>Only one action ratio appears. A product of all ratios would also correct the state distribution and recover trajectory importance sampling; the surrogate deliberately does not do that.</p>
+<h3 id="43-first-order-agreement-with-the-true-objective">4.3 First-order agreement with the true objective</h3>
+<p>Let the old policy be <span class="math-inline">\(\pi_{\theta_0}\)</span> and let the candidate be <span class="math-inline">\(\pi_\theta\)</span>. Then</p>
+<div class="math-display">\[L_{\pi_{\theta_0}}(\pi_{\theta_0})=J(\theta_0),\]</div>
+<p>and</p>
+<div class="math-display">\[\nabla_\theta
+L_{\pi_{\theta_0}}(\pi_\theta)
+\big|_{\theta=\theta_0}
+=
+\nabla_\theta J(\theta)
+\big|_{\theta=\theta_0}.\]</div>
+<p><code>[DERIVATION · Step 1]</code> Define</p>
+<div class="math-display">\[f_t(\theta,s)
+:=
+\sum_a\pi_{\theta,t}(a\mid s)A_t^{\pi_{\theta_0}}(s,a).\]</div>
+<p>At <span class="math-inline">\(\theta_0\)</span>, zero-mean advantage implies <span class="math-inline">\(f_t(\theta_0,s)=0\)</span> for every <span class="math-inline">\((t,s)\)</span>.</p>
+<p><code>[DERIVATION · Step 2]</code> The exact objective can be written</p>
+<div class="math-display">\[J(\theta)
+=J(\theta_0)
++\sum_{t,s}
+\rho_{\pi_\theta}(t,s)f_t(\theta,s).\]</div>
+<p>Differentiate at <span class="math-inline">\(\theta_0\)</span>:</p>
+<div class="math-display">\[\begin{aligned}
+\nabla_\theta J(\theta)\big|_{\theta_0}
+=
+\sum_{t,s}
+\Bigl[
+&amp;\nabla_\theta\rho_{\pi_\theta}(t,s)
+\underbrace{f_t(\theta_0,s)}_{0}\\
+&amp;+\rho_{\pi_{\theta_0}}(t,s)
+\nabla_\theta f_t(\theta,s)\big|_{\theta_0}
+\Bigr].
+\end{aligned}\]</div>
+<p>The occupancy-derivative term vanishes. The remaining term is exactly the derivative of the surrogate.</p>
+<p><code>[SYNTHESIS]</code> Freezing the state distribution is wrong for a finite move but harmless to first order at the old policy. The remaining question is how large the move may be before higher-order error dominates.</p>
+<h2 id="5-a-trust-region-policy-improvement-bound">5. A trust-region policy-improvement bound</h2>
+<h3 id="51-measuring-policy-change">5.1 Measuring policy change</h3>
+<p>For distributions <span class="math-inline">\(p\)</span> and <span class="math-inline">\(q\)</span> on <span class="math-inline">\(\mathcal A\)</span>, define total variation and KL divergence:</p>
+<div class="math-display">\[D_{\mathrm{TV}}(p,q)
+:=
+\frac12\sum_a|p(a)-q(a)|,\]</div>
+<div class="math-display">\[D_{\mathrm{KL}}(p\|q)
+:=
+\sum_a p(a)\log\frac{p(a)}{q(a)}.\]</div>
+<p>For policies, use the worst case over time and state:</p>
+<div class="math-display">\[D_{\mathrm{TV}}^{\max}(\pi,\widetilde\pi)
+:=
+\max_{0\le t&lt;T,\,s\in\mathcal S}
+D_{\mathrm{TV}}
+(\pi_t(\cdot\mid s),\widetilde\pi_t(\cdot\mid s)),\]</div>
+<div class="math-display">\[D_{\mathrm{KL}}^{\max}(\pi,\widetilde\pi)
+:=
+\max_{0\le t&lt;T,\,s\in\mathcal S}
+D_{\mathrm{KL}}
+(\pi_t(\cdot\mid s)\|\widetilde\pi_t(\cdot\mid s)).\]</div>
+<p><code>[DIRECT]</code> These maxima include states that the old policy never visits. This strength is important for the theorem and is later relaxed by practical TRPO.</p>
+<h3 id="52-the-finite-horizon-bound">5.2 The finite-horizon bound</h3>
+<p>Let</p>
+<div class="math-display">\[\alpha=D_{\mathrm{TV}}^{\max}(\pi,\widetilde\pi),
+\qquad
+\varepsilon_A=max_{t,s,a}|A_t^\pi(s,a)|.\]</div>
+<p>Then</p>
+<div class="math-display">\[\boxed{
+|J(\widetilde\pi)-L_\pi(\widetilde\pi)|
+\le
+2\varepsilon_A T(T-1)\alpha^2.
+}\]</div>
+<p>Equivalently,</p>
+<div class="math-display">\[J(\widetilde\pi)
+\ge
+L_\pi(\widetilde\pi)
+-2\varepsilon_A T(T-1)\alpha^2.\]</div>
+<p><code>[SYNTHESIS]</code> There are two factors of policy difference:</p>
+<ol>
+<li>one because the candidate's expected advantage at a fixed state is small when its action distribution is close to the old one;</li>
+<li>one because the candidate and old trajectories are unlikely to have reached different states when their earlier action distributions are close.</li>
+</ol>
+<p>That is why the surrogate error is quadratic in <span class="math-inline">\(\alpha\)</span>.</p>
+<h3 id="53-first-factor-action-distribution-change">5.3 First factor: action-distribution change</h3>
+<p>Define</p>
+<div class="math-display">\[f_t(s)
+:=
+\sum_a\widetilde\pi_t(a\mid s)A_t^\pi(s,a).\]</div>
+<p>Because the old policy has zero expected advantage,</p>
+<div class="math-display">\[f_t(s)
+=
+\sum_a
+(\widetilde\pi_t(a\mid s)-\pi_t(a\mid s))
+A_t^\pi(s,a).\]</div>
+<p>Therefore</p>
+<div class="math-display">\[\begin{aligned}
+|f_t(s)|
+&amp;\le
+\sum_a
+|\widetilde\pi_t(a\mid s)-\pi_t(a\mid s)|
+|A_t^\pi(s,a)|\\
+&amp;\le
+2\varepsilon_A
+D_{\mathrm{TV}}
+(\pi_t(\cdot\mid s),\widetilde\pi_t(\cdot\mid s))\\
+&amp;\le2\varepsilon_A\alpha.
+\end{aligned}\]</div>
+<h3 id="54-second-factor-state-distribution-change-via-coupling">5.4 Second factor: state-distribution change via coupling</h3>
+<p><code>[DIRECT]</code> Couple one trajectory from <span class="math-inline">\(\pi\)</span> with one from <span class="math-inline">\(\widetilde\pi\)</span>. Begin from the same initial state. As long as the histories agree, couple the two action draws so that they disagree with probability at most <span class="math-inline">\(\alpha\)</span>. If the actions agree, draw the same next state. After the first disagreement, the two trajectories may evolve independently.</p>
+<p><code>[DERIVATION]</code> Before state <span class="math-inline">\(s_t\)</span> is reached, there are <span class="math-inline">\(t\)</span> opportunities for an action disagreement. A union bound gives</p>
+<div class="math-display">\[\Pr(s_t\ne\widetilde s_t)\le t\alpha.\]</div>
+<p>Subtracting the exact and frozen-state objectives gives</p>
+<div class="math-display">\[J(\widetilde\pi)-L_\pi(\widetilde\pi)
+=
+\sum_{t=0}^{T-1}
+\mathbb E[f_t(\widetilde s_t)-f_t(s_t)].\]</div>
+<p>When the states agree, the difference is zero. Otherwise each term has magnitude at most <span class="math-inline">\(2\varepsilon_A\alpha\)</span>, so the difference has magnitude at most <span class="math-inline">\(4\varepsilon_A\alpha\)</span>. Hence</p>
+<div class="math-display">\[\begin{aligned}
+|J(\widetilde\pi)-L_\pi(\widetilde\pi)|
+&amp;\le
+\sum_{t=0}^{T-1}
+4\varepsilon_A\alpha\Pr(s_t\ne\widetilde s_t)\\
+&amp;\le
+4\varepsilon_A\alpha^2
+\sum_{t=0}^{T-1}t\\
+&amp;=
+4\varepsilon_A\alpha^2
+\frac{T(T-1)}2\\
+&amp;=
+2\varepsilon_A T(T-1)\alpha^2.
+\end{aligned}\]</div>
+<h3 id="55-from-total-variation-to-kl">5.5 From total variation to KL</h3>
+<p>Pinsker's inequality states</p>
+<div class="math-display">\[D_{\mathrm{TV}}(p,q)^2
+\le\frac12D_{\mathrm{KL}}(p\|q).\]</div>
+<p>Applying it to the policy bound gives</p>
+<div class="math-display">\[J(\widetilde\pi)
+\ge
+L_\pi(\widetilde\pi)
+-C_\pi D_{\mathrm{KL}}^{\max}(\pi,\widetilde\pi),\]</div>
+<p>where</p>
+<div class="math-display">\[C_\pi:=\varepsilon_A T(T-1).\]</div>
+<p><code>[EXPLANATION]</code> This lower bound suggests maximizing a surrogate reward minus a penalty for moving too far from the old policy.</p>
+<h3 id="56-why-the-idealized-update-is-monotone">5.6 Why the idealized update is monotone</h3>
+<p>Define</p>
+<div class="math-display">\[M_i(\widetilde\pi)
+:=
+L_{\pi_i}(\widetilde\pi)
+-C_iD_{\mathrm{KL}}^{\max}(\pi_i,\widetilde\pi).\]</div>
+<p>Suppose <span class="math-inline">\(\pi_{i+1}\)</span> is chosen so that <span class="math-inline">\(M_i(\pi_{i+1})\ge M_i(\pi_i)\)</span>. The lower bound and equality at the old policy imply</p>
+<div class="math-display">\[J(\pi_{i+1})-J(\pi_i)
+\ge
+M_i(\pi_{i+1})-M_i(\pi_i)
+\ge0.\]</div>
+<p><code>[LIMIT]</code> This is an idealized guarantee. It assumes exact advantages, exact occupancies, optimization over all Markov policies, and a worst-case KL over every time and state.</p>
+<h2 id="6-why-monotonic-improvement-does-not-solve-exploration">6. Why monotonic improvement does not solve exploration</h2>
+<p><code>[DIRECT]</code> Consider a two-step MDP. At the initial state <span class="math-inline">\(s_0\)</span>:</p>
+<ul>
+<li><strong>safe</strong> gives reward <span class="math-inline">\(1/2\)</span> and terminates;</li>
+<li><strong>try</strong> gives reward <span class="math-inline">\(0\)</span> and moves to <span class="math-inline">\(s_*\)</span>.</li>
+</ul>
+<p>At <span class="math-inline">\(s_*\)</span>:</p>
+<ul>
+<li><strong>good</strong> gives reward <span class="math-inline">\(1\)</span>;</li>
+<li><strong>bad</strong> gives reward <span class="math-inline">\(0\)</span>.</li>
+</ul>
+<p>Suppose the current policy chooses safe at <span class="math-inline">\(s_0\)</span> and bad at <span class="math-inline">\(s_*\)</span>. Its return is <span class="math-inline">\(1/2\)</span>. The globally better behavior is try followed by good, with return <span class="math-inline">\(1\)</span>.</p>
+<p>However, under the current policy, choosing try and then following the current continuation leads to bad, so</p>
+<div class="math-display">\[A_0^\pi(s_0,\mathrm{try})=-\frac12.\]</div>
+<p>Also <span class="math-inline">\(s_*\)</span> is never visited, so <span class="math-inline">\(\rho_\pi(1,s_*)=0\)</span>. Consequently the surrogate cannot see the benefit of changing the action at <span class="math-inline">\(s_*\)</span>, and it penalizes moving toward try at <span class="math-inline">\(s_0\)</span>.</p>
+<p><code>[SYNTHESIS]</code> Local policy improvement can get stuck because coordinated changes are required at both a visited state and an unvisited state. Exact advantages do not eliminate this problem: the advantage of the first exploratory action is evaluated under the old, still-bad continuation.</p>
+<p><code>[DIRECT]</code> If try is assigned only a small probability <span class="math-inline">\(p\)</span>, then <span class="math-inline">\(N\)</span> sampled episodes all miss <span class="math-inline">\(s_*\)</span> with probability</p>
+<div class="math-display">\[(1-p)^N.\]</div>
+<p>Positive action probabilities therefore do not by themselves imply efficient exploration.</p>
+<h2 id="7-practical-trpo">7. Practical TRPO</h2>
+<h3 id="71-the-population-surrogate">7.1 The population surrogate</h3>
+<p>Let <span class="math-inline">\(\pi_{\mathrm{old}}=\pi_{\theta_{\mathrm{old}}}\)</span> be the policy that collected the batch. Let <span class="math-inline">\(\mathbb E_{\mathrm{old}}\)</span> draw <span class="math-inline">\((t,s,a)\)</span> by first choosing <span class="math-inline">\((t,s)\)</span> from the normalized old occupancy <span class="math-inline">\(\rho_{\mathrm{old}}(t,s)/T\)</span> and then drawing <span class="math-inline">\(a\sim\pi_{\mathrm{old},t}(\cdot\mid s)\)</span>.</p>
+<p>Define</p>
+<div class="math-display">\[F(\theta)
+:=
+\mathbb E_{\mathrm{old}}
+\left[
+\frac{\pi_{\theta,t}(a\mid s)}
+{\pi_{\mathrm{old},t}(a\mid s)}
+A_t^{\pi_{\mathrm{old}}}(s,a)
+\right],\]</div>
+<p>and the average KL</p>
+<div class="math-display">\[\overline D_{\mathrm{KL}}(\theta_{\mathrm{old}},\theta)
+:=
+\mathbb E_{\mathrm{old}}
+\left[
+D_{\mathrm{KL}}
+(\pi_{\mathrm{old},t}(\cdot\mid s)
+\|\pi_{\theta,t}(\cdot\mid s))
+\right].\]</div>
+<p>The factor <span class="math-inline">\(1/T\)</span> in the sampling convention does not change the optimizer of the surrogate.</p>
+<h3 id="72-hard-constraint-and-soft-penalty">7.2 Hard constraint and soft penalty</h3>
+<p>TRPO replaces the theorem's worst-case constraint with an average over states visited by the old policy. Two natural forms are</p>
+<div class="math-display">\[\max_\theta F(\theta)
+\quad\text{subject to}\quad
+\overline D_{\mathrm{KL}}(\theta_{\mathrm{old}},\theta)\le\delta,\]</div>
+<p>and</p>
+<div class="math-display">\[\max_\theta
+\left\{
+F(\theta)-\beta
+\overline D_{\mathrm{KL}}(\theta_{\mathrm{old}},\theta)
+\right\}.\]</div>
+<p><code>[EXPLANATION]</code> The hard version is the usual TRPO formulation. The soft version permits adaptive tuning of <span class="math-inline">\(\beta\)</span>: increase the penalty if the observed KL is too large and decrease it if the update is too conservative.</p>
+<p><code>[LIMIT]</code> Average KL is practical but weaker than the maximum KL used in the theorem. A small average can hide a large change at a rare state.</p>
+<h3 id="73-empirical-optimization">7.3 Empirical optimization</h3>
+<p>With <span class="math-inline">\(N\)</span> trajectories, empirical expectations average over <span class="math-inline">\(NT\)</span> time steps. During optimization:</p>
+<ul>
+<li>trajectories remain fixed;</li>
+<li>old action probabilities remain fixed;</li>
+<li>advantage estimates remain fixed;</li>
+<li>only the candidate policy probabilities change.</li>
+</ul>
+<p><code>[EXPLANATION]</code> The batch becomes off-policy as soon as <span class="math-inline">\(\theta\)</span> moves, but the surrogate can reuse it for several optimization steps as long as the new policy remains near <span class="math-inline">\(\pi_{\mathrm{old}}\)</span>.</p>
+<h2 id="8-proximal-policy-optimization">8. Proximal policy optimization</h2>
+<h3 id="81-the-probability-ratio">8.1 The probability ratio</h3>
+<p>For a sampled transition <span class="math-inline">\((t,s_t,a_t)\)</span>, define</p>
+<div class="math-display">\[w_t(\theta)
+:=
+\frac{
+\pi_{\theta,t}(a_t\mid s_t)
+}{
+\pi_{\mathrm{old},t}(a_t\mid s_t)
+},
+\qquad
+w_t(\theta_{\mathrm{old}})=1.\]</div>
+<p>Let <span class="math-inline">\(\widehat A_t\)</span> estimate the old policy's advantage. The ordinary empirical surrogate contribution is <span class="math-inline">\(w_t(\theta)\widehat A_t\)</span>.</p>
+<p><code>[EXPLANATION]</code> If <span class="math-inline">\(\widehat A_t&gt;0\)</span>, gradient ascent tries to make <span class="math-inline">\(w_t\)</span> larger: increase the sampled action's probability. If <span class="math-inline">\(\widehat A_t&lt;0\)</span>, it tries to make <span class="math-inline">\(w_t\)</span> smaller.</p>
+<h3 id="82-the-clipped-objective">8.2 The clipped objective</h3>
+<p>Choose <span class="math-inline">\(0&lt;\epsilon&lt;1\)</span> and define</p>
+<div class="math-display">\[\operatorname{clip}(w,1-\epsilon,1+\epsilon)
+:=
+\min\{1+\epsilon,\max\{1-\epsilon,w\}\}.\]</div>
+<p>PPO's clipped per-sample objective is</p>
+<div class="math-display">\[\boxed{
+\ell_t^{\mathrm{CLIP}}(\theta)
+:=
+\min
+\left\{
+w_t(\theta)\widehat A_t,
+\operatorname{clip}(w_t(\theta),1-\epsilon,1+\epsilon)
+\widehat A_t
+\right\}.
+}\]</div>
+<p>The batch objective is</p>
+<div class="math-display">\[\widehat L^{\mathrm{CLIP}}(\theta)
+=
+\widehat{\mathbb E}[\ell_t^{\mathrm{CLIP}}(\theta)].\]</div>
+<h3 id="83-why-the-minimum-is-essential">8.3 Why the minimum is essential</h3>
+<p>The objective can be written piecewise:</p>
+<div class="math-display">\[\ell_t^{\mathrm{CLIP}}(\theta)
+=
+\begin{cases}
+\widehat A_t\min\{w_t(\theta),1+\epsilon\},
+&amp;\widehat A_t\ge0,\\[4pt]
+\widehat A_t\max\{w_t(\theta),1-\epsilon\},
+&amp;\widehat A_t&lt;0.
+\end{cases}\]</div>
+<p><code>[EXPLANATION · Positive advantage]</code> We want to increase the action probability, but once <span class="math-inline">\(w_t\)</span> reaches <span class="math-inline">\(1+\epsilon\)</span>, further increase gives no additional objective value. A move in the wrong direction, below <span class="math-inline">\(1-\epsilon\)</span>, is <strong>not</strong> clipped away; it continues to reduce the objective.</p>
+<p><code>[EXPLANATION · Negative advantage]</code> We want to decrease the action probability, but once <span class="math-inline">\(w_t\)</span> reaches <span class="math-inline">\(1-\epsilon\)</span>, further decrease gives no additional objective value. A wrong-direction increase above <span class="math-inline">\(1+\epsilon\)</span> continues to hurt.</p>
+<p><code>[SYNTHESIS]</code> PPO does not simply clamp every ratio. It removes the incentive for an excessively large move in the beneficial direction while preserving the penalty for moving far in the harmful direction.</p>
+<h3 id="84-numerical-check-for-a-clipping-width-of-02">8.4 Numerical check for a clipping width of 0.2</h3>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Ratio <span class="math-inline">\(w\)</span></th>
+<th style="text-align: right;"><span class="math-inline">\(\widehat A=+1\)</span></th>
+<th style="text-align: right;"><span class="math-inline">\(\widehat A=-1\)</span></th>
+<th>Interpretation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;"><span class="math-inline">\(0.5\)</span></td>
+<td style="text-align: right;"><span class="math-inline">\(0.5\)</span></td>
+<td style="text-align: right;"><span class="math-inline">\(-0.8\)</span></td>
+<td>A positive action was suppressed; a negative action has already been sufficiently suppressed.</td>
+</tr>
+<tr>
+<td style="text-align: right;"><span class="math-inline">\(0.9\)</span></td>
+<td style="text-align: right;"><span class="math-inline">\(0.9\)</span></td>
+<td style="text-align: right;"><span class="math-inline">\(-0.9\)</span></td>
+<td>Both lie inside the active interval.</td>
+</tr>
+<tr>
+<td style="text-align: right;"><span class="math-inline">\(1.0\)</span></td>
+<td style="text-align: right;"><span class="math-inline">\(1.0\)</span></td>
+<td style="text-align: right;"><span class="math-inline">\(-1.0\)</span></td>
+<td>Old policy.</td>
+</tr>
+<tr>
+<td style="text-align: right;"><span class="math-inline">\(1.1\)</span></td>
+<td style="text-align: right;"><span class="math-inline">\(1.1\)</span></td>
+<td style="text-align: right;"><span class="math-inline">\(-1.1\)</span></td>
+<td>Both lie inside the active interval.</td>
+</tr>
+<tr>
+<td style="text-align: right;"><span class="math-inline">\(1.5\)</span></td>
+<td style="text-align: right;"><span class="math-inline">\(1.2\)</span></td>
+<td style="text-align: right;"><span class="math-inline">\(-1.5\)</span></td>
+<td>Positive improvement saturates; increasing a negative action is still penalized.</td>
+</tr>
+</tbody>
+</table>
+<p><code>[CHECK]</code> For <span class="math-inline">\(\widehat A=-1\)</span> and <span class="math-inline">\(w=0.5\)</span>, the two candidates are <span class="math-inline">\(-0.5\)</span> and <span class="math-inline">\(-0.8\)</span>; the minimum is <span class="math-inline">\(-0.8\)</span>. This is why the objective is flat below <span class="math-inline">\(1-\epsilon\)</span> rather than becoming artificially better.</p>
+<h2 id="9-value-learning-entropy-and-advantage-estimation">9. Value learning, entropy, and advantage estimation</h2>
+<h3 id="91-critic-loss">9.1 Critic loss</h3>
+<p>Suppose the parameters also define a value head <span class="math-inline">\(V_{\theta,t}(s)\)</span>. Given a fixed target <span class="math-inline">\(V_t^{\mathrm{targ}}\)</span>, use</p>
+<div class="math-display">\[\ell_t^{\mathrm{VF}}(\theta)
+:=
+\bigl(V_{\theta,t}(s_t)-V_t^{\mathrm{targ}}\bigr)^2.\]</div>
+<p><code>[EXPLANATION]</code> The critic is a learned baseline. It does not determine which action was sampled; it predicts future return from the state so that the policy can learn from a centered, lower-variance signal.</p>
+<h3 id="92-entropy-bonus">9.2 Entropy bonus</h3>
+<p>The policy entropy at a state is</p>
+<div class="math-display">\[\mathcal H(\pi_{\theta,t}(\cdot\mid s))
+:=
+-\sum_a
+\pi_{\theta,t}(a\mid s)
+\log\pi_{\theta,t}(a\mid s).\]</div>
+<p>Rewarding entropy discourages premature concentration on a few actions. It does not guarantee efficient exploration, as the two-step counterexample showed.</p>
+<h3 id="93-combined-ppo-objective">9.3 Combined PPO objective</h3>
+<p>For coefficients <span class="math-inline">\(c_1,c_2\ge0\)</span>, the lecture writes the maximization objective as</p>
+<div class="math-display">\[\boxed{
+\widehat L^{\mathrm{PPO}}(\theta)
+=
+\widehat{\mathbb E}
+\left[
+\ell_t^{\mathrm{CLIP}}(\theta)
+-c_1\ell_t^{\mathrm{VF}}(\theta)
++c_2\mathcal H(\pi_{\theta,t}(\cdot\mid s_t))
+\right].
+}\]</div>
+<p><code>[SIGN CHECK]</code> If software minimizes a loss instead of maximizing an objective, the signs reverse:</p>
+<div class="math-display">\[\mathcal L_{mathrm{min}}
+=
+-\widehat L^{\mathrm{CLIP}}
++c_1\widehat L^{\mathrm{VF}}
+-c_2\widehat{\mathcal H}.\]</div>
+<h3 id="94-bootstrapped-advantage-estimates">9.4 Bootstrapped advantage estimates</h3>
+<p>Suppose a sampled segment begins at <span class="math-inline">\(t\)</span> and stops at <span class="math-inline">\(b\)</span>, with <span class="math-inline">\(t&lt;b\le T\)</span>. Let <span class="math-inline">\(\widehat V\)</span> be the value predictor used when data were collected and set <span class="math-inline">\(\widehat V_T=0\)</span>. Define</p>
+<div class="math-display">\[V_t^{\mathrm{targ}}
+:=
+\sum_{u=t}^{b-1}r_u(s_u,a_u)
++\widehat V_b(s_b),\]</div>
+<div class="math-display">\[\widehat A_t
+:=
+V_t^{\mathrm{targ}}-\widehat V_t(s_t).\]</div>
+<p><code>[EXPLANATION]</code> The bootstrap value stands in for the unobserved return beyond the segment. If the value estimates are exact, the conditional expectation of <span class="math-inline">\(\widehat A_t\)</span> is the true advantage.</p>
+<h3 id="95-generalized-advantage-estimation">9.5 Generalized advantage estimation</h3>
+<p>Define the one-step temporal-difference residual</p>
+<div class="math-display">\[\delta_u
+:=
+r_u(s_u,a_u)
++\widehat V_{u+1}(s_{u+1})
+-\widehat V_u(s_u).\]</div>
+<p>For <span class="math-inline">\(\lambda\in[0,1]\)</span>, GAE uses</p>
+<div class="math-display">\[\boxed{
+\widehat A_t^{\mathrm{GAE}}
+=
+\sum_{u=t}^{b-1}
+\lambda^{u-t}\delta_u.
+}\]</div>
+<p><code>[DERIVATION · <span class="math-inline">\(\lambda=1\)</span>]</code> The value terms telescope:</p>
+<div class="math-display">\[\begin{aligned}
+\sum_{u=t}^{b-1}\delta_u
+&amp;=
+\sum_{u=t}^{b-1}r_u
++\sum_{u=t}^{b-1}
+(\widehat V_{u+1}-\widehat V_u)\\
+&amp;=
+\sum_{u=t}^{b-1}r_u
++\widehat V_b-\widehat V_t.
+\end{aligned}\]</div>
+<p>This recovers the bootstrapped segment-return advantage.</p>
+<p><code>[EXPLANATION]</code> Smaller <span class="math-inline">\(\lambda\)</span> emphasizes short lookaheads. This usually lowers sampling variance but relies more heavily on the learned value function and can therefore introduce more bias when the critic is inaccurate.</p>
+<h3 id="96-backward-computation-of-gae">9.6 Backward computation of GAE</h3>
+<p>GAE need not be computed with a nested sum. Traverse the segment backward:</p>
+<pre><code class="language-python">gae = 0.0
+advantages = zeros_like(rewards)
+
+for t in reversed(range(segment_length)):
+    delta = rewards[t] + values[t + 1] - values[t]
+    gae = delta + lam * gae
+    advantages[t] = gae
+
+value_targets = advantages + values[:-1]
+</code></pre>
+<p><code>[IMPLEMENTATION NOTE]</code> For discounted problems, implementations usually insert a discount <span class="math-inline">\(\gamma\)</span> into both the TD residual and recursion. The lecture's displayed finite-horizon formulas use undiscounted returns, so <span class="math-inline">\(\gamma\)</span> is omitted here rather than silently added.</p>
+<h2 id="10-the-ppo-training-loop">10. The PPO training loop</h2>
+<p><code>[DIRECT]</code> One outer iteration follows this sequence:</p>
+<ol>
+<li>Freeze <span class="math-inline">\(\theta_{\mathrm{old}}\)</span>.</li>
+<li>Collect trajectories using <span class="math-inline">\(\pi_{\theta_{\mathrm{old}}}\)</span>.</li>
+<li>Store old action log-probabilities.</li>
+<li>Compute fixed advantages and value targets.</li>
+<li>Initialize the trainable parameters at <span class="math-inline">\(\theta_{\mathrm{old}}\)</span>.</li>
+<li>Take several epochs of minibatch gradient steps on the combined objective.</li>
+<li>Hold the old log-probabilities, advantages, and targets fixed throughout those epochs.</li>
+<li>Make the resulting policy the next data-collection policy and repeat.</li>
+</ol>
+<h3 id="101-minimal-implementation-skeleton">10.1 Minimal implementation skeleton</h3>
+<pre><code class="language-python"># rollout tensors are fixed for all PPO epochs
+obs, actions, old_logp, advantages, value_targets = rollout_batch
+
+for _ in range(ppo_epochs):
+    for mb in minibatches(rollout_batch):
+        logp, values, entropy = model.evaluate(mb.obs, mb.actions)
+
+        ratio = exp(logp - mb.old_logp)
+        unclipped = ratio * mb.advantages
+        clipped = clip(ratio, 1 - eps, 1 + eps) * mb.advantages
+        policy_objective = mean(minimum(unclipped, clipped))
+
+        value_loss = mean((values - mb.value_targets) ** 2)
+        entropy_bonus = mean(entropy)
+
+        # optimizer minimizes, so negate the maximization objective
+        loss = -policy_objective + c1 * value_loss - c2 * entropy_bonus
+
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+</code></pre>
+<p><code>[CHECK]</code> The ratio should equal one before the first update on a fresh batch. If it does not, the stored old log-probability and the recomputed log-probability are not describing the same policy, observations, actions, or masking convention.</p>
+<p><code>[CHECK]</code> Advantage normalization, masking padded tokens, value clipping, gradient clipping, KL-based early stopping, and distributed batching are common engineering additions, but they are not part of the lecture's displayed derivation and should be documented separately when used.</p>
+<h2 id="11-connections-to-language-model-post-training">11. Connections to language-model post-training</h2>
+<h3 id="111-ppo-for-language-model-alignment">11.1 PPO for language-model alignment</h3>
+<p><code>[DIRECT]</code> InstructGPT uses PPO with a learned value function and adds a per-token KL penalty toward a fixed reference policy <span class="math-inline">\(\pi_{\mathrm{ref}}\)</span>, usually the supervised fine-tuned model.</p>
+<p><code>[EXPLANATION]</code> Two different anchors are present:</p>
+<ul>
+<li><span class="math-inline">\(\pi_{\mathrm{old}}\)</span> changes every batch and controls the size of one PPO update;</li>
+<li><span class="math-inline">\(\pi_{\mathrm{ref}}\)</span> stays fixed and discourages the trained policy from drifting too far from the supervised model over the whole run.</li>
+</ul>
+<p>The reference KL is not the same as an entropy bonus. At a fixed state,</p>
+<div class="math-display">\[-D_{\mathrm{KL}}(\pi\|\pi_{\mathrm{ref}})
+=
+\mathcal H(\pi)
++\mathbb E_{a\sim\pi}[\log\pi_{\mathrm{ref}}(a)].\]</div>
+<p>It rewards entropy but also specifically favors actions the reference considers likely.</p>
+<h3 id="112-removing-the-learned-critic">11.2 Removing the learned critic</h3>
+<p><code>[DIRECT]</code> GRPO keeps a clipped policy term but estimates advantages by sampling several responses to the same prompt and comparing their rewards. It therefore removes the learned value model. Its objective includes a reference-policy KL and no separate entropy bonus.</p>
+<p><code>[SYNTHESIS]</code> This creates the bridge to Lecture 13. PPO's policy-ratio machinery can remain while the source of the advantage estimate changes from a token-level critic to a same-prompt group statistic.</p>
+<p><code>[CAUTION]</code> Group-relative response-level estimators are not generally unbiased estimators of the token-level advantage <span class="math-inline">\(A_t^{\pi_{\mathrm{old}}}(s_t,a_t)\)</span> defined in this lecture.</p>
+<h3 id="113-later-changes-to-regularization">11.3 Later changes to regularization</h3>
+<p><code>[DIRECT]</code> DAPO removes the fixed-reference KL penalty and uses different lower and upper clipping thresholds. A larger upper threshold allows more increase for actions with positive estimated advantage, which is intended to counter entropy collapse.</p>
+<p><code>[SYNTHESIS]</code> Across PPO, GRPO, and DAPO, the clipped policy term is comparatively stable while three design choices vary:</p>
+<ol>
+<li>how advantages are estimated;</li>
+<li>whether a learned critic is used;</li>
+<li>how the policy is regularized.</li>
+</ol>
+<h2 id="12-what-each-approximation-changes">12. What each approximation changes</h2>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Exact object</th>
+<th>Approximation or replacement</th>
+<th>Main risk</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>REINFORCE</td>
+<td><span class="math-inline">\(\nabla J(\theta)\)</span> under current-policy trajectories</td>
+<td>Monte Carlo batch average</td>
+<td>High variance</td>
+</tr>
+<tr>
+<td>Baseline/critic</td>
+<td>Exact advantage</td>
+<td>Learned value prediction</td>
+<td>Bias or noise from critic error</td>
+</tr>
+<tr>
+<td>Surrogate</td>
+<td>Candidate occupancy <span class="math-inline">\(\rho_{\widetilde\pi}\)</span></td>
+<td>Old occupancy <span class="math-inline">\(\rho_\pi\)</span></td>
+<td>Error grows when the policy moves far</td>
+</tr>
+<tr>
+<td>TRPO theory → practice</td>
+<td>Maximum KL over all states</td>
+<td>Average KL over sampled old states</td>
+<td>Rare-state changes can be hidden</td>
+</tr>
+<tr>
+<td>TRPO → PPO</td>
+<td>Explicit KL constraint</td>
+<td>Clipped per-sample incentive</td>
+<td>Clipping does not strictly enforce a KL bound</td>
+</tr>
+<tr>
+<td>Full episodes → segments</td>
+<td>Complete return</td>
+<td>Bootstrap from <span class="math-inline">\(\widehat V\)</span></td>
+<td>Dependence on value accuracy</td>
+</tr>
+<tr>
+<td>Long lookahead → GAE</td>
+<td>Monte Carlo-like advantage</td>
+<td><span class="math-inline">\(\lambda\)</span>-weighted TD residuals</td>
+<td>Bias-variance tradeoff</td>
+</tr>
+</tbody>
+</table>
+<p><code>[SYNTHESIS]</code> “PPO is stable” should not be interpreted as a theorem that clipping guarantees improvement. The monotonic theorem belongs to a stronger idealized setup. PPO is a practical surrogate whose behavior should still be monitored through KL, clipping fraction, value error, entropy, and achieved return.</p>
+<h2 id="13-common-conceptual-and-implementation-mistakes">13. Common conceptual and implementation mistakes</h2>
+<h3 id="131-confusing-old-and-reference-policies">13.1 Confusing old and reference policies</h3>
+<p>The old policy is the batch behavior policy. The reference policy is a longer-term regularization anchor. They may coincide at one moment but have different roles.</p>
+<h3 id="132-recomputing-old-quantities-after-an-update">13.2 Recomputing “old” quantities after an update</h3>
+<p>If <code>old_logp</code> is recomputed with current parameters, the ratio collapses toward one and no longer measures policy change. Old log-probabilities must be stored or evaluated by a frozen model.</p>
+<h3 id="133-differentiating-through-the-advantage-target">13.3 Differentiating through the advantage target</h3>
+<p>The policy-gradient argument treats <span class="math-inline">\(\widehat A_t\)</span> as fixed. If actor and critic share a network, the advantage should be detached for the policy term unless a deliberately different objective is intended.</p>
+<h3 id="134-thinking-clipping-bounds-the-ratio-everywhere">13.4 Thinking clipping bounds the ratio everywhere</h3>
+<p>Clipping bounds the objective's incentive in one favorable direction; it does not project the policy into <span class="math-inline">\([1-\epsilon,1+\epsilon]\)</span> for every sample. Ratios can and do leave that interval.</p>
+<h3 id="135-assuming-a-small-average-kl-implies-every-state-is-safe">13.5 Assuming a small average KL implies every state is safe</h3>
+<p>The theoretical guarantee uses a maximum over all states. Practical average KL may miss a large shift at a state that is rare under the old policy.</p>
+<h3 id="136-treating-monotone-local-improvement-as-global-optimization">13.6 Treating monotone local improvement as global optimization</h3>
+<p>The exploration example shows that coordinated changes at unvisited states may be invisible or look locally harmful.</p>
+<h2 id="14-compact-derivation-chain">14. Compact derivation chain</h2>
+<p>The lecture's main chain can be compressed into six statements:</p>
+<ol>
+<li><strong>Score identity</strong></li>
+</ol>
+<div class="math-display">\[\nabla J(\theta)
+   =\mathbb E_{\pi_\theta}
+   \left[R(\tau)\nabla\log p_\theta(\tau)\right].\]</div>
+<ol start="2">
+<li><strong>Trajectory score decomposes</strong></li>
+</ol>
+<div class="math-display">\[\nabla\log p_\theta(\tau)
+   =\sum_t\nabla\log\pi_{\theta,t}(a_t\mid s_t).\]</div>
+<ol start="3">
+<li><strong>Exact performance difference</strong></li>
+</ol>
+<div class="math-display">\[J(\widetilde\pi)-J(\pi)
+   =\mathbb E_{\widetilde\pi}\left[\sum_tA_t^\pi\right].\]</div>
+<ol start="4">
+<li><strong>Freeze the state distribution</strong></li>
+</ol>
+<div class="math-display">\[L_\pi(\widetilde\pi)-J(\pi)
+   =\mathbb E_{\pi}
+   \left[
+   \sum_t
+   \frac{\widetilde\pi_t(a_t\mid s_t)}{\pi_t(a_t\mid s_t)}
+   A_t^\pi(s_t,a_t)
+   \right].\]</div>
+<ol start="5">
+<li><strong>Control the surrogate error</strong></li>
+</ol>
+<div class="math-display">\[J(\widetilde\pi)
+   \ge
+   L_\pi(\widetilde\pi)
+   -C_\pi D_{\mathrm{KL}}^{\max}(\pi,\widetilde\pi).\]</div>
+<ol start="6">
+<li><strong>Replace constrained optimization with clipping</strong></li>
+</ol>
+<div class="math-display">\[\ell^{\mathrm{CLIP}}
+   =\min\{w\widehat A,\operatorname{clip}(w,1-\epsilon,1+\epsilon)\widehat A\}.\]</div>
+<p><code>[SYNTHESIS]</code> Every step trades something: exactness for sampleability, variance for critic dependence, candidate-state accuracy for data reuse, worst-case control for practical averages, and a hard trust region for a clipped heuristic.</p>
+<h2 id="15-open-questions-for-manual-study">15. Open questions for manual study</h2>
+<ul>
+<li><code>[OPEN]</code> In what regimes does average KL provide enough control even though the theorem requires maximum KL?</li>
+<li><code>[OPEN]</code> Can a practical diagnostic detect rare-state policy changes that average KL misses?</li>
+<li><code>[OPEN]</code> How should <span class="math-inline">\(\epsilon\)</span>, the number of PPO epochs, and learning rate be coupled rather than tuned independently?</li>
+<li><code>[OPEN]</code> When actor and critic share most parameters, how much does critic optimization alter the effective policy step outside the clipped surrogate analysis?</li>
+<li><code>[OPEN]</code> In language modeling, when is a token-level critic preferable to group-relative response baselines?</li>
+<li><code>[OPEN]</code> Which parts of the trust-region derivation survive when rewards or transitions depend on the model parameters?</li>
+<li><code>[OPEN]</code> How does the exploration counterexample change under intrinsic rewards, optimistic value estimates, or explicit coverage objectives?</li>
+</ul>
+<h2 id="16-source-trail">16. Source trail</h2>
+<p><code>[DIRECT]</code> The lecture notes cite the following primary works:</p>
+<ol>
+<li>Williams (1992), <a href="https://doi.org/10.1007/BF00992696">REINFORCE</a>.</li>
+<li>Kakade and Langford (2002), <em>Approximately Optimal Approximate Reinforcement Learning</em>.</li>
+<li>Schulman et al. (2015), <a href="https://arxiv.org/abs/1502.05477">Trust Region Policy Optimization</a>.</li>
+<li>Schulman et al. (2017), <a href="https://arxiv.org/abs/1707.06347">Proximal Policy Optimization Algorithms</a>.</li>
+<li>Schulman et al. (2016), <a href="https://arxiv.org/abs/1506.02438">Generalized Advantage Estimation</a>.</li>
+<li>Ouyang et al. (2022), <a href="https://arxiv.org/abs/2203.02155">Training language models to follow instructions with human feedback</a>.</li>
+<li>Shao et al. (2024), <a href="https://arxiv.org/abs/2402.03300">DeepSeekMath</a>.</li>
+<li>Yu et al. (2025), <a href="https://arxiv.org/abs/2503.14476">DAPO</a>.</li>
+</ol>
+<h2 id="revision-log">Revision log</h2>
+<ul>
+<li><strong>2026-10-12 — AI-assisted first draft.</strong> Reconstructed the complete Lecture 11 sequence, expanded both main proofs, added clipping case analysis, GAE recursion, implementation checks, and a bridge to Lecture 13. Manual verification remains pending.</li>
+</ul>
+      </article>
+    </div>
+  </main>
+
+  <footer class="site-footer section-shell">
+    <div><strong>CS 395T</strong><span>Learning note</span></div>
+    <p>Markdown source · draft</p>
+    <a href="../index.html#notes">Return to index ←</a>
+  </footer>
+</body>
+</html>

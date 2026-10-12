@@ -6,6 +6,7 @@
   <meta name="description" content="An AI-assisted first reconstruction of the decoder-only Transformer: tokenization, attention, positional information, normalization, MLPs, unembedding, and the full pre-norm residual stack.">
   <title>Lecture 03 — Transformer Architecture — CS 395T</title>
   <link rel="stylesheet" href="../assets/styles.css">
+  <link rel="stylesheet" href="../assets/transformer-lab.css">
   <script>
     window.MathJax = {
       tex: {
@@ -15,6 +16,7 @@
     };
   </script>
   <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js" defer></script>
+  <script src="../assets/transformer-lab.js" defer></script>
   <script src="../assets/app.js" defer></script>
 </head>
 <body>
@@ -52,6 +54,7 @@
 </ul>
 </li>
 <li><a href="#reading-map">Reading map</a></li>
+<li><a href="#interactive-transformer-visual-lab">Interactive Transformer visual lab</a></li>
 <li><a href="#learning-goals">Learning goals</a></li>
 <li><a href="#1-from-text-to-vectors">1. From text to vectors</a><ul>
 <li><a href="#11-why-subword-tokenization-is-a-compromise">1.1 Why subword tokenization is a compromise</a></li>
@@ -164,6 +167,161 @@
 </tr>
 </tbody>
 </table>
+<h2 id="interactive-transformer-visual-lab">Interactive Transformer visual lab</h2>
+<ul>
+<li><code>[SYNTHESIS]</code> The two animations below use a deliberately tiny decoder-only model. The first traces one token through the complete residual stream; the second exposes every step of scaled dot-product attention. The numerical vectors are pedagogical toy values, not activations from a trained language model.</li>
+</ul>
+<div class="transformer-lab" data-transformer-lab>
+  <section class="transformer-lab__section" aria-labelledby="transformer-flow-title">
+    <div class="transformer-lab__heading">
+      <div>
+        <p class="transformer-lab__kicker">ANIMATION 01 · THE WHOLE DECODER</p>
+        <h3 id="transformer-flow-title">Follow one token through the residual stream</h3>
+      </div>
+      <p>Press play or select a stage. The purple path is the representation currently being transformed; the thin vertical rail is the information-preserving residual stream.</p>
+    </div>
+
+    <div class="transformer-flow" data-transformer-flow>
+      <div class="transformer-flow__controls">
+        <button type="button" class="transformer-lab__button transformer-lab__button--primary" data-flow-play aria-pressed="false">Play forward pass</button>
+        <button type="button" class="transformer-lab__button" data-flow-previous>Previous</button>
+        <button type="button" class="transformer-lab__button" data-flow-next>Next</button>
+        <span data-flow-progress aria-live="polite">1 / 7</span>
+      </div>
+
+      <div class="transformer-flow__body">
+        <div class="transformer-stack" role="img" aria-label="Interactive decoder-only Transformer architecture diagram">
+          <div class="transformer-stack__rail" aria-hidden="true"><span></span></div>
+          <button type="button" class="transformer-node is-active" data-flow-stage="0" aria-pressed="true">
+            <span>01</span><strong>Token IDs</strong><small>discrete sequence v₁…vₜ</small>
+          </button>
+          <i class="transformer-arrow" aria-hidden="true">↑</i>
+          <button type="button" class="transformer-node" data-flow-stage="1" aria-pressed="false">
+            <span>02</span><strong>Embedding + position</strong><small>X⁽⁰⁾ ∈ ℝᵈˣᵀ</small>
+          </button>
+          <i class="transformer-arrow" aria-hidden="true">↑</i>
+          <div class="transformer-block" data-block>
+            <p>REPEATED L TIMES</p>
+            <button type="button" class="transformer-node" data-flow-stage="2" aria-pressed="false">
+              <span>03</span><strong>Norm → masked MHA</strong><small>tokens exchange prefix information</small>
+            </button>
+            <div class="transformer-add" aria-label="Add attention update to residual stream">＋ residual</div>
+            <button type="button" class="transformer-node" data-flow-stage="3" aria-pressed="false">
+              <span>04</span><strong>Norm → MLP</strong><small>each position computes locally</small>
+            </button>
+            <div class="transformer-add" aria-label="Add MLP update to residual stream">＋ residual</div>
+          </div>
+          <i class="transformer-arrow" aria-hidden="true">↑</i>
+          <button type="button" class="transformer-node" data-flow-stage="4" aria-pressed="false">
+            <span>05</span><strong>Final norm</strong><small>prepare the residual state for readout</small>
+          </button>
+          <i class="transformer-arrow" aria-hidden="true">↑</i>
+          <button type="button" class="transformer-node" data-flow-stage="5" aria-pressed="false">
+            <span>06</span><strong>Unembedding</strong><small>one logit per vocabulary item</small>
+          </button>
+          <i class="transformer-arrow" aria-hidden="true">↑</i>
+          <button type="button" class="transformer-node" data-flow-stage="6" aria-pressed="false">
+            <span>07</span><strong>Softmax</strong><small>p(next token | prefix)</small>
+          </button>
+        </div>
+
+        <div class="transformer-flow__explanation" aria-live="polite">
+          <p class="transformer-flow__eyebrow" data-flow-eyebrow>STEP 01 · DISCRETE INPUT</p>
+          <h4 data-flow-title>Tokenization gives the model indices, not meanings</h4>
+          <p data-flow-description>Each token is an integer address into the embedding table. Geometry appears only after lookup.</p>
+          <div class="transformer-flow__tensor">
+            <span>current object</span>
+            <strong data-flow-tensor>token_ids: [T]</strong>
+          </div>
+          <pre><code data-flow-code>token_ids = tokenizer(text)
+# [T] integers in {0, …, |V| − 1}</code></pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="transformer-lab__section attention-lab" aria-labelledby="attention-lab-title">
+    <div class="transformer-lab__heading">
+      <div>
+        <p class="transformer-lab__kicker">ANIMATION 02 · INSIDE ONE HEAD</p>
+        <h3 id="attention-lab-title">Open the scaled dot-product calculation</h3>
+      </div>
+      <p>Choose a query token, then walk from Q/K/V projections to the weighted value sum. The numbers are computed in your browser from visible two-dimensional toy vectors.</p>
+    </div>
+
+    <div class="attention-lab__toolbar">
+      <div>
+        <span>Query token</span>
+        <div class="attention-lab__tokens" data-query-tokens role="group" aria-label="Choose query token"></div>
+      </div>
+      <label class="attention-lab__mask">
+        <input type="checkbox" data-causal checked>
+        <span><strong>Causal mask</strong><small>hide keys to the right of the query</small></span>
+      </label>
+    </div>
+
+    <div class="attention-lab__steps" role="group" aria-label="Attention calculation step">
+      <button type="button" data-attention-stage="0" class="is-active" aria-pressed="true"><span>01</span>Project Q/K/V</button>
+      <button type="button" data-attention-stage="1" aria-pressed="false"><span>02</span>Dot products</button>
+      <button type="button" data-attention-stage="2" aria-pressed="false"><span>03</span>Scale + mask</button>
+      <button type="button" data-attention-stage="3" aria-pressed="false"><span>04</span>Softmax</button>
+      <button type="button" data-attention-stage="4" aria-pressed="false"><span>05</span>Mix values</button>
+    </div>
+
+    <div class="attention-lab__canvas">
+      <div class="attention-vectors">
+        <div class="attention-vectors__query">
+          <span>selected query</span>
+          <strong data-query-label>sleep</strong>
+          <code data-query-vector>q = [0.90, 0.70]</code>
+        </div>
+        <div class="attention-vectors__rows" data-attention-rows></div>
+      </div>
+
+      <div class="attention-matrix-panel">
+        <div class="attention-matrix-panel__header">
+          <div><span>attention matrix</span><strong>rows = queries · columns = keys</strong></div>
+          <button type="button" class="transformer-lab__button" data-attention-play aria-pressed="false">Play calculation</button>
+        </div>
+        <div class="attention-matrix" data-attention-matrix role="img" aria-label="Toy causal attention weight matrix"></div>
+        <p class="attention-lab__output" data-attention-output aria-live="polite">First compute the query, key, and value projections for every token.</p>
+      </div>
+    </div>
+
+    <div class="attention-lab__formula">
+      <div>
+        <span data-attention-eyebrow>STEP 01 · LINEAR PROJECTIONS</span>
+        <strong data-attention-formula>qᵢ = WQ xᵢ · kⱼ = WK xⱼ · vⱼ = WV xⱼ</strong>
+      </div>
+      <pre><code data-attention-code>Q = X @ W_Q
+K = X @ W_K
+V = X @ W_V</code></pre>
+    </div>
+
+    <p class="transformer-lab__caveat"><strong>Honesty note.</strong> This head is intentionally two-dimensional and hand designed so its arithmetic can be inspected. It explains the mechanism; it does not claim to reproduce a trained model's learned attention pattern.</p>
+  </section>
+
+  <section class="transformer-lab__section external-explainer" aria-labelledby="external-explainer-title">
+    <div class="transformer-lab__heading">
+      <div>
+        <p class="transformer-lab__kicker">EXTERNAL LAB · OPTIONAL</p>
+        <h3 id="external-explainer-title">Run a real GPT-2 visualization</h3>
+      </div>
+      <p><em>Transformer Explainer</em> is an open-source Georgia Tech project that runs a GPT-2 model in the browser. It is loaded only when you ask, so the note itself remains fast and usable offline.</p>
+    </div>
+    <div class="external-explainer__frame" data-external-frame>
+      <div class="external-explainer__placeholder">
+        <span>THIRD-PARTY INTERACTIVE</span>
+        <p>Loading connects this page to <code>poloclub.github.io</code>. If embedding is blocked by the browser, use the direct link.</p>
+        <button type="button" class="transformer-lab__button transformer-lab__button--primary" data-load-external>Load Transformer Explainer</button>
+        <a href="https://poloclub.github.io/transformer-explainer/" target="_blank" rel="noopener noreferrer">Open in a new tab ↗</a>
+      </div>
+    </div>
+    <p class="external-explainer__credit">Created by Aeree Cho and collaborators at Georgia Tech's Polo Club; source available under the MIT License on <a href="https://github.com/poloclub/transformer-explainer" target="_blank" rel="noopener noreferrer">GitHub</a>.</p>
+  </section>
+</div>
+
+
 <h2 id="learning-goals">Learning goals</h2>
 <ul>
 <li>After working through the note manually, I should be able to:</li>

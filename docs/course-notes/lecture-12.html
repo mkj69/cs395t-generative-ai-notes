@@ -1,0 +1,802 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A detailed AI-assisted study scaffold for supervised fine-tuning, reward modeling, PPO-based RLHF, and the derivation and implementation of direct preference optimization.">
+  <title>Lecture 12 — SFT, RLHF, and DPO — CS 395T</title>
+  <link rel="stylesheet" href="../assets/styles.css">
+  <script>
+    window.MathJax = {
+      tex: {
+        processEscapes: true
+      },
+      svg: { fontCache: 'global' }
+    };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js" defer></script>
+  <script src="../assets/app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header">
+    <a class="wordmark" href="../index.html"><span>CS 395T</span><small>Learning &amp; research notebook</small></a>
+    <button class="menu-button" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button>
+    <nav id="site-nav" class="site-nav" aria-label="Primary navigation">
+      <a href="../structure.html">Structure</a>
+      <a href="../index.html#notes">Index</a>
+      <a href="../method.html">Writing guide</a>
+      <a href="../index.html#about">About</a>
+    </nav>
+  </header>
+
+  <main id="main" class="note-shell">
+    <header class="note-hero">
+      <div class="template-banner learning-banner">
+        <strong>LEARNING NOTE · DRAFT</strong>
+        <span>Work in progress</span>
+      </div>
+      <p class="eyebrow">05 OCT 2026 · DRAFT</p>
+      <h1>Lecture 12 — SFT, RLHF, and DPO</h1>
+      <p class="note-abstract">A detailed AI-assisted study scaffold for supervised fine-tuning, reward modeling, PPO-based RLHF, and the derivation and implementation of direct preference optimization.</p>
+      <ul class="tag-list" aria-label="Topics"><li>supervised fine-tuning</li><li>preference learning</li><li>reward modeling</li><li>RLHF</li><li>DPO</li><li>KL regularization</li><li>post-training</li></ul>
+    </header>
+
+    <div class="note-layout">
+      <aside class="note-toc" aria-label="On this page">
+        <p class="aside-label">ON THIS PAGE</p>
+        <div class="toc">
+<ul>
+<li><a href="#source-boundary">Source boundary</a></li>
+<li><a href="#reading-map">Reading map</a></li>
+<li><a href="#1-post-training-changes-the-behavioral-objective">1. Post-training changes the behavioral objective</a><ul>
+<li><a href="#11-pretraining-is-not-instruction-following">1.1 Pretraining is not instruction following</a></li>
+<li><a href="#12-three-distributions-must-be-distinguished">1.2 Three distributions must be distinguished</a></li>
+</ul>
+</li>
+<li><a href="#2-supervised-fine-tuning">2. Supervised fine-tuning</a><ul>
+<li><a href="#21-demonstration-likelihood">2.1 Demonstration likelihood</a></li>
+<li><a href="#22-which-tokens-contribute-to-the-loss">2.2 Which tokens contribute to the loss?</a></li>
+<li><a href="#23-token-averaging-versus-example-averaging">2.3 Token averaging versus example averaging</a></li>
+<li><a href="#24-minimal-sft-loss">2.4 Minimal SFT loss</a></li>
+<li><a href="#25-what-sft-can-and-cannot-infer">2.5 What SFT can and cannot infer</a></li>
+</ul>
+</li>
+<li><a href="#3-from-comparisons-to-a-reward-model">3. From comparisons to a reward model</a><ul>
+<li><a href="#31-preference-data">3.1 Preference data</a></li>
+<li><a href="#32-bradley-terry-preference-model">3.2 Bradley-Terry preference model</a></li>
+<li><a href="#33-reward-model-likelihood">3.3 Reward-model likelihood</a></li>
+<li><a href="#34-reward-is-identifiable-only-up-to-a-prompt-dependent-shift">3.4 Reward is identifiable only up to a prompt-dependent shift</a></li>
+<li><a href="#35-minimal-reward-model-loss">3.5 Minimal reward-model loss</a></li>
+</ul>
+</li>
+<li><a href="#4-ppo-based-rlhf">4. PPO-based RLHF</a><ul>
+<li><a href="#41-the-kl-regularized-objective">4.1 The KL-regularized objective</a></li>
+<li><a href="#42-why-the-sampled-log-ratio-is-a-kl-penalty">4.2 Why the sampled log-ratio is a KL penalty</a></li>
+<li><a href="#43-reference-policy-versus-old-policy">4.3 Reference policy versus old policy</a></li>
+<li><a href="#44-why-not-maximize-learned-reward-without-constraint">4.4 Why not maximize learned reward without constraint?</a></li>
+<li><a href="#45-where-ppo-enters">4.5 Where PPO enters</a></li>
+</ul>
+</li>
+<li><a href="#5-dpo-starts-from-the-same-regularized-control-problem">5. DPO starts from the same regularized control problem</a><ul>
+<li><a href="#51-solve-for-the-optimal-policy-at-one-prompt">5.1 Solve for the optimal policy at one prompt</a></li>
+<li><a href="#52-stationarity-calculation">5.2 Stationarity calculation</a></li>
+<li><a href="#53-invert-the-policy-reward-relation">5.3 Invert the policy-reward relation</a></li>
+</ul>
+</li>
+<li><a href="#6-the-dpo-loss">6. The DPO loss</a><ul>
+<li><a href="#61-the-partition-function-cancels-in-comparisons">6.1 The partition function cancels in comparisons</a></li>
+<li><a href="#62-parameterize-the-optimal-policy-directly">6.2 Parameterize the optimal policy directly</a></li>
+<li><a href="#63-why-the-reference-policy-does-not-cancel">6.3 Why the reference policy does not cancel</a></li>
+</ul>
+</li>
+<li><a href="#7-understanding-the-dpo-gradient">7. Understanding the DPO gradient</a></li>
+<li><a href="#8-a-small-numerical-example">8. A small numerical example</a></li>
+<li><a href="#9-minimal-dpo-implementation">9. Minimal DPO implementation</a><ul>
+<li><a href="#91-sequence-log-probabilities">9.1 Sequence log-probabilities</a></li>
+<li><a href="#92-pairwise-loss">9.2 Pairwise loss</a></li>
+</ul>
+</li>
+<li><a href="#10-sft-reward-model-rlhf-and-dpo-compared">10. SFT, reward-model RLHF, and DPO compared</a></li>
+<li><a href="#11-important-subtleties">11. Important subtleties</a><ul>
+<li><a href="#111-dpo-is-offline-with-respect-to-its-pair-dataset">11.1 DPO is offline with respect to its pair dataset</a></li>
+<li><a href="#112-the-meaning-of-beta">11.2 The meaning of beta</a></li>
+<li><a href="#113-sequence-length-changes-log-probability-scale">11.3 Sequence length changes log-probability scale</a></li>
+<li><a href="#114-reference-support-matters">11.4 Reference support matters</a></li>
+<li><a href="#115-preference-labels-need-not-define-a-universal-reward">11.5 Preference labels need not define a universal reward</a></li>
+<li><a href="#116-low-training-loss-is-not-sufficient-evaluation">11.6 Low training loss is not sufficient evaluation</a></li>
+</ul>
+</li>
+<li><a href="#12-relationship-to-lectures-11-and-13">12. Relationship to Lectures 11 and 13</a><ul>
+<li><a href="#121-from-lecture-11">12.1 From Lecture 11</a></li>
+<li><a href="#122-toward-lecture-13">12.2 Toward Lecture 13</a></li>
+</ul>
+</li>
+<li><a href="#13-a-diagnostic-checklist">13. A diagnostic checklist</a><ul>
+<li><a href="#sft">SFT</a></li>
+<li><a href="#reward-modeling">Reward modeling</a></li>
+<li><a href="#ppo-based-rlhf">PPO-based RLHF</a></li>
+<li><a href="#dpo">DPO</a></li>
+</ul>
+</li>
+<li><a href="#14-compact-derivation-chain">14. Compact derivation chain</a></li>
+<li><a href="#15-open-questions-for-manual-study">15. Open questions for manual study</a></li>
+<li><a href="#16-source-trail">16. Source trail</a></li>
+<li><a href="#revision-log">Revision log</a></li>
+</ul>
+</div>
+
+      </aside>
+      <article class="prose note-prose markdown-body">
+        <blockquote>
+<p><strong>AI-assisted study scaffold, not a lecture transcript.</strong> The course schedule lists Lecture 12 as a student-presentation session on SFT, RLHF, and DPO, but it does not publish a unified handout for this lecture. This note therefore does not claim to reconstruct what the presenters said. It develops the named topics from the primary papers listed below and marks derivations and synthesis explicitly. It has not yet been manually verified or rewritten by the author.</p>
+</blockquote>
+<h2 id="source-boundary">Source boundary</h2>
+<p><code>[DIRECT · COURSE SCHEDULE]</code> The official schedule names the October 5 session <strong>“Post-training I (Student Presentations #1): SFT, RLHF, and DPO.”</strong> It does not link lecture notes or slides for that session: <a href="https://noahgol.github.io/teaching/cs395t-f26/">https://noahgol.github.io/teaching/cs395t-f26/</a>.</p>
+<p><code>[DIRECT · PRIMARY SOURCES]</code> The main technical sources used here are:</p>
+<ol>
+<li>Ouyang et al. (2022), <a href="https://arxiv.org/abs/2203.02155">Training language models to follow instructions with human feedback</a>.</li>
+<li>Christiano et al. (2017), <a href="https://arxiv.org/abs/1706.03741">Deep reinforcement learning from human preferences</a>.</li>
+<li>Rafailov et al. (2023), <a href="https://arxiv.org/abs/2305.18290">Direct Preference Optimization</a>.</li>
+</ol>
+<p><code>[SOURCE BOUNDARY]</code> Statements labeled <code>[DIRECT]</code> are attributable to these sources or to the course schedule. <code>[DERIVATION]</code> lines work through the mathematics. <code>[EXPLANATION]</code> and <code>[SYNTHESIS]</code> organize the ideas but are not reported classroom claims.</p>
+<p><code>[SYNTHESIS]</code> The central problem is that next-token pretraining and desired assistant behavior are different objectives. Post-training supplies a narrower behavioral signal:</p>
+<ul>
+<li>demonstrations say <strong>what response to imitate</strong>;</li>
+<li>comparisons say <strong>which of two responses is preferred</strong>;</li>
+<li>RLHF turns those comparisons into a reward and optimizes it;</li>
+<li>DPO eliminates the explicit reward-model-plus-RL loop by fitting a policy directly to the comparisons under a specific model of preferences and KL-regularized optimization.</li>
+</ul>
+<h2 id="reading-map">Reading map</h2>
+<table>
+<thead>
+<tr>
+<th>Part</th>
+<th>Data</th>
+<th>Learned object</th>
+<th>Main question</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>SFT</td>
+<td>Prompt-response demonstrations <span class="math-inline">\((x,y^*)\)</span></td>
+<td>Policy <span class="math-inline">\(\pi_\theta(y\mid x)\)</span></td>
+<td>Can the model imitate desired behavior?</td>
+</tr>
+<tr>
+<td>Reward modeling</td>
+<td>Preference triples <span class="math-inline">\((x,y_w,y_l)\)</span></td>
+<td>Scalar score <span class="math-inline">\(r_\phi(x,y)\)</span></td>
+<td>Can pairwise judgments be generalized to unseen responses?</td>
+</tr>
+<tr>
+<td>PPO-based RLHF</td>
+<td>Prompts and policy samples</td>
+<td>Policy plus value model</td>
+<td>Can expected learned reward be increased without drifting too far?</td>
+</tr>
+<tr>
+<td>DPO</td>
+<td>Static preference triples</td>
+<td>Policy relative to a reference</td>
+<td>Can the KL-regularized optimum be fitted without explicit reward modeling or online RL?</td>
+</tr>
+</tbody>
+</table>
+<h2 id="1-post-training-changes-the-behavioral-objective">1. Post-training changes the behavioral objective</h2>
+<h3 id="11-pretraining-is-not-instruction-following">1.1 Pretraining is not instruction following</h3>
+<p><code>[DIRECT · INSTRUCTGPT]</code> The InstructGPT paper starts from a mismatch: predicting the next token on internet text is not the same objective as following a user's instruction helpfully and safely.</p>
+<p><code>[EXPLANATION]</code> A pretrained model can contain useful knowledge and capabilities while assigning substantial probability to responses that are evasive, badly formatted, unhelpful, or inconsistent with the intended role. Post-training does not create a clean separation between “knowledge” and “behavior,” but it supplies examples and comparisons that directly concern behavior on prompts of interest.</p>
+<h3 id="12-three-distributions-must-be-distinguished">1.2 Three distributions must be distinguished</h3>
+<p>Let</p>
+<ul>
+<li><span class="math-inline">\(\mathcal D_{mathrm{pre}}\)</span> be the pretraining text distribution;</li>
+<li><span class="math-inline">\(\mathcal D_{mathrm{prompt}}\)</span> be the prompts on which the assistant will be trained or deployed;</li>
+<li><span class="math-inline">\(\mathcal D_{mathrm{pref}}\)</span> be the distribution of collected human comparisons.</li>
+</ul>
+<p><code>[SYNTHESIS]</code> These distributions need not match. A method can fit its preference dataset well and still fail on deployment prompts. Data collection is therefore not an incidental step: it defines which behaviors receive supervision.</p>
+<h2 id="2-supervised-fine-tuning">2. Supervised fine-tuning</h2>
+<h3 id="21-demonstration-likelihood">2.1 Demonstration likelihood</h3>
+<p>Suppose the demonstration dataset is</p>
+<div class="math-display">\[\mathcal D_{mathrm{SFT}}
+=\{(x^{(i)},y^{(i)})\}_{i=1}^{N},\]</div>
+<p>where <span class="math-inline">\(x\)</span> is a prompt and <span class="math-inline">\(y=(y_1,\ldots,y_T)\)</span> is a desired response.</p>
+<p>The autoregressive policy factorizes as</p>
+<div class="math-display">\[\pi_\theta(y\mid x)
+=\prod_{t=1}^{T}
+\pi_\theta(y_t\mid x,y_{&lt;t}).\]</div>
+<p>Maximum likelihood minimizes the response negative log-likelihood</p>
+<div class="math-display">\[\boxed{
+\mathcal L_{mathrm{SFT}}(\theta)
+=
+-\mathbb E_{(x,y)\sim\mathcal D_{mathrm{SFT}}}
+\left[
+\sum_{t=1}^{T}
+\log\pi_\theta(y_t\mid x,y_{&lt;t})
+\right].
+}\]</div>
+<p><code>[EXPLANATION]</code> Training uses teacher forcing: token <span class="math-inline">\(y_t\)</span> is predicted from the demonstrated prefix <span class="math-inline">\(y_{&lt;t}\)</span>, not from a prefix sampled from the current model.</p>
+<h3 id="22-which-tokens-contribute-to-the-loss">2.2 Which tokens contribute to the loss?</h3>
+<p>In instruction tuning, the prompt and response are often concatenated into one sequence. A response mask <span class="math-inline">\(m_t\in\{0,1\}\)</span> can exclude prompt tokens:</p>
+<div class="math-display">\[\mathcal L_{mathrm{SFT}}
+=
+-\frac{
+\sum_t m_t\log\pi_\theta(z_t\mid z_{&lt;t})
+}{
+\sum_t m_t
+},\]</div>
+<p>where <span class="math-inline">\(z\)</span> denotes the full formatted sequence.</p>
+<p><code>[SYNTHESIS]</code> Including or excluding prompt-token loss changes the training objective. “SFT” is not fully specified until the serialization template, masks, normalization, and example weights are known.</p>
+<h3 id="23-token-averaging-versus-example-averaging">2.3 Token averaging versus example averaging</h3>
+<p>Two common batch objectives are</p>
+<div class="math-display">\[\mathcal L_{mathrm{token}}
+=
+-\frac{
+\sum_i\sum_t m_{i,t}\log\pi_\theta(y_{i,t}\mid x_i,y_{i,&lt;t})
+}{
+\sum_i\sum_t m_{i,t}
+},\]</div>
+<p>and</p>
+<div class="math-display">\[\mathcal L_{mathrm{example}}
+=
+-\frac1B
+\sum_{i=1}^{B}
+\frac{
+\sum_t m_{i,t}\log\pi_\theta(y_{i,t}\mid x_i,y_{i,&lt;t})
+}{
+\sum_t m_{i,t}
+}.\]</div>
+<p><code>[DERIVATION]</code> In the first objective, a response with twice as many unmasked tokens contributes roughly twice as much total weight. In the second, every response receives equal total weight regardless of length.</p>
+<p><code>[SYNTHESIS]</code> Length normalization is not merely an implementation detail; it changes the empirical distribution being optimized.</p>
+<h3 id="24-minimal-sft-loss">2.4 Minimal SFT loss</h3>
+<pre><code class="language-python"># logits: [batch, sequence, vocabulary]
+# labels: next-token ids, with -100 on prompt/padding positions
+shifted_logits = logits[:, :-1]
+shifted_labels = labels[:, 1:]
+
+loss = cross_entropy(
+    shifted_logits.reshape(-1, vocab_size),
+    shifted_labels.reshape(-1),
+    ignore_index=-100,
+)
+</code></pre>
+<p><code>[CHECK]</code> A common silent error is an off-by-one mask: the mask must select the labels being predicted after the causal shift, not the input positions before the shift.</p>
+<h3 id="25-what-sft-can-and-cannot-infer">2.5 What SFT can and cannot infer</h3>
+<p><code>[EXPLANATION]</code> A demonstration tells the model that one response should have high likelihood. It does not directly specify how that response compares with the many other plausible responses.</p>
+<p><code>[SYNTHESIS]</code> SFT is especially natural when a target response can be written. Preference learning becomes attractive when producing a perfect answer is difficult but comparing two candidate answers is easier.</p>
+<p><code>[LIMIT]</code> SFT only observes demonstrated prefixes during training. During generation, the model conditions on its own sampled prefixes. Errors can therefore move generation into regions absent from the demonstration data.</p>
+<h2 id="3-from-comparisons-to-a-reward-model">3. From comparisons to a reward model</h2>
+<h3 id="31-preference-data">3.1 Preference data</h3>
+<p>Let</p>
+<div class="math-display">\[(x,y_w,y_l)\sim\mathcal D_{mathrm{pref}},\]</div>
+<p>where <span class="math-inline">\(y_w\)</span> is preferred to <span class="math-inline">\(y_l\)</span> for prompt <span class="math-inline">\(x\)</span>.</p>
+<p><code>[DIRECT · INSTRUCTGPT]</code> The InstructGPT pipeline first collected demonstrations for SFT, then collected rankings of model responses and trained a reward model, and finally optimized the policy against that reward model using PPO.</p>
+<h3 id="32-bradley-terry-preference-model">3.2 Bradley-Terry preference model</h3>
+<p>Assign each response a scalar latent reward <span class="math-inline">\(r^*(x,y)\)</span>. The Bradley-Terry model assumes</p>
+<div class="math-display">\[\Pr(y_1\succ y_2\mid x)
+=
+\frac{e^{r^*(x,y_1)}}
+{e^{r^*(x,y_1)}+e^{r^*(x,y_2)}}
+=
+\sigma\bigl(r^*(x,y_1)-r^*(x,y_2)\bigr),\]</div>
+<p>where</p>
+<div class="math-display">\[\sigma(z)=\frac1{1+e^{-z}}.\]</div>
+<p><code>[EXPLANATION]</code> The model converts a difference in latent rewards into a preference probability. Equal rewards predict a <span class="math-inline">\(50\%\)</span> preference probability; a large positive difference predicts near-certain preference for the first response.</p>
+<h3 id="33-reward-model-likelihood">3.3 Reward-model likelihood</h3>
+<p>Parameterize a scalar reward <span class="math-inline">\(r_\phi(x,y)\)</span>. Maximum likelihood gives</p>
+<div class="math-display">\[\boxed{
+\mathcal L_{mathrm{RM}}(\phi)
+=
+-\mathbb E_{(x,y_w,y_l)\sim\mathcal D_{mathrm{pref}}}
+\left[
+\log\sigma
+\bigl(r_\phi(x,y_w)-r_\phi(x,y_l)\bigr)
+\right].
+}\]</div>
+<p><code>[DERIVATION]</code> Let <span class="math-inline">\(d=r_\phi(x,y_w)-r_\phi(x,y_l)\)</span>. For one pair,</p>
+<div class="math-display">\[\ell(d)=-\log\sigma(d)=\log(1+e^{-d}).\]</div>
+<p>Its derivative is</p>
+<div class="math-display">\[\frac{d\ell}{dd}=-\sigma(-d).\]</div>
+<p>When the model incorrectly gives the loser a larger reward, <span class="math-inline">\(d&lt;0\)</span> and <span class="math-inline">\(\sigma(-d)\)</span> is large, so the update strongly increases the reward difference. Already-correct, high-margin pairs receive smaller gradients.</p>
+<h3 id="34-reward-is-identifiable-only-up-to-a-prompt-dependent-shift">3.4 Reward is identifiable only up to a prompt-dependent shift</h3>
+<p>For any function <span class="math-inline">\(c(x)\)</span>, define</p>
+<div class="math-display">\[r&#x27;(x,y)=r(x,y)+c(x).\]</div>
+<p>Then</p>
+<div class="math-display">\[r&#x27;(x,y_w)-r&#x27;(x,y_l)
+=
+r(x,y_w)-r(x,y_l).\]</div>
+<p><code>[CONCLUSION]</code> Pairwise comparisons cannot identify the absolute reward level for a prompt. They only constrain differences among responses to the same prompt.</p>
+<p><code>[DIRECT · INSTRUCTGPT]</code> The InstructGPT implementation normalized the learned reward with a bias before RL. Such a convention selects an origin but does not create new preference information.</p>
+<h3 id="35-minimal-reward-model-loss">3.5 Minimal reward-model loss</h3>
+<pre><code class="language-python">chosen_reward = reward_model(prompt, chosen_response)
+rejected_reward = reward_model(prompt, rejected_response)
+
+reward_margin = chosen_reward - rejected_reward
+loss = -logsigmoid(reward_margin).mean()
+</code></pre>
+<p><code>[CHECK]</code> Swapping chosen and rejected examples changes the sign of the margin. A reversed convention can train a perfectly consistent model in exactly the wrong direction.</p>
+<h2 id="4-ppo-based-rlhf">4. PPO-based RLHF</h2>
+<h3 id="41-the-kl-regularized-objective">4.1 The KL-regularized objective</h3>
+<p>Let <span class="math-inline">\(\pi_{\mathrm{ref}}\)</span> be a fixed reference policy, commonly the SFT model. A standard population objective is</p>
+<div class="math-display">\[\boxed{
+\max_{\pi}
+\mathbb E_{x\sim\mathcal D_{\mathrm{prompt}}}
+\left[
+\mathbb E_{y\sim\pi(\cdot\mid x)}[r_\phi(x,y)]
+-\beta
+D_{\mathrm{KL}}
+\bigl(\pi(\cdot\mid x)\|\pi_{\mathrm{ref}}(\cdot\mid x)\bigr)
+\right].
+}\]</div>
+<p><code>[EXPLANATION]</code> The reward model encourages preferred behavior. The KL term discourages the policy from moving far from a distribution on which the reward model and language model are better understood.</p>
+<h3 id="42-why-the-sampled-log-ratio-is-a-kl-penalty">4.2 Why the sampled log-ratio is a KL penalty</h3>
+<p>For a fixed prompt,</p>
+<div class="math-display">\[D_{\mathrm{KL}}(\pi\|\pi_{\mathrm{ref}})
+=
+\sum_y\pi(y\mid x)
+\log\frac{\pi(y\mid x)}{\pi_{\mathrm{ref}}(y\mid x)}.\]</div>
+<p>Therefore</p>
+<div class="math-display">\[D_{\mathrm{KL}}(\pi\|\pi_{\mathrm{ref}})
+=
+\mathbb E_{y\sim\pi(\cdot\mid x)}
+\left[
+\log\frac{\pi(y\mid x)}{\pi_{\mathrm{ref}}(y\mid x)}
+\right].\]</div>
+<p>One sampled response can use the regularized scalar return</p>
+<div class="math-display">\[R(x,y)
+=
+r_\phi(x,y)
+-\beta
+\log\frac{\pi(y\mid x)}{\pi_{\mathrm{ref}}(y\mid x)}.\]</div>
+<p>For an autoregressive model,</p>
+<div class="math-display">\[\log\frac{\pi(y\mid x)}{\pi_{\mathrm{ref}}(y\mid x)}
+=
+\sum_{t=1}^{T}
+\left[
+\log\pi(y_t\mid x,y_{&lt;t})
+-\log\pi_{\mathrm{ref}}(y_t\mid x,y_{&lt;t})
+\right].\]</div>
+<p><code>[DIRECT · INSTRUCTGPT]</code> The InstructGPT implementation used a per-token KL penalty from the SFT model to mitigate over-optimization of the reward model.</p>
+<h3 id="43-reference-policy-versus-old-policy">4.3 Reference policy versus old policy</h3>
+<p>Lecture 11 introduced two distinct policies:</p>
+<ul>
+<li><span class="math-inline">\(\pi_{\mathrm{old}}\)</span> collected the current PPO batch and changes after each outer iteration;</li>
+<li><span class="math-inline">\(\pi_{\mathrm{ref}}\)</span> anchors the entire post-training run and usually remains fixed.</li>
+</ul>
+<p><code>[SYNTHESIS]</code> PPO clipping controls one update relative to <span class="math-inline">\(\pi_{\mathrm{old}}\)</span>. The reference KL controls cumulative behavioral drift relative to <span class="math-inline">\(\pi_{\mathrm{ref}}\)</span>. Confusing them obscures both the derivation and implementation.</p>
+<h3 id="44-why-not-maximize-learned-reward-without-constraint">4.4 Why not maximize learned reward without constraint?</h3>
+<p><code>[SYNTHESIS]</code> The reward model is fitted on a finite comparison distribution. If policy optimization finds responses far outside that distribution, a high predicted reward may reflect model error rather than genuine preference.</p>
+<p>The KL term does not prove that reward exploitation is impossible. It limits how aggressively the optimizer searches unfamiliar regions.</p>
+<h3 id="45-where-ppo-enters">4.5 Where PPO enters</h3>
+<p>The regularized response reward is not differentiable through sampled discrete tokens in the ordinary pathwise sense. Policy gradients estimate how changing token probabilities changes expected reward. PPO then reuses each on-policy batch for multiple bounded surrogate updates, as derived in Lecture 11.</p>
+<p><code>[SYNTHESIS]</code> Classical language-model RLHF contains several learned components:</p>
+<ol>
+<li>an SFT policy;</li>
+<li>a reward model;</li>
+<li>an RL policy;</li>
+<li>usually a value model or value head;</li>
+<li>a fixed reference policy;</li>
+<li>a temporarily frozen old policy or stored old log-probabilities.</li>
+</ol>
+<p>This complexity is one motivation for direct preference methods.</p>
+<h2 id="5-dpo-starts-from-the-same-regularized-control-problem">5. DPO starts from the same regularized control problem</h2>
+<h3 id="51-solve-for-the-optimal-policy-at-one-prompt">5.1 Solve for the optimal policy at one prompt</h3>
+<p>Fix prompt <span class="math-inline">\(x\)</span> and assume a general reward <span class="math-inline">\(r(x,y)\)</span>. Consider</p>
+<div class="math-display">\[\max_{\pi}
+\sum_y\pi(y\mid x)r(x,y)
+-\beta
+\sum_y\pi(y\mid x)
+\log\frac{\pi(y\mid x)}{\pi_{\mathrm{ref}}(y\mid x)},\]</div>
+<p>subject to</p>
+<div class="math-display">\[\sum_y\pi(y\mid x)=1.\]</div>
+<p>Introduce multiplier <span class="math-inline">\(\lambda\)</span>:</p>
+<div class="math-display">\[\begin{aligned}
+\mathcal J(\pi,\lambda)
+=
+&amp;\sum_y\pi(y\mid x)r(x,y)\\
+&amp;-\beta\sum_y\pi(y\mid x)
+\log\frac{\pi(y\mid x)}{\pi_{\mathrm{ref}}(y\mid x)}\\
+&amp;+\lambda\left(\sum_y\pi(y\mid x)-1\right).
+\end{aligned}\]</div>
+<h3 id="52-stationarity-calculation">5.2 Stationarity calculation</h3>
+<p><code>[DERIVATION · Step 1]</code> Differentiate with respect to one probability <span class="math-inline">\(\pi(y\mid x)\)</span>:</p>
+<div class="math-display">\[\frac{\partial\mathcal J}{\partial\pi(y\mid x)}
+=
+r(x,y)
+-\beta\left(
+\log\frac{\pi(y\mid x)}{\pi_{\mathrm{ref}}(y\mid x)}+1
+\right)
++\lambda.\]</div>
+<p><code>[DERIVATION · Step 2]</code> Set the derivative to zero and rearrange:</p>
+<div class="math-display">\[\log\frac{\pi(y\mid x)}{\pi_{\mathrm{ref}}(y\mid x)}
+=
+\frac{r(x,y)}{\beta}
++\frac{\lambda}{\beta}-1.\]</div>
+<p><code>[DERIVATION · Step 3]</code> Exponentiate:</p>
+<div class="math-display">\[\pi(y\mid x)
+=
+\pi_{\mathrm{ref}}(y\mid x)
+\exp\left(\frac{r(x,y)}{\beta}\right)
+\exp\left(\frac{\lambda}{\beta}-1\right).\]</div>
+<p>The final exponential is constant across responses for the same prompt. Normalization gives</p>
+<div class="math-display">\[\boxed{
+\pi_r(y\mid x)
+=
+\frac1{Z(x)}
+\pi_{\mathrm{ref}}(y\mid x)
+\exp\left(\frac{r(x,y)}{\beta}\right),
+}\]</div>
+<p>with</p>
+<div class="math-display">\[Z(x)
+=
+\sum_y
+\pi_{\mathrm{ref}}(y\mid x)
+\exp\left(\frac{r(x,y)}{\beta}\right).\]</div>
+<p><code>[EXPLANATION]</code> The optimum is an exponentially tilted reference policy. Larger reward increases probability; the reference supplies the base measure; <span class="math-inline">\(\beta\)</span> controls how strongly reward can tilt it.</p>
+<h3 id="53-invert-the-policy-reward-relation">5.3 Invert the policy-reward relation</h3>
+<p>Take logs:</p>
+<div class="math-display">\[\log\pi_r(y\mid x)
+=
+\log\pi_{\mathrm{ref}}(y\mid x)
++\frac{r(x,y)}{\beta}
+-\log Z(x).\]</div>
+<p>Therefore</p>
+<div class="math-display">\[\boxed{
+r(x,y)
+=
+\beta
+\log\frac{\pi_r(y\mid x)}{\pi_{\mathrm{ref}}(y\mid x)}
++\beta\log Z(x).
+}\]</div>
+<p><code>[EXPLANATION]</code> This expresses a reward through the policy it induces. The unknown partition term depends on <span class="math-inline">\(x\)</span> but not on which response <span class="math-inline">\(y\)</span> is compared.</p>
+<h2 id="6-the-dpo-loss">6. The DPO loss</h2>
+<h3 id="61-the-partition-function-cancels-in-comparisons">6.1 The partition function cancels in comparisons</h3>
+<p>For two responses to the same prompt,</p>
+<div class="math-display">\[\begin{aligned}
+r(x,y_w)-r(x,y_l)
+=
+\beta\Biggl[
+&amp;\log\frac{\pi_r(y_w\mid x)}{\pi_{\mathrm{ref}}(y_w\mid x)}\\
+&amp;-\log\frac{\pi_r(y_l\mid x)}{\pi_{\mathrm{ref}}(y_l\mid x)}
+\Biggr].
+\end{aligned}\]</div>
+<p>The two <span class="math-inline">\(\beta\log Z(x)\)</span> terms cancel.</p>
+<p><code>[SYNTHESIS]</code> This cancellation is the key move. DPO does not need to compute the partition function over all possible responses because preference data only depends on reward differences.</p>
+<h3 id="62-parameterize-the-optimal-policy-directly">6.2 Parameterize the optimal policy directly</h3>
+<p>Define the policy-relative score</p>
+<div class="math-display">\[s_\theta(x,y)
+:=
+\beta
+\log\frac{\pi_\theta(y\mid x)}{\pi_{\mathrm{ref}}(y\mid x)}.\]</div>
+<p>The preference logit for one pair is</p>
+<div class="math-display">\[z_\theta(x,y_w,y_l)
+=
+s_\theta(x,y_w)-s_\theta(x,y_l).\]</div>
+<p>Substitute this logit into the Bradley-Terry likelihood:</p>
+<div class="math-display">\[\boxed{
+\mathcal L_{\mathrm{DPO}}(\theta)
+=
+-\mathbb E_{(x,y_w,y_l)\sim\mathcal D_{mathrm{pref}}}
+\left[
+\log\sigma\bigl(z_\theta(x,y_w,y_l)\bigr)
+\right].
+}\]</div>
+<p>Expanded,</p>
+<div class="math-display">\[\begin{aligned}
+z_\theta
+=\beta\Biggl[
+&amp;\log\frac{\pi_\theta(y_w\mid x)}{\pi_{\mathrm{ref}}(y_w\mid x)}\\
+&amp;-\log\frac{\pi_\theta(y_l\mid x)}{\pi_{\mathrm{ref}}(y_l\mid x)}
+\Biggr].
+\end{aligned}\]</div>
+<p><code>[CONCLUSION]</code> DPO uses a binary classification loss over response pairs, but the classifier logit is constrained to be a difference of policy-versus-reference log-probability ratios.</p>
+<h3 id="63-why-the-reference-policy-does-not-cancel">6.3 Why the reference policy does not cancel</h3>
+<p>The prompt-dependent partition term cancels, but the response-dependent reference probabilities generally do not:</p>
+<div class="math-display">\[z_\theta
+=
+\beta
+\left[
+\log\pi_\theta(y_w\mid x)-\log\pi_\theta(y_l\mid x)
+\right]
+-\beta
+\left[
+\log\pi_{\mathrm{ref}}(y_w\mid x)-\log\pi_{\mathrm{ref}}(y_l\mid x)
+\right].\]</div>
+<p><code>[EXPLANATION]</code> DPO is not simply “make the winner more likely than the loser.” It learns how much more the new policy should favor the winner <strong>relative to the reference policy's existing preference</strong>.</p>
+<h2 id="7-understanding-the-dpo-gradient">7. Understanding the DPO gradient</h2>
+<p>For one pair,</p>
+<div class="math-display">\[\ell(\theta)=-\log\sigma(z_\theta).\]</div>
+<p>Since</p>
+<div class="math-display">\[\frac{d}{dz}[-\log\sigma(z)]= -\sigma(-z),\]</div>
+<p>and the reference policy is fixed,</p>
+<div class="math-display">\[\nabla_\theta z_\theta
+=
+\beta
+\left[
+\nabla_\theta\log\pi_\theta(y_w\mid x)
+-\nabla_\theta\log\pi_\theta(y_l\mid x)
+\right].\]</div>
+<p>Therefore</p>
+<div class="math-display">\[\boxed{
+\nabla_\theta\ell(\theta)
+=
+-\beta\sigma(-z_\theta)
+\left[
+\nabla_\theta\log\pi_\theta(y_w\mid x)
+-\nabla_\theta\log\pi_\theta(y_l\mid x)
+\right].
+}\]</div>
+<p>Gradient descent follows the negative gradient, so it:</p>
+<ul>
+<li>increases the chosen response log-probability;</li>
+<li>decreases the rejected response log-probability;</li>
+<li>applies a large weight <span class="math-inline">\(\sigma(-z_\theta)\)</span> when the current relative policy score ranks the pair incorrectly or with a small margin;</li>
+<li>applies a small weight when the chosen response already has a large relative margin.</li>
+</ul>
+<p><code>[SYNTHESIS]</code> DPO behaves like a reference-corrected, adaptively weighted contrast between two sequence log-likelihoods.</p>
+<h2 id="8-a-small-numerical-example">8. A small numerical example</h2>
+<p>Suppose, for one prompt,</p>
+<div class="math-display">\[\pi_{\mathrm{ref}}(y_w\mid x)=0.30,
+\qquad
+\pi_{\mathrm{ref}}(y_l\mid x)=0.20,\]</div>
+<p>while the trainable policy has</p>
+<div class="math-display">\[\pi_\theta(y_w\mid x)=0.36,
+\qquad
+\pi_\theta(y_l\mid x)=0.18.\]</div>
+<p>The winner and loser log-ratios are</p>
+<div class="math-display">\[\log\frac{0.36}{0.30}=\log 1.2\approx0.182,\]</div>
+<div class="math-display">\[\log\frac{0.18}{0.20}=\log 0.9\approx-0.105.\]</div>
+<p>Their difference is about <span class="math-inline">\(0.287\)</span>. If <span class="math-inline">\(\beta=0.1\)</span>, then</p>
+<div class="math-display">\[z\approx0.0287,
+\qquad
+\sigma(z)\approx0.507,\]</div>
+<p>and the pair loss is</p>
+<div class="math-display">\[-\log\sigma(z)\approx0.679.\]</div>
+<p><code>[EXPLANATION]</code> The trainable policy has moved in the preferred direction relative to the reference, but the scaled margin is still small, so the pair still receives a substantial gradient.</p>
+<h2 id="9-minimal-dpo-implementation">9. Minimal DPO implementation</h2>
+<h3 id="91-sequence-log-probabilities">9.1 Sequence log-probabilities</h3>
+<p>For a response mask <span class="math-inline">\(m_t\)</span>,</p>
+<div class="math-display">\[\log\pi_\theta(y\mid x)
+=
+\sum_t
+m_t\log\pi_\theta(y_t\mid x,y_{&lt;t}).\]</div>
+<p>Use the same serialization, causal shift, response mask, and length convention for the policy and reference model.</p>
+<h3 id="92-pairwise-loss">9.2 Pairwise loss</h3>
+<pre><code class="language-python">def masked_sequence_logp(logits, labels, response_mask):
+    token_logp = log_softmax(logits[:, :-1], dim=-1)
+    target = labels[:, 1:]
+    mask = response_mask[:, 1:]
+    selected = gather(token_logp, index=target)
+    return (selected * mask).sum(dim=-1)
+
+
+chosen_logp = masked_sequence_logp(
+    policy_chosen_logits, chosen_labels, chosen_mask
+)
+rejected_logp = masked_sequence_logp(
+    policy_rejected_logits, rejected_labels, rejected_mask
+)
+
+with no_grad():
+    ref_chosen_logp = masked_sequence_logp(
+        reference_chosen_logits, chosen_labels, chosen_mask
+    )
+    ref_rejected_logp = masked_sequence_logp(
+        reference_rejected_logits, rejected_labels, rejected_mask
+    )
+
+policy_margin = chosen_logp - rejected_logp
+reference_margin = ref_chosen_logp - ref_rejected_logp
+dpo_logit = beta * (policy_margin - reference_margin)
+
+loss = -logsigmoid(dpo_logit).mean()
+</code></pre>
+<p><code>[CHECK]</code> The reference model is frozen. Gradients through its log-probabilities waste memory at best and change the intended objective at worst.</p>
+<p><code>[CHECK]</code> Both responses must share the same prompt formatting. If system messages or separators differ, the loss may learn formatting artifacts instead of the labeled preference.</p>
+<h2 id="10-sft-reward-model-rlhf-and-dpo-compared">10. SFT, reward-model RLHF, and DPO compared</h2>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>SFT</th>
+<th>Reward model + PPO</th>
+<th>DPO</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Training signal</td>
+<td>One desired response</td>
+<td>Pairwise preferences converted to scalar reward</td>
+<td>Pairwise preferences directly</td>
+</tr>
+<tr>
+<td>Sampling during optimization</td>
+<td>No</td>
+<td>Yes, from the current policy</td>
+<td>No, for the basic offline algorithm</td>
+</tr>
+<tr>
+<td>Explicit reward model</td>
+<td>No</td>
+<td>Yes</td>
+<td>No standalone model</td>
+</tr>
+<tr>
+<td>Learned value model</td>
+<td>No</td>
+<td>Usually</td>
+<td>No</td>
+</tr>
+<tr>
+<td>Fixed reference policy</td>
+<td>Optional</td>
+<td>Usually</td>
+<td>Yes in the standard loss</td>
+</tr>
+<tr>
+<td>On-policy RL loop</td>
+<td>No</td>
+<td>Yes</td>
+<td>No</td>
+</tr>
+<tr>
+<td>Core objective</td>
+<td>Demonstration likelihood</td>
+<td>Expected reward minus KL</td>
+<td>Preference likelihood under policy-ratio reward parameterization</td>
+</tr>
+<tr>
+<td>Main convenience</td>
+<td>Simple and stable</td>
+<td>Can optimize a learned scalar objective on fresh samples</td>
+<td>Simple supervised-style optimization on preference pairs</td>
+</tr>
+<tr>
+<td>Main limitation</td>
+<td>Demonstrations are expensive and specify only one target</td>
+<td>Complex and vulnerable to reward-model exploitation</td>
+<td>Depends on static preference coverage and modeling assumptions</td>
+</tr>
+</tbody>
+</table>
+<p><code>[SYNTHESIS]</code> DPO removes components from the training pipeline, but it does not remove assumptions. It relies on the preference model, reference policy, offline pair distribution, and the relationship between KL-regularized reward maximization and the fitted policy.</p>
+<h2 id="11-important-subtleties">11. Important subtleties</h2>
+<h3 id="111-dpo-is-offline-with-respect-to-its-pair-dataset">11.1 DPO is offline with respect to its pair dataset</h3>
+<p>Basic DPO does not sample fresh responses during each gradient update. If the optimized policy moves into regions poorly represented by the preference pairs, the dataset does not automatically expand to cover them.</p>
+<h3 id="112-the-meaning-of-beta">11.2 The meaning of beta</h3>
+<p>In the regularized control objective, larger <span class="math-inline">\(\beta\)</span> imposes a stronger KL penalty. The closed-form optimum</p>
+<div class="math-display">\[\pi_r\propto\pi_{\mathrm{ref}}e^{r/\beta}\]</div>
+<p>then stays closer to the reference for the same reward scale.</p>
+<p>In the DPO likelihood, <span class="math-inline">\(\beta\)</span> multiplies the policy log-ratio margin. Its effect cannot be interpreted independently of reward scale, optimization, data, and model capacity.</p>
+<h3 id="113-sequence-length-changes-log-probability-scale">11.3 Sequence length changes log-probability scale</h3>
+<p>A sequence log-probability is a sum over tokens. Longer responses often have more negative raw log-probability simply because they contain more factors.</p>
+<p><code>[SYNTHESIS]</code> Replacing sums with per-token averages changes the DPO objective. Either convention can be implemented, but it should not be changed silently.</p>
+<h3 id="114-reference-support-matters">11.4 Reference support matters</h3>
+<p>The derivation assumes the relevant response has nonzero reference probability. Softmax language models assign positive mathematical probability to every vocabulary token, but finite precision, masking, truncation, and incompatible tokenization or templates can still make practical ratios invalid.</p>
+<h3 id="115-preference-labels-need-not-define-a-universal-reward">11.5 Preference labels need not define a universal reward</h3>
+<p>Human judgments may be noisy, context-dependent, or mutually inconsistent. Bradley-Terry is a statistical model of comparisons, not a proof that every preference dataset arises from one globally coherent scalar reward.</p>
+<h3 id="116-low-training-loss-is-not-sufficient-evaluation">11.6 Low training loss is not sufficient evaluation</h3>
+<p>A policy can separate training pairs without improving responses drawn from the deployment distribution. Evaluation should sample from the trained policy and assess held-out prompts, not only re-score stored pairs.</p>
+<h2 id="12-relationship-to-lectures-11-and-13">12. Relationship to Lectures 11 and 13</h2>
+<h3 id="121-from-lecture-11">12.1 From Lecture 11</h3>
+<p>Lecture 11 supplies the policy-gradient and PPO machinery used in classical RLHF. Its distinction between <span class="math-inline">\(\pi_{\mathrm{old}}\)</span> and <span class="math-inline">\(\pi_{\mathrm{ref}}\)</span> prevents a common conceptual error in post-training implementations.</p>
+<h3 id="122-toward-lecture-13">12.2 Toward Lecture 13</h3>
+<p>Lecture 13 studies verifiable rewards and group-based estimators. Compared with the preference pipeline here:</p>
+<ul>
+<li>RLHF learns a reward from human comparisons;</li>
+<li>DPO trains directly on offline comparisons;</li>
+<li>RLVR receives a programmatic or otherwise verifiable outcome reward;</li>
+<li>GRPO-like methods estimate relative advantages from several fresh responses to the same prompt.</li>
+</ul>
+<p><code>[SYNTHESIS]</code> These methods differ along two independent axes:</p>
+<ol>
+<li><strong>Where does the supervision come from?</strong> Demonstration, human preference, learned reward, or verifier.</li>
+<li><strong>How is the policy updated?</strong> Maximum likelihood, policy gradient, clipped surrogate, or direct preference likelihood.</li>
+</ol>
+<h2 id="13-a-diagnostic-checklist">13. A diagnostic checklist</h2>
+<h3 id="sft">SFT</h3>
+<ul>
+<li>Are only intended response tokens included in the loss?</li>
+<li>Is the causal shift aligned with the mask?</li>
+<li>Are examples weighted per token or per response?</li>
+<li>Does evaluation use generated responses rather than teacher-forced loss alone?</li>
+</ul>
+<h3 id="reward-modeling">Reward modeling</h3>
+<ul>
+<li>Are chosen and rejected responses consistently ordered?</li>
+<li>Are train/test splits grouped by prompt to avoid correlated leakage?</li>
+<li>Is calibration checked, not only pairwise accuracy?</li>
+<li>Does the reward model generalize to samples from later policies?</li>
+</ul>
+<h3 id="ppo-based-rlhf">PPO-based RLHF</h3>
+<ul>
+<li>Are old-policy and reference-policy log-probabilities stored separately?</li>
+<li>Is the KL measured with the same token masks and serialization as the policy loss?</li>
+<li>Are reward, KL, value error, entropy, and sample quality monitored together?</li>
+<li>Is the policy being optimized outside the reward model's data distribution?</li>
+</ul>
+<h3 id="dpo">DPO</h3>
+<ul>
+<li>Is the reference model frozen?</li>
+<li>Are policy and reference sequence log-probabilities computed identically?</li>
+<li>Is the winner-loser sign verified with a tiny synthetic batch?</li>
+<li>Is the chosen length normalization explicitly documented?</li>
+<li>Are trained-policy generations evaluated on held-out prompts?</li>
+</ul>
+<h2 id="14-compact-derivation-chain">14. Compact derivation chain</h2>
+<ol>
+<li><strong>SFT imitates demonstrations</strong></li>
+</ol>
+<div class="math-display">\[\mathcal L_{\mathrm{SFT}}
+   =-\mathbb E\log\pi_\theta(y^*\mid x).\]</div>
+<ol start="2">
+<li><strong>Reward modeling fits preference differences</strong></li>
+</ol>
+<div class="math-display">\[\mathcal L_{\mathrm{RM}}
+   =-\mathbb E\log\sigma(r_\phi(x,y_w)-r_\phi(x,y_l)).\]</div>
+<ol start="3">
+<li><strong>RLHF optimizes learned reward under a KL anchor</strong></li>
+</ol>
+<div class="math-display">\[\max_\pi
+   \mathbb E[r_\phi]
+   -\beta D_{\mathrm{KL}}(\pi\|\pi_{\mathrm{ref}}).\]</div>
+<ol start="4">
+<li><strong>The exact regularized optimum is an exponential tilt</strong></li>
+</ol>
+<div class="math-display">\[\pi_r(y\mid x)
+   =\frac1{Z(x)}
+   \pi_{\mathrm{ref}}(y\mid x)e^{r(x,y)/\beta}.\]</div>
+<ol start="5">
+<li><strong>Invert the relation</strong></li>
+</ol>
+<div class="math-display">\[r(x,y)
+   =\beta\log\frac{\pi_r(y\mid x)}{\pi_{\mathrm{ref}}(y\mid x)}
+   +\beta\log Z(x).\]</div>
+<ol start="6">
+<li><strong>Pairwise differences cancel the partition function</strong></li>
+</ol>
+<div class="math-display">\[r_w-r_l
+   =\beta\left[
+   \log\frac{\pi_r(y_w\mid x)}{\pi_{\mathrm{ref}}(y_w\mid x)}
+   -\log\frac{\pi_r(y_l\mid x)}{\pi_{\mathrm{ref}}(y_l\mid x)}
+   \right].\]</div>
+<ol start="7">
+<li><strong>DPO fits the policy directly</strong></li>
+</ol>
+<div class="math-display">\[\mathcal L_{\mathrm{DPO}}
+   =-\mathbb E\log\sigma(z_\theta).\]</div>
+<h2 id="15-open-questions-for-manual-study">15. Open questions for manual study</h2>
+<ul>
+<li><code>[OPEN]</code> Which behaviors are easier to demonstrate than to compare, and which are easier to compare than to demonstrate?</li>
+<li><code>[OPEN]</code> When does a scalar reward model fail to represent heterogeneous or intransitive preferences?</li>
+<li><code>[OPEN]</code> How quickly does an offline DPO dataset become stale as the policy moves away from the model that generated its responses?</li>
+<li><code>[OPEN]</code> Can active data collection choose comparison pairs that are maximally informative rather than merely high-scoring?</li>
+<li><code>[OPEN]</code> How should response length enter preference objectives when labelers have length preferences of their own?</li>
+<li><code>[OPEN]</code> What diagnostics distinguish genuine preference improvement from exploitation of annotator or judge artifacts?</li>
+<li><code>[OPEN]</code> Under what assumptions does lower DPO loss imply improvement in expected human preference for fresh policy samples?</li>
+<li><code>[OPEN]</code> How should uncertainty or disagreement among labelers be represented instead of collapsed into one binary label?</li>
+</ul>
+<h2 id="16-source-trail">16. Source trail</h2>
+<ul>
+<li><code>[DIRECT]</code> <a href="https://noahgol.github.io/teaching/cs395t-f26/">CS 395T schedule</a> — identifies the session topic and presentation format.</li>
+<li><code>[DIRECT]</code> Ouyang et al. (2022), <a href="https://arxiv.org/abs/2203.02155">InstructGPT</a> — demonstration SFT, comparison-based reward modeling, and PPO with an SFT-reference KL penalty.</li>
+<li><code>[DIRECT]</code> Christiano et al. (2017), <a href="https://arxiv.org/abs/1706.03741">Deep RL from Human Preferences</a> — learning behavioral rewards from human comparisons.</li>
+<li><code>[DIRECT]</code> Rafailov et al. (2023), <a href="https://arxiv.org/abs/2305.18290">Direct Preference Optimization</a> — closed-form KL-regularized optimum, reward-policy reparameterization, and the DPO loss.</li>
+</ul>
+<h2 id="revision-log">Revision log</h2>
+<ul>
+<li><strong>2026-10-12 — AI-assisted first draft.</strong> Added a source-bounded study scaffold; derived SFT, reward-model, RLHF, and DPO objectives; included the DPO gradient, a numerical example, implementation skeletons, diagnostics, and links to Lectures 11 and 13. Manual verification remains pending.</li>
+</ul>
+      </article>
+    </div>
+  </main>
+
+  <footer class="site-footer section-shell">
+    <div><strong>CS 395T</strong><span>Learning note</span></div>
+    <p>Markdown source · draft</p>
+    <a href="../index.html#notes">Return to index ←</a>
+  </footer>
+</body>
+</html>

@@ -1,0 +1,827 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A detailed AI-assisted study scaffold for knowledge distillation, from temperature-scaled soft targets to sequence-level and on-policy distillation for autoregressive language models.">
+  <title>Lecture 14 — Knowledge Distillation for Language Models — CS 395T</title>
+  <link rel="stylesheet" href="../assets/styles.css">
+  <script>
+    window.MathJax = {
+      tex: {
+        processEscapes: true
+      },
+      svg: { fontCache: 'global' }
+    };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js" defer></script>
+  <script src="../assets/app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header">
+    <a class="wordmark" href="../index.html"><span>CS 395T</span><small>Learning &amp; research notebook</small></a>
+    <button class="menu-button" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button>
+    <nav id="site-nav" class="site-nav" aria-label="Primary navigation">
+      <a href="../structure.html">Structure</a>
+      <a href="../index.html#notes">Index</a>
+      <a href="../method.html">Writing guide</a>
+      <a href="../index.html#about">About</a>
+    </nav>
+  </header>
+
+  <main id="main" class="note-shell">
+    <header class="note-hero">
+      <div class="template-banner learning-banner">
+        <strong>LEARNING NOTE · DRAFT</strong>
+        <span>Work in progress</span>
+      </div>
+      <p class="eyebrow">12 OCT 2026 · DRAFT</p>
+      <h1>Lecture 14 — Knowledge Distillation for Language Models</h1>
+      <p class="note-abstract">A detailed AI-assisted study scaffold for knowledge distillation, from temperature-scaled soft targets to sequence-level and on-policy distillation for autoregressive language models.</p>
+      <ul class="tag-list" aria-label="Topics"><li>knowledge distillation</li><li>model compression</li><li>soft targets</li><li>temperature scaling</li><li>sequence-level distillation</li><li>forward KL</li><li>reverse KL</li><li>on-policy distillation</li></ul>
+    </header>
+
+    <div class="note-layout">
+      <aside class="note-toc" aria-label="On this page">
+        <p class="aside-label">ON THIS PAGE</p>
+        <div class="toc">
+<ul>
+<li><a href="#source-boundary">Source boundary</a></li>
+<li><a href="#reading-map">Reading map</a></li>
+<li><a href="#1-what-is-being-distilled">1. What is being distilled?</a><ul>
+<li><a href="#11-teacher-student-and-transfer-distribution">1.1 Teacher, student, and transfer distribution</a></li>
+<li><a href="#12-why-use-a-student-at-all">1.2 Why use a student at all?</a></li>
+<li><a href="#13-white-box-and-black-box-access">1.3 White-box and black-box access</a></li>
+</ul>
+</li>
+<li><a href="#2-classical-soft-target-distillation">2. Classical soft-target distillation</a><ul>
+<li><a href="#21-hard-labels-discard-similarity-information">2.1 Hard labels discard similarity information</a></li>
+<li><a href="#22-temperature-scaled-distributions">2.2 Temperature-scaled distributions</a></li>
+<li><a href="#23-the-distillation-loss">2.3 The distillation loss</a></li>
+<li><a href="#24-gradient-with-respect-to-student-logits">2.4 Gradient with respect to student logits</a></li>
+<li><a href="#25-why-use-the-squared-temperature-factor">2.5 Why use the squared-temperature factor?</a></li>
+</ul>
+</li>
+<li><a href="#3-from-classification-to-autoregressive-language-models">3. From classification to autoregressive language models</a><ul>
+<li><a href="#31-a-response-is-a-product-of-token-conditionals">3.1 A response is a product of token conditionals</a></li>
+<li><a href="#32-token-level-forward-kl-distillation">3.2 Token-level forward-KL distillation</a></li>
+<li><a href="#33-sequence-kl-decomposes-into-token-kl">3.3 Sequence KL decomposes into token KL</a></li>
+<li><a href="#34-token-averaging-changes-the-objective">3.4 Token averaging changes the objective</a></li>
+</ul>
+</li>
+<li><a href="#4-three-kinds-of-targets-for-language-model-distillation">4. Three kinds of targets for language-model distillation</a><ul>
+<li><a href="#41-hard-ground-truth-targets">4.1 Hard ground-truth targets</a></li>
+<li><a href="#42-soft-token-targets">4.2 Soft token targets</a></li>
+<li><a href="#43-hard-teacher-generated-sequences">4.3 Hard teacher-generated sequences</a></li>
+</ul>
+</li>
+<li><a href="#5-sequence-level-knowledge-distillation">5. Sequence-level knowledge distillation</a><ul>
+<li><a href="#51-basic-algorithm">5.1 Basic algorithm</a></li>
+<li><a href="#52-decoding-is-a-lossy-projection">5.2 Decoding is a lossy projection</a></li>
+<li><a href="#53-sampling-versus-deterministic-decoding">5.3 Sampling versus deterministic decoding</a></li>
+</ul>
+</li>
+<li><a href="#6-the-prefix-distribution-problem">6. The prefix-distribution problem</a><ul>
+<li><a href="#61-teacher-forcing-trains-on-prefixes-chosen-elsewhere">6.1 Teacher forcing trains on prefixes chosen elsewhere</a></li>
+<li><a href="#62-a-two-step-example">6.2 A two-step example</a></li>
+</ul>
+</li>
+<li><a href="#7-forward-kl-and-reverse-kl">7. Forward KL and reverse KL</a><ul>
+<li><a href="#71-forward-kl">7.1 Forward KL</a></li>
+<li><a href="#72-reverse-kl">7.2 Reverse KL</a></li>
+<li><a href="#73-deriving-the-reverse-kl-gradient">7.3 Deriving the reverse-KL gradient</a></li>
+<li><a href="#74-autoregressive-log-ratio">7.4 Autoregressive log-ratio</a></li>
+<li><a href="#75-mode-covering-and-mode-seeking-need-care">7.5 “Mode covering” and “mode seeking” need care</a></li>
+</ul>
+</li>
+<li><a href="#8-on-policy-distillation">8. On-policy distillation</a><ul>
+<li><a href="#81-correct-the-student-on-its-own-prefixes">8.1 Correct the student on its own prefixes</a></li>
+<li><a href="#82-mixed-policy-training">8.2 Mixed-policy training</a></li>
+<li><a href="#83-a-minimal-on-policy-loop">8.3 A minimal on-policy loop</a></li>
+</ul>
+</li>
+<li><a href="#9-implementing-token-level-soft-distillation">9. Implementing token-level soft distillation</a><ul>
+<li><a href="#91-stable-loss-computation">9.1 Stable loss computation</a></li>
+<li><a href="#92-combining-hard-and-soft-supervision">9.2 Combining hard and soft supervision</a></li>
+<li><a href="#93-vocabulary-alignment">9.3 Vocabulary alignment</a></li>
+</ul>
+</li>
+<li><a href="#10-numerical-example-one-soft-target-update">10. Numerical example: one soft-target update</a></li>
+<li><a href="#11-capacity-gap-and-the-projection-viewpoint">11. Capacity gap and the projection viewpoint</a><ul>
+<li><a href="#111-why-a-smaller-student-may-need-a-simpler-target">11.1 Why a smaller student may need a simpler target</a></li>
+<li><a href="#112-the-student-can-sometimes-exceed-the-teacher-on-a-metric">11.2 The student can sometimes exceed the teacher on a metric</a></li>
+</ul>
+</li>
+<li><a href="#12-distillation-versus-nearby-post-training-methods">12. Distillation versus nearby post-training methods</a></li>
+<li><a href="#13-failure-modes-and-diagnostics">13. Failure modes and diagnostics</a><ul>
+<li><a href="#131-poor-transfer-prompts">13.1 Poor transfer prompts</a></li>
+<li><a href="#132-teacher-errors-become-labels">13.2 Teacher errors become labels</a></li>
+<li><a href="#133-exposure-bias">13.3 Exposure bias</a></li>
+<li><a href="#134-temperature-is-miscalibrated">13.4 Temperature is miscalibrated</a></li>
+<li><a href="#135-loss-decreases-while-deployment-quality-stalls">13.5 Loss decreases while deployment quality stalls</a></li>
+<li><a href="#136-efficiency-is-not-measured-end-to-end">13.6 Efficiency is not measured end to end</a></li>
+</ul>
+</li>
+<li><a href="#14-a-practical-experiment-design">14. A practical experiment design</a><ul>
+<li><a href="#141-controlled-comparison">14.1 Controlled comparison</a></li>
+<li><a href="#142-metrics">14.2 Metrics</a></li>
+</ul>
+</li>
+<li><a href="#15-a-compact-decision-procedure">15. A compact decision procedure</a></li>
+<li><a href="#16-open-questions">16. Open questions</a></li>
+<li><a href="#17-what-to-verify-manually">17. What to verify manually</a></li>
+<li><a href="#source-trail">Source trail</a></li>
+</ul>
+</div>
+
+      </aside>
+      <article class="prose note-prose markdown-body">
+        <blockquote>
+<p><strong>AI-assisted study scaffold, not a lecture transcript.</strong> The official course schedule lists Lecture 14 as a student-presentation session on distillation, but it does not publish a unified handout or slide deck for this lecture. This note therefore does not claim to reconstruct what the presenters said. It develops the named topic from the primary papers listed below and marks derivations and synthesis explicitly. It has not yet been manually verified or rewritten by the author.</p>
+</blockquote>
+<h2 id="source-boundary">Source boundary</h2>
+<p><code>[DIRECT · COURSE SCHEDULE]</code> The official schedule names the October 12 session <strong>“Post-training III (Student Presentations #2): Distillation.”</strong> It does not link lecture notes or slides for this session: <a href="https://noahgol.github.io/teaching/cs395t-f26/">https://noahgol.github.io/teaching/cs395t-f26/</a>.</p>
+<p><code>[DIRECT · PRIMARY SOURCES]</code> The main technical sources used in this scaffold are:</p>
+<ol>
+<li>Hinton, Vinyals, and Dean (2015), <a href="https://arxiv.org/abs/1503.02531">Distilling the Knowledge in a Neural Network</a>.</li>
+<li>Kim and Rush (2016), <a href="https://arxiv.org/abs/1606.07947">Sequence-Level Knowledge Distillation</a>.</li>
+<li>Gu et al. (2023), <a href="https://arxiv.org/abs/2306.08543">MiniLLM: Knowledge Distillation of Large Language Models</a>.</li>
+<li>Agarwal et al. (2023), <a href="https://arxiv.org/abs/2306.13649">On-Policy Distillation of Language Models: Learning from Self-Generated Mistakes</a>.</li>
+</ol>
+<p><code>[SOURCE BOUNDARY]</code> Statements labeled <code>[DIRECT]</code> are attributable to these papers or to the course schedule. <code>[DERIVATION]</code> lines work through the mathematics. <code>[EXPLANATION]</code> and <code>[SYNTHESIS]</code> organize the ideas but are not reported classroom claims.</p>
+<p><code>[SYNTHESIS]</code> Distillation is best understood as <strong>distribution transfer under constraints</strong>. A teacher defines behavior that we would like to reproduce; a student has limited capacity, a different deployment budget, and access to only some form of teacher signal. Every distillation method must answer four questions:</p>
+<ol>
+<li>Which inputs or prompts will be used?</li>
+<li>What part of the teacher is observable: labels, generated sequences, logits, or hidden states?</li>
+<li>Under whose prefixes is the student trained: data, teacher, or student prefixes?</li>
+<li>Which discrepancy between teacher and student is minimized?</li>
+</ol>
+<h2 id="reading-map">Reading map</h2>
+<table>
+<thead>
+<tr>
+<th>Part</th>
+<th>Teacher signal</th>
+<th>Student training context</th>
+<th>Main question</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Classical logit distillation</td>
+<td>Full class probabilities</td>
+<td>Fixed dataset inputs</td>
+<td>Why are soft targets richer than one-hot labels?</td>
+</tr>
+<tr>
+<td>Token-level language-model KD</td>
+<td>Next-token distribution</td>
+<td>Dataset or teacher prefixes</td>
+<td>How does a classifier loss extend to an autoregressive model?</td>
+</tr>
+<tr>
+<td>Sequence-level KD</td>
+<td>Complete teacher-generated response</td>
+<td>Teacher-generated prefixes</td>
+<td>Can teacher outputs be converted into an ordinary SFT dataset?</td>
+</tr>
+<tr>
+<td>Reverse-KL distillation</td>
+<td>Teacher probabilities</td>
+<td>Student-generated prefixes</td>
+<td>What happens when the student chooses where it is corrected?</td>
+</tr>
+<tr>
+<td>Generalized on-policy KD</td>
+<td>Teacher distribution or score</td>
+<td>Mixture of student/data prefixes</td>
+<td>How can train-time prefixes resemble deployment prefixes?</td>
+</tr>
+</tbody>
+</table>
+<h2 id="1-what-is-being-distilled">1. What is being distilled?</h2>
+<h3 id="11-teacher-student-and-transfer-distribution">1.1 Teacher, student, and transfer distribution</h3>
+<p>Let the teacher have parameters <span class="math-inline">\(\phi\)</span> and the student have parameters <span class="math-inline">\(\theta\)</span>. For an input <span class="math-inline">\(x\)</span>, they define conditional distributions</p>
+<div class="math-display">\[p_\phi(y\mid x)
+\qquad\text{and}\qquad
+q_\theta(y\mid x).\]</div>
+<p>The transfer inputs are drawn from a distribution <span class="math-inline">\(x\sim\mathcal D_{\mathrm{tr}}\)</span>.</p>
+<p><code>[EXPLANATION]</code> <span class="math-inline">\(\mathcal D_{\mathrm{tr}}\)</span> need not contain labels. If the teacher can provide a distribution or generate a response, unlabeled inputs can still carry supervision.</p>
+<p><code>[SYNTHESIS]</code> A distillation result is therefore never specified by “teacher” and “student” alone. It also depends on the transfer distribution. A student can closely imitate the teacher on <span class="math-inline">\(\mathcal D_{\mathrm{tr}}\)</span> and disagree elsewhere.</p>
+<h3 id="12-why-use-a-student-at-all">1.2 Why use a student at all?</h3>
+<p><code>[DIRECT · HINTON ET AL.]</code> The original motivation is deployment: an ensemble or large model can be accurate but expensive, while a single smaller model can be faster and easier to serve.</p>
+<p><code>[SYNTHESIS]</code> For language models, the relevant constraints may include:</p>
+<ul>
+<li>parameter memory;</li>
+<li>key-value-cache memory;</li>
+<li>latency to first token;</li>
+<li>decoding throughput;</li>
+<li>energy or hardware limits;</li>
+<li>ability to run locally;</li>
+<li>licensing or API-access constraints.</li>
+</ul>
+<p><code>[CHECK]</code> Distillation does not automatically improve every one of these quantities. A smaller parameter count may not produce lower latency if the architecture, sequence length, batching regime, or hardware utilization changes unfavorably.</p>
+<h3 id="13-white-box-and-black-box-access">1.3 White-box and black-box access</h3>
+<p><code>[DEFINITION]</code> In this note:</p>
+<ul>
+<li><strong>white-box distillation</strong> means that the student trainer can inspect teacher probabilities, logits, or internal representations;</li>
+<li><strong>black-box distillation</strong> means that only teacher-generated outputs or API responses are available.</li>
+</ul>
+<p><code>[SYNTHESIS]</code> The distinction changes the learning problem. White-box distillation can transfer the entire next-token distribution. Black-box imitation only observes samples from that distribution, often after decoding has further altered it.</p>
+<h2 id="2-classical-soft-target-distillation">2. Classical soft-target distillation</h2>
+<h3 id="21-hard-labels-discard-similarity-information">2.1 Hard labels discard similarity information</h3>
+<p>Suppose a <span class="math-inline">\(K\)</span>-class problem has a hard label <span class="math-inline">\(c\)</span>. Ordinary supervised learning minimizes</p>
+<div class="math-display">\[\mathcal L_{\mathrm{hard}}
+=-\log q_\theta(c\mid x).\]</div>
+<p><code>[EXPLANATION]</code> This target says that class <span class="math-inline">\(c\)</span> is correct, but it says nothing about how the remaining classes compare with one another.</p>
+<p>If the teacher assigns</p>
+<div class="math-display">\[p_\phi(\cdot\mid x)
+=(0.70,0.20,0.08,0.02),\]</div>
+<p>then the second class is a much more plausible alternative than the fourth. A one-hot target <span class="math-inline">\((1,0,0,0)\)</span> erases that relation.</p>
+<p><code>[SYNTHESIS]</code> The non-maximal probabilities are often called <strong>dark knowledge</strong>: they encode the teacher's view of similarities and confusions among alternatives.</p>
+<h3 id="22-temperature-scaled-distributions">2.2 Temperature-scaled distributions</h3>
+<p>Let <span class="math-inline">\(z^T\in\mathbb R^K\)</span> and <span class="math-inline">\(z^S\in\mathbb R^K\)</span> be teacher and student logits. For temperature <span class="math-inline">\(\tau&gt;0\)</span>, define</p>
+<div class="math-display">\[p_i^{(\tau)}
+=\frac{\exp(z_i^T/\tau)}
+{\sum_j\exp(z_j^T/\tau)},
+\qquad
+q_i^{(\tau)}
+=\frac{\exp(z_i^S/\tau)}
+{\sum_j\exp(z_j^S/\tau)}.\]</div>
+<p><code>[EXPLANATION]</code></p>
+<ul>
+<li><span class="math-inline">\(\tau=1\)</span> gives the ordinary softmax;</li>
+<li><span class="math-inline">\(\tau&gt;1\)</span> flattens the distribution and exposes more relative information;</li>
+<li><span class="math-inline">\(0&lt;\tau&lt;1\)</span> sharpens the distribution.</li>
+</ul>
+<p><code>[CHECK]</code> Temperature changes the target used during training. At deployment, the student does not have to decode with that same temperature.</p>
+<h3 id="23-the-distillation-loss">2.3 The distillation loss</h3>
+<p>The teacher-to-student forward KL is</p>
+<div class="math-display">\[\begin{aligned}
+\mathcal L_{\mathrm{KD}}
+&amp;=D_{\mathrm{KL}}\!\left(
+p^{(\tau)}\,\|\,q^{(\tau)}
+\right)\\
+&amp;=\sum_{i=1}^{K}
+p_i^{(\tau)}
+\log\frac{p_i^{(\tau)}}{q_i^{(\tau)}}.
+\end{aligned}\]</div>
+<p>The entropy of the teacher does not depend on <span class="math-inline">\(\theta\)</span>, so minimizing this KL is equivalent to minimizing soft-target cross-entropy:</p>
+<div class="math-display">\[\boxed{
+\mathcal L_{\mathrm{soft}}
+=-\sum_i p_i^{(\tau)}\log q_i^{(\tau)}.
+}\]</div>
+<h3 id="24-gradient-with-respect-to-student-logits">2.4 Gradient with respect to student logits</h3>
+<p><code>[DERIVATION · Step 1]</code> For temperature-scaled softmax,</p>
+<div class="math-display">\[\frac{\partial\log q_i^{(\tau)}}{\partial z_k^S}
+=\frac1\tau
+\left(\mathbf 1\{i=k\}-q_k^{(\tau)}\right).\]</div>
+<p><code>[DERIVATION · Step 2]</code> Differentiate the cross-entropy:</p>
+<div class="math-display">\[\begin{aligned}
+\frac{\partial\mathcal L_{\mathrm{soft}}}{\partial z_k^S}
+&amp;=-\sum_i p_i^{(\tau)}
+\frac{\partial\log q_i^{(\tau)}}{\partial z_k^S}\\
+&amp;=\frac1\tau
+\left(q_k^{(\tau)}-p_k^{(\tau)}\right).
+\end{aligned}\]</div>
+<p><code>[CONCLUSION]</code> Every class receives a signed correction. The student logit increases when it assigns less probability than the teacher and decreases when it assigns more.</p>
+<h3 id="25-why-use-the-squared-temperature-factor">2.5 Why use the squared-temperature factor?</h3>
+<p>At a larger temperature, both the explicit <span class="math-inline">\(1/\tau\)</span> in the gradient and the shrinking difference <span class="math-inline">\(q^{(\tau)}-p^{(\tau)}\)</span> reduce the gradient magnitude. Hinton et al. multiply the soft loss by <span class="math-inline">\(\tau^2\)</span>:</p>
+<div class="math-display">\[\mathcal L
+=(1-\alpha)\mathcal L_{\mathrm{hard}}
++\alpha\tau^2\mathcal L_{\mathrm{soft}}.\]</div>
+<p><code>[DERIVATION · HIGH-TEMPERATURE INTUITION]</code> Center the logits so that <span class="math-inline">\(\sum_i z_i=0\)</span>. When <span class="math-inline">\(\tau\)</span> is large,</p>
+<div class="math-display">\[\exp(z_i/\tau)\approx 1+z_i/\tau,\]</div>
+<p>and therefore</p>
+<div class="math-display">\[\operatorname{softmax}(z/\tau)_i
+\approx \frac1K+\frac{z_i}{K\tau}.\]</div>
+<p>Thus</p>
+<div class="math-display">\[q_i^{(\tau)}-p_i^{(\tau)}
+\approx
+\frac{z_i^S-z_i^T}{K\tau},\]</div>
+<p>and the unscaled logit gradient is approximately proportional to <span class="math-inline">\(1/\tau^2\)</span>. Multiplication by <span class="math-inline">\(\tau^2\)</span> keeps the soft-target term on a comparable scale.</p>
+<p><code>[LIMIT]</code> This approximation explains the classical scaling rule, but it is not an identity for arbitrary temperatures or logits.</p>
+<h2 id="3-from-classification-to-autoregressive-language-models">3. From classification to autoregressive language models</h2>
+<h3 id="31-a-response-is-a-product-of-token-conditionals">3.1 A response is a product of token conditionals</h3>
+<p>For a prompt <span class="math-inline">\(x\)</span> and response <span class="math-inline">\(y=(y_1,\ldots,y_T)\)</span>,</p>
+<div class="math-display">\[p_\phi(y\mid x)
+=\prod_{t=1}^{T}
+p_\phi(y_t\mid x,y_{&lt;t}),\]</div>
+<p>and similarly</p>
+<div class="math-display">\[q_\theta(y\mid x)
+=\prod_{t=1}^{T}
+q_\theta(y_t\mid x,y_{&lt;t}).\]</div>
+<p><code>[EXPLANATION]</code> The vocabulary is now the class set, but the classification input changes at every token because the prefix changes.</p>
+<h3 id="32-token-level-forward-kl-distillation">3.2 Token-level forward-KL distillation</h3>
+<p>Given a collection of prefixes <span class="math-inline">\(h_t=(x,y_{&lt;t})\)</span>, a common objective is</p>
+<div class="math-display">\[\boxed{
+\mathcal L_{\mathrm{token\text{-}KD}}
+=\mathbb E_{h_t\sim\mu}
+\left[
+D_{\mathrm{KL}}
+\left(
+p_\phi(\cdot\mid h_t)
+\,\|\,
+q_\theta(\cdot\mid h_t)
+\right)
+\right],
+}\]</div>
+<p>where <span class="math-inline">\(\mu\)</span> is a distribution over prefixes.</p>
+<p><code>[SYNTHESIS]</code> The loss is incomplete until <span class="math-inline">\(\mu\)</span> is specified. Prefixes may come from:</p>
+<ul>
+<li>human demonstrations;</li>
+<li>a fixed text corpus;</li>
+<li>teacher-generated responses;</li>
+<li>student-generated responses;</li>
+<li>a mixture of these sources.</li>
+</ul>
+<h3 id="33-sequence-kl-decomposes-into-token-kl">3.3 Sequence KL decomposes into token KL</h3>
+<p><code>[DERIVATION · Step 1]</code> Start with forward KL over complete responses:</p>
+<div class="math-display">\[D_{\mathrm{KL}}(p_\phi\|q_\theta)
+=\mathbb E_{y\sim p_\phi}
+\left[
+\log\frac{p_\phi(y\mid x)}{q_\theta(y\mid x)}
+\right].\]</div>
+<p><code>[DERIVATION · Step 2]</code> Apply the autoregressive factorization:</p>
+<div class="math-display">\[\log\frac{p_\phi(y\mid x)}{q_\theta(y\mid x)}
+=\sum_{t=1}^{T}
+\log\frac{
+p_\phi(y_t\mid x,y_{&lt;t})
+}{
+q_\theta(y_t\mid x,y_{&lt;t})
+}.\]</div>
+<p><code>[DERIVATION · Step 3]</code> Condition on each teacher-generated prefix:</p>
+<div class="math-display">\[\boxed{
+D_{\mathrm{KL}}(p_\phi\|q_\theta)
+=
+\mathbb E_{y\sim p_\phi}
+\left[
+\sum_{t=1}^{T}
+D_{\mathrm{KL}}
+\left(
+p_\phi(\cdot\mid x,y_{&lt;t})
+\,\|\,
+q_\theta(\cdot\mid x,y_{&lt;t})
+\right)
+\right].
+}\]</div>
+<p><code>[CONCLUSION]</code> Exact sequence-level forward KL can be estimated by sampling responses from the teacher and matching the teacher's full next-token distribution along those teacher trajectories.</p>
+<h3 id="34-token-averaging-changes-the-objective">3.4 Token averaging changes the objective</h3>
+<p>For a batch of variable-length responses, consider</p>
+<div class="math-display">\[\mathcal L_{\mathrm{all\ tokens}}
+=\frac{
+\sum_i\sum_t m_{i,t}\,\ell_{i,t}
+}{
+\sum_i\sum_t m_{i,t}
+},\]</div>
+<p>versus</p>
+<div class="math-display">\[\mathcal L_{\mathrm{per\ response}}
+=\frac1B\sum_i
+\frac{
+\sum_t m_{i,t}\,\ell_{i,t}
+}{
+\sum_t m_{i,t}
+}.\]</div>
+<p><code>[SYNTHESIS]</code> The first gives longer responses more total weight. The second gives every response equal weight. Distillation code should state which normalization it uses.</p>
+<h2 id="4-three-kinds-of-targets-for-language-model-distillation">4. Three kinds of targets for language-model distillation</h2>
+<h3 id="41-hard-ground-truth-targets">4.1 Hard ground-truth targets</h3>
+<p>With a demonstrated token <span class="math-inline">\(y_t^*\)</span>,</p>
+<div class="math-display">\[\ell_{\mathrm{NLL},t}
+=-\log q_\theta(y_t^*\mid x,y_{&lt;t}^*).\]</div>
+<p>This is ordinary supervised fine-tuning.</p>
+<h3 id="42-soft-token-targets">4.2 Soft token targets</h3>
+<p>With teacher probabilities,</p>
+<div class="math-display">\[\ell_{\mathrm{soft},t}
+=-\sum_{v\in\mathcal V}
+p_\phi^{(\tau)}(v\mid h_t)
+\log q_\theta^{(\tau)}(v\mid h_t).\]</div>
+<p><code>[EXPLANATION]</code> One forward pass of the teacher supplies a target over the entire vocabulary, not merely the sampled token.</p>
+<h3 id="43-hard-teacher-generated-sequences">4.3 Hard teacher-generated sequences</h3>
+<p>If only samples are available, draw or decode</p>
+<div class="math-display">\[\hat y\sim p_\phi(\cdot\mid x)\]</div>
+<p>and train with</p>
+<div class="math-display">\[\ell_{\mathrm{SeqKD}}
+=-\sum_t
+\log q_\theta(\hat y_t\mid x,\hat y_{&lt;t}).\]</div>
+<p><code>[DIRECT · KIM AND RUSH]</code> Sequence-level knowledge distillation trains a student on sequences produced by a teacher, converting teacher behavior into a standard supervised dataset.</p>
+<p><code>[SYNTHESIS]</code> Hard sequence targets are convenient and work with black-box teachers, but they discard the teacher's uncertainty at every token. The decoding algorithm also becomes part of the target-generating process.</p>
+<h2 id="5-sequence-level-knowledge-distillation">5. Sequence-level knowledge distillation</h2>
+<h3 id="51-basic-algorithm">5.1 Basic algorithm</h3>
+<p>For every transfer input <span class="math-inline">\(x_i\)</span>:</p>
+<ol>
+<li>run teacher decoding to produce <span class="math-inline">\(\hat y_i\)</span>;</li>
+<li>store <span class="math-inline">\((x_i,\hat y_i)\)</span>;</li>
+<li>train the student by maximum likelihood on the resulting dataset.</li>
+</ol>
+<p>In pseudocode:</p>
+<pre><code class="language-python">distilled_examples = []
+
+for prompt in transfer_prompts:
+    teacher_response = teacher.generate(
+        prompt,
+        decoding=&quot;beam&quot;  # or greedy / sampling
+    )
+    distilled_examples.append((prompt, teacher_response))
+
+for prompt, response in batches(distilled_examples):
+    loss = response_nll(student, prompt, response)
+    loss.backward()
+    optimizer.step()
+</code></pre>
+<h3 id="52-decoding-is-a-lossy-projection">5.2 Decoding is a lossy projection</h3>
+<p>Suppose the teacher distribution is multimodal:</p>
+<div class="math-display">\[p_\phi(y\mid x)
+=0.45\,\delta_{y_A}
++0.40\,\delta_{y_B}
++0.15\,\delta_{y_C}.\]</div>
+<p>Greedy or beam decoding may always choose <span class="math-inline">\(y_A\)</span>. A dataset containing only <span class="math-inline">\(y_A\)</span> makes the effective target approximately <span class="math-inline">\(\delta_{y_A}\)</span> rather than the full teacher distribution.</p>
+<p><code>[SYNTHESIS]</code> Sequence KD may simplify the output distribution in a way that helps a limited-capacity student, but it can also erase diversity and calibrated uncertainty.</p>
+<h3 id="53-sampling-versus-deterministic-decoding">5.3 Sampling versus deterministic decoding</h3>
+<p><code>[EXPLANATION]</code></p>
+<ul>
+<li>deterministic decoding produces cleaner and less diverse targets;</li>
+<li>stochastic sampling better represents teacher diversity but can include low-quality outputs;</li>
+<li>generating several candidates and filtering them spends more teacher compute in exchange for a curated training set.</li>
+</ul>
+<p><code>[CHECK]</code> “Train on teacher data” is not a complete recipe. The number of samples, decoding temperature, top-<span class="math-inline">\(p\)</span>, filtering rule, and prompt distribution all shape the student.</p>
+<h2 id="6-the-prefix-distribution-problem">6. The prefix-distribution problem</h2>
+<h3 id="61-teacher-forcing-trains-on-prefixes-chosen-elsewhere">6.1 Teacher forcing trains on prefixes chosen elsewhere</h3>
+<p>In fixed-data training, the student sees prefixes <span class="math-inline">\(y_{&lt;t}\)</span> from a dataset or the teacher. At deployment, it sees prefixes sampled from itself.</p>
+<p>Let</p>
+<div class="math-display">\[\mu_{\mathrm{train}}(h)
+\neq
+\mu_{q_\theta}(h)\]</div>
+<p>denote this mismatch.</p>
+<p><code>[EXPLANATION]</code> If the student makes an early mistake, the resulting prefix may be rare or absent in the training data. The student then receives no direct training on how to recover from that state.</p>
+<h3 id="62-a-two-step-example">6.2 A two-step example</h3>
+<p>Suppose the teacher almost always starts with token <span class="math-inline">\(A\)</span>, while the student sometimes starts with <span class="math-inline">\(B\)</span>.</p>
+<ul>
+<li>Offline teacher-forced KD trains the second token mostly after prefix <span class="math-inline">\(A\)</span>.</li>
+<li>Deployment asks the student to predict the second token after both <span class="math-inline">\(A\)</span> and <span class="math-inline">\(B\)</span>.</li>
+<li>If prefix <span class="math-inline">\(B\)</span> was never queried during training, teacher knowledge about how to continue from <span class="math-inline">\(B\)</span> was not transferred.</li>
+</ul>
+<p><code>[SYNTHESIS]</code> This is not merely “error accumulation.” It is a support problem: the training process may never visit the states at which the deployed student needs guidance.</p>
+<h2 id="7-forward-kl-and-reverse-kl">7. Forward KL and reverse KL</h2>
+<p>For a fixed prompt, abbreviate the teacher sequence distribution by <span class="math-inline">\(p(y)\)</span> and the student by <span class="math-inline">\(q_\theta(y)\)</span>.</p>
+<h3 id="71-forward-kl">7.1 Forward KL</h3>
+<div class="math-display">\[D_{\mathrm{KL}}(p\|q_\theta)
+=\mathbb E_{y\sim p}
+\left[
+\log p(y)-\log q_\theta(y)
+\right].\]</div>
+<p>Only the second term depends on <span class="math-inline">\(\theta\)</span>, so</p>
+<div class="math-display">\[\nabla_\theta D_{\mathrm{KL}}(p\|q_\theta)
+=-
+\mathbb E_{y\sim p}
+[\nabla_\theta\log q_\theta(y)].\]</div>
+<p><code>[EXPLANATION]</code> The teacher chooses which sequences appear in the expectation. Missing a sequence with substantial teacher probability is costly.</p>
+<h3 id="72-reverse-kl">7.2 Reverse KL</h3>
+<div class="math-display">\[D_{\mathrm{KL}}(q_\theta\|p)
+=\mathbb E_{y\sim q_\theta}
+\left[
+\log q_\theta(y)-\log p(y)
+\right].\]</div>
+<p><code>[EXPLANATION]</code> Now the student chooses which sequences appear in the expectation. Probability placed where the teacher assigns very little mass is costly.</p>
+<h3 id="73-deriving-the-reverse-kl-gradient">7.3 Deriving the reverse-KL gradient</h3>
+<p>Define</p>
+<div class="math-display">\[f_\theta(y)=\log q_\theta(y)-\log p(y).\]</div>
+<p><code>[DERIVATION · Step 1]</code> Apply the score-function identity to an expectation whose distribution and integrand both depend on <span class="math-inline">\(\theta\)</span>:</p>
+<div class="math-display">\[\nabla_\theta\mathbb E_{y\sim q_\theta}[f_\theta(y)]
+=\mathbb E_{q_\theta}
+\left[
+f_\theta(y)\nabla_\theta\log q_\theta(y)
++\nabla_\theta f_\theta(y)
+\right].\]</div>
+<p><code>[DERIVATION · Step 2]</code> Since the teacher is fixed,</p>
+<div class="math-display">\[\nabla_\theta f_\theta(y)
+=\nabla_\theta\log q_\theta(y).\]</div>
+<p><code>[DERIVATION · Step 3]</code> The expected score is zero:</p>
+<div class="math-display">\[\mathbb E_{q_\theta}
+[\nabla_\theta\log q_\theta(y)]
+=\nabla_\theta\sum_y q_\theta(y)=0.\]</div>
+<p>Therefore</p>
+<div class="math-display">\[\boxed{
+\nabla_\theta D_{\mathrm{KL}}(q_\theta\|p)
+=\mathbb E_{y\sim q_\theta}
+\left[
+\log\frac{q_\theta(y)}{p(y)}
+\nabla_\theta\log q_\theta(y)
+\right].
+}\]</div>
+<p><code>[CONNECTION]</code> This has the form of a policy gradient. The log-ratio acts like a sequence-level cost, and a baseline can be subtracted to reduce variance without changing the expected gradient.</p>
+<h3 id="74-autoregressive-log-ratio">7.4 Autoregressive log-ratio</h3>
+<p>For a sampled student response,</p>
+<div class="math-display">\[\log\frac{q_\theta(y\mid x)}{p_\phi(y\mid x)}
+=\sum_{t=1}^{T}
+\log\frac{
+q_\theta(y_t\mid x,y_{&lt;t})
+}{
+p_\phi(y_t\mid x,y_{&lt;t})
+}.\]</div>
+<p><code>[EXPLANATION]</code> The teacher can score the same student-generated prefix and token. This supplies a dense token-level discrepancy even though the response was sampled on-policy from the student.</p>
+<h3 id="75-mode-covering-and-mode-seeking-need-care">7.5 “Mode covering” and “mode seeking” need care</h3>
+<p><code>[COMMON INTUITION]</code> Forward KL is often described as mode covering because it penalizes the student for missing teacher-supported outcomes. Reverse KL is often described as mode seeking because it strongly penalizes student mass in teacher-low-probability regions.</p>
+<p><code>[LIMIT]</code> These phrases are qualitative intuitions, not universal theorems about a finite-capacity neural language model trained with stochastic gradients. The observed behavior also depends on parameterization, sampling, prefix distribution, optimization, and finite data.</p>
+<h2 id="8-on-policy-distillation">8. On-policy distillation</h2>
+<h3 id="81-correct-the-student-on-its-own-prefixes">8.1 Correct the student on its own prefixes</h3>
+<p><code>[DIRECT · AGARWAL ET AL.]</code> Generalized Knowledge Distillation trains on student-generated sequences so the teacher can provide feedback at prefixes that the student itself visits.</p>
+<p>A schematic objective is</p>
+<div class="math-display">\[\mathcal L_{\mathrm{on\text{-}policy}}
+=\mathbb E_{x\sim\mathcal D}
+\mathbb E_{y\sim q_\theta(\cdot\mid x)}
+\left[
+\sum_t
+d\!\left(
+p_\phi(\cdot\mid x,y_{&lt;t}),
+q_\theta(\cdot\mid x,y_{&lt;t})
+\right)
+\right],\]</div>
+<p>where <span class="math-inline">\(d\)</span> may be a forward KL, reverse KL, Jensen–Shannon-style divergence, or another discrepancy.</p>
+<h3 id="82-mixed-policy-training">8.2 Mixed-policy training</h3>
+<p>Pure on-policy sampling can be noisy early in training. A mixture can generate a prefix from the teacher or student:</p>
+<div class="math-display">\[\pi_{\mathrm{mix}}
+=(1-\lambda)p_\phi+\lambda q_\theta,
+\qquad 0\le\lambda\le1.\]</div>
+<p>Then</p>
+<div class="math-display">\[\mathcal L_{\mathrm{GKD}}
+=\mathbb E_{y\sim\pi_{\mathrm{mix}}}
+\left[
+\sum_t d(p_{\phi,t},q_{\theta,t})
+\right].\]</div>
+<p><code>[SYNTHESIS]</code> <span class="math-inline">\(\lambda\)</span> controls a curriculum over prefix distributions:</p>
+<ul>
+<li><span class="math-inline">\(\lambda=0\)</span>: teacher-prefix distillation;</li>
+<li><span class="math-inline">\(\lambda=1\)</span>: fully student-prefix distillation;</li>
+<li>intermediate <span class="math-inline">\(\lambda\)</span>: retain teacher-quality trajectories while exposing the student to its own mistakes.</li>
+</ul>
+<h3 id="83-a-minimal-on-policy-loop">8.3 A minimal on-policy loop</h3>
+<pre><code class="language-python">for prompts in loader:
+    with no_grad():
+        student_tokens = student.generate(
+            prompts,
+            do_sample=True,
+            temperature=1.0,
+        )
+
+        # Teacher is evaluated on the student's prefixes.
+        teacher_logits = teacher(prompts, student_tokens).logits
+
+    student_logits = student(prompts, student_tokens).logits
+
+    loss = masked_token_kl(
+        teacher_logits=teacher_logits,
+        student_logits=student_logits,
+        response_mask=response_mask(student_tokens),
+    )
+
+    loss.backward()
+    optimizer.step()
+</code></pre>
+<p><code>[CHECK]</code> The generated token IDs should be treated as sampled data. Accidentally backpropagating through an assumed differentiable sampling operation changes neither the discrete samples nor the intended gradient estimator.</p>
+<h2 id="9-implementing-token-level-soft-distillation">9. Implementing token-level soft distillation</h2>
+<h3 id="91-stable-loss-computation">9.1 Stable loss computation</h3>
+<pre><code class="language-python">def token_kd_loss(student_logits, teacher_logits, mask, tau=2.0):
+    # [batch, time, vocabulary]
+    teacher_prob = softmax(teacher_logits / tau, dim=-1)
+    student_logprob = log_softmax(student_logits / tau, dim=-1)
+
+    # Cross-entropy differs from forward KL only by teacher entropy.
+    token_loss = -(teacher_prob * student_logprob).sum(dim=-1)
+
+    masked_mean = (token_loss * mask).sum() / mask.sum().clamp_min(1)
+    return (tau ** 2) * masked_mean
+</code></pre>
+<p><code>[IMPLEMENTATION NOTE]</code> Computing <code>log_softmax</code> directly is more numerically stable than taking a logarithm after <code>softmax</code>.</p>
+<h3 id="92-combining-hard-and-soft-supervision">9.2 Combining hard and soft supervision</h3>
+<pre><code class="language-python">loss = (
+    (1.0 - alpha) * hard_response_nll(student_logits, labels)
+    + alpha * token_kd_loss(
+        student_logits,
+        teacher_logits,
+        response_mask,
+        tau=temperature,
+    )
+)
+</code></pre>
+<p><code>[SYNTHESIS]</code> Hard targets anchor the student to observed desired outputs. Soft targets communicate how the teacher distributes probability among alternatives. The mixing coefficient <span class="math-inline">\(\alpha\)</span> is a modeling choice, not a harmless scale factor.</p>
+<h3 id="93-vocabulary-alignment">9.3 Vocabulary alignment</h3>
+<p>The token-KL formula assumes teacher and student distributions share the same vocabulary and tokenization.</p>
+<p><code>[LIMIT]</code> If tokenizers differ, token <span class="math-inline">\(v\)</span> in one model need not correspond to a single token in the other. Options include:</p>
+<ul>
+<li>sequence-level distillation;</li>
+<li>mapping distributions into a shared vocabulary;</li>
+<li>distilling representations after learned projections;</li>
+<li>matching probabilities over strings rather than raw token IDs.</li>
+</ul>
+<p>None is automatically equivalent to same-vocabulary token KL.</p>
+<h2 id="10-numerical-example-one-soft-target-update">10. Numerical example: one soft-target update</h2>
+<p>Suppose the teacher and student next-token probabilities are</p>
+<div class="math-display">\[p=(0.70,0.20,0.10),
+\qquad
+q=(0.40,0.30,0.30),\]</div>
+<p>at <span class="math-inline">\(\tau=1\)</span>.</p>
+<p>The gradient of the soft cross-entropy with respect to the student logits is</p>
+<div class="math-display">\[q-p=(-0.30,0.10,0.20).\]</div>
+<p>Under gradient descent:</p>
+<ul>
+<li>the first logit increases because the student underestimates it by <span class="math-inline">\(0.30\)</span>;</li>
+<li>the second logit decreases slightly;</li>
+<li>the third decreases more strongly because the student assigns three times the teacher probability.</li>
+</ul>
+<p>The forward KL is</p>
+<div class="math-display">\[\begin{aligned}
+D_{\mathrm{KL}}(p\|q)
+&amp;=0.70\log\frac{0.70}{0.40}
++0.20\log\frac{0.20}{0.30}
++0.10\log\frac{0.10}{0.30}\\
+&amp;\approx 0.201.
+\end{aligned}\]</div>
+<p>The reverse KL is</p>
+<div class="math-display">\[\begin{aligned}
+D_{\mathrm{KL}}(q\|p)
+&amp;=0.40\log\frac{0.40}{0.70}
++0.30\log\frac{0.30}{0.20}
++0.30\log\frac{0.30}{0.10}\\
+&amp;\approx 0.227.
+\end{aligned}\]</div>
+<p><code>[EXPLANATION]</code> KL is asymmetric because the expectation weights differ. Forward KL weights the log-ratio by teacher probability; reverse KL weights it by student probability.</p>
+<h2 id="11-capacity-gap-and-the-projection-viewpoint">11. Capacity gap and the projection viewpoint</h2>
+<p>Let <span class="math-inline">\(\mathcal Q\)</span> be the family of distributions the student architecture can represent. Distillation approximately solves</p>
+<div class="math-display">\[q^*
+=\arg\min_{q\in\mathcal Q}
+D(p_\phi,q).\]</div>
+<p><code>[SYNTHESIS]</code> If <span class="math-inline">\(p_\phi\notin\mathcal Q\)</span>, the student cannot exactly copy the teacher. The divergence determines which approximation is preferred.</p>
+<h3 id="111-why-a-smaller-student-may-need-a-simpler-target">11.1 Why a smaller student may need a simpler target</h3>
+<p>The teacher may allocate probability across many valid styles, reasoning paths, and lengths. A limited student may struggle to represent all of them simultaneously.</p>
+<p>Possible responses include:</p>
+<ul>
+<li>sharpen the teacher distribution;</li>
+<li>use deterministic sequence targets;</li>
+<li>restrict the prompt domain;</li>
+<li>introduce an intermediate-size assistant teacher;</li>
+<li>distill one capability at a time;</li>
+<li>increase student capacity.</li>
+</ul>
+<p><code>[HYPOTHESIS]</code> The success of a narrower, cleaner teacher-generated dataset can partly reflect an easier projection problem rather than perfect transfer of the teacher's complete behavior.</p>
+<h3 id="112-the-student-can-sometimes-exceed-the-teacher-on-a-metric">11.2 The student can sometimes exceed the teacher on a metric</h3>
+<p><code>[EXPLANATION]</code> Distillation is not a theorem that the student must score below the teacher. A student may benefit from regularization, a different architecture, additional hard labels, filtered data, or an evaluation distribution closer to the transfer set.</p>
+<p><code>[CHECK]</code> “Student beats teacher” does not imply that all teacher knowledge was transferred. It is a statement about a particular metric and distribution.</p>
+<h2 id="12-distillation-versus-nearby-post-training-methods">12. Distillation versus nearby post-training methods</h2>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Supervision</th>
+<th>Primary objective</th>
+<th>Main limitation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>SFT</td>
+<td>Demonstrated response</td>
+<td>Increase likelihood of one target</td>
+<td>Does not expose alternatives</td>
+</tr>
+<tr>
+<td>Soft KD</td>
+<td>Teacher token distribution</td>
+<td>Match dense teacher probabilities</td>
+<td>Requires logit access and aligned vocabularies</td>
+</tr>
+<tr>
+<td>Sequence KD</td>
+<td>Teacher-generated response</td>
+<td>Imitate sampled/decoded outputs</td>
+<td>Loses uncertainty; depends on decoding</td>
+</tr>
+<tr>
+<td>DPO</td>
+<td>Preferred and rejected responses</td>
+<td>Increase relative preference under a reference</td>
+<td>Requires comparison data</td>
+</tr>
+<tr>
+<td>RLHF/RLVR</td>
+<td>Scalar learned or verified reward</td>
+<td>Increase expected reward</td>
+<td>Sampling and optimization are more complex</td>
+</tr>
+</tbody>
+</table>
+<p><code>[CONNECTION TO LECTURE 12]</code> SFT uses a delta-like target concentrated on the demonstrated token. Soft distillation replaces that target with the teacher's full distribution. DPO does not try to reproduce a teacher distribution; it fits relative preferences.</p>
+<p><code>[CONNECTION TO LECTURE 13]</code> On-policy distillation and policy gradient both sample from the current student/policy. Their signals differ: distillation queries a teacher distribution, whereas RLVR queries a verifier. Reverse-KL gradients can nevertheless take a policy-gradient form.</p>
+<h2 id="13-failure-modes-and-diagnostics">13. Failure modes and diagnostics</h2>
+<h3 id="131-poor-transfer-prompts">13.1 Poor transfer prompts</h3>
+<p>If <span class="math-inline">\(\mathcal D_{\mathrm{tr}}\)</span> omits a capability, the teacher provides no supervision for it.</p>
+<p><strong>Diagnostic:</strong> stratify evaluation by prompt domain and compare coverage with the transfer set.</p>
+<h3 id="132-teacher-errors-become-labels">13.2 Teacher errors become labels</h3>
+<p>A generated response can be fluent and wrong. Sequence KD may turn that error into a hard target.</p>
+<p><strong>Diagnostic:</strong> retain teacher confidence, verifier scores, human checks, or multiple candidates rather than assuming every teacher generation is correct.</p>
+<h3 id="133-exposure-bias">13.3 Exposure bias</h3>
+<p>The student performs well on teacher prefixes but degrades on self-generated prefixes.</p>
+<p><strong>Diagnostic:</strong> compare token KL on dataset prefixes, teacher prefixes, and student prefixes. A large gap indicates a prefix-distribution problem.</p>
+<h3 id="134-temperature-is-miscalibrated">13.4 Temperature is miscalibrated</h3>
+<p>Very high temperature can overemphasize a noisy tail; very low temperature approaches hard-label imitation.</p>
+<p><strong>Diagnostic:</strong> inspect probability mass and gradient contribution by teacher-probability rank, not only the final loss.</p>
+<h3 id="135-loss-decreases-while-deployment-quality-stalls">13.5 Loss decreases while deployment quality stalls</h3>
+<p>The student may match teacher probabilities on the training prefixes without improving end-to-end generations.</p>
+<p><strong>Diagnostic:</strong> track both teacher-agreement metrics and task metrics under actual decoding settings.</p>
+<h3 id="136-efficiency-is-not-measured-end-to-end">13.6 Efficiency is not measured end to end</h3>
+<p>A smaller model may have worse throughput because of kernels, batching, or memory movement.</p>
+<p><strong>Diagnostic:</strong> report latency, throughput, peak memory, energy when available, and quality at the deployment sequence lengths and hardware.</p>
+<h2 id="14-a-practical-experiment-design">14. A practical experiment design</h2>
+<h3 id="141-controlled-comparison">14.1 Controlled comparison</h3>
+<p>Hold constant:</p>
+<ul>
+<li>student initialization and architecture;</li>
+<li>transfer prompts;</li>
+<li>number of response tokens processed;</li>
+<li>optimizer and learning-rate budget;</li>
+<li>evaluation prompts and decoding.</li>
+</ul>
+<p>Compare:</p>
+<ol>
+<li>SFT on original responses;</li>
+<li>sequence KD on teacher responses;</li>
+<li>offline token-level forward KL;</li>
+<li>on-policy token-level KD;</li>
+<li>a hard-plus-soft mixture.</li>
+</ol>
+<h3 id="142-metrics">14.2 Metrics</h3>
+<p>Measure at least three layers:</p>
+<table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>Example metrics</th>
+<th>What it tests</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Agreement</td>
+<td>token KL, teacher win rate</td>
+<td>Does the student imitate the teacher?</td>
+</tr>
+<tr>
+<td>Task quality</td>
+<td>accuracy, pass rate, human preference</td>
+<td>Does imitation help the target task?</td>
+</tr>
+<tr>
+<td>Deployment</td>
+<td>latency, throughput, memory</td>
+<td>Did compression achieve its practical goal?</td>
+</tr>
+</tbody>
+</table>
+<p><code>[SYNTHESIS]</code> No single metric establishes successful distillation. Low KL can coexist with poor generations, and strong benchmark quality can coexist with little deployment benefit.</p>
+<h2 id="15-a-compact-decision-procedure">15. A compact decision procedure</h2>
+<ol>
+<li><strong>Only teacher text is available:</strong> begin with sequence KD and carefully document decoding and filtering.</li>
+<li><strong>Teacher logits and a shared tokenizer are available:</strong> add token-level soft targets.</li>
+<li><strong>Student generations drift after early errors:</strong> query the teacher on student prefixes and try on-policy or mixed-policy KD.</li>
+<li><strong>The student is much smaller:</strong> test temperature, target simplification, and intermediate teachers instead of assuming exact imitation is possible.</li>
+<li><strong>Serving cost is the goal:</strong> measure real deployment cost, not just parameter count.</li>
+</ol>
+<h2 id="16-open-questions">16. Open questions</h2>
+<ol>
+<li>Which prefix mixture gives the best tradeoff between teacher-quality trajectories and correction of student mistakes?</li>
+<li>How should temperature depend on student capacity or token position?</li>
+<li>When does preserving teacher uncertainty improve generation, and when does it overwhelm a smaller student?</li>
+<li>Can a black-box student recover calibrated uncertainty from multiple teacher samples without logits?</li>
+<li>How should distillation handle different tokenizers without reducing everything to hard sequence imitation?</li>
+<li>Which teacher capabilities are absent because the transfer prompt distribution never elicits them?</li>
+<li>How much apparent compression comes from narrowing the task rather than transferring general capability?</li>
+<li>Can verifier-guided filtering remove teacher errors without collapsing response diversity?</li>
+</ol>
+<h2 id="17-what-to-verify-manually">17. What to verify manually</h2>
+<ul>
+<li>Re-read the four primary papers and confirm which variants were actually emphasized in the student presentations.</li>
+<li>Check whether the course presenters used “distillation” mainly for compression, synthetic-data imitation, or self-distillation.</li>
+<li>Reproduce the <span class="math-inline">\(\tau^2\)</span> scaling derivation with centered logits.</li>
+<li>Implement the same-vocabulary token-KL loss and verify its gradient numerically.</li>
+<li>Compare teacher-prefix and student-prefix losses on one small autoregressive model.</li>
+<li>Replace broad synthesis claims with the author's own examples and conclusions after studying the papers.</li>
+</ul>
+<h2 id="source-trail">Source trail</h2>
+<ul>
+<li>CS 395T course schedule: <a href="https://noahgol.github.io/teaching/cs395t-f26/">https://noahgol.github.io/teaching/cs395t-f26/</a></li>
+<li>Hinton, Vinyals, and Dean, <em>Distilling the Knowledge in a Neural Network</em>: <a href="https://arxiv.org/abs/1503.02531">https://arxiv.org/abs/1503.02531</a></li>
+<li>Kim and Rush, <em>Sequence-Level Knowledge Distillation</em>: <a href="https://arxiv.org/abs/1606.07947">https://arxiv.org/abs/1606.07947</a></li>
+<li>Gu et al., <em>MiniLLM: Knowledge Distillation of Large Language Models</em>: <a href="https://arxiv.org/abs/2306.08543">https://arxiv.org/abs/2306.08543</a></li>
+<li>Agarwal et al., <em>On-Policy Distillation of Language Models</em>: <a href="https://arxiv.org/abs/2306.13649">https://arxiv.org/abs/2306.13649</a></li>
+</ul>
+      </article>
+    </div>
+  </main>
+
+  <footer class="site-footer section-shell">
+    <div><strong>CS 395T</strong><span>Learning note</span></div>
+    <p>Markdown source · draft</p>
+    <a href="../index.html#notes">Return to index ←</a>
+  </footer>
+</body>
+</html>

@@ -1,5 +1,45 @@
 [
   {
+    "title": "Lecture 15 — LoRA, Continual Learning, and Test-Time Training",
+    "question": "A detailed AI-assisted study scaffold connecting low-rank adaptation, catastrophic forgetting, replay and regularization, and test-time parameter updates under distribution shift.",
+    "type": "learning",
+    "typeLabel": "Learning note",
+    "status": "Draft",
+    "date": "Oct 2026",
+    "tags": [
+      "LoRA",
+      "parameter-efficient fine-tuning",
+      "continual learning",
+      "catastrophic forgetting",
+      "experience replay",
+      "elastic weight consolidation",
+      "test-time training",
+      "test-time adaptation"
+    ],
+    "url": "course-notes/lecture-15.html",
+    "disclaimer": "AI-assisted · in progress"
+  },
+  {
+    "title": "Lecture 14 — Knowledge Distillation for Language Models",
+    "question": "A detailed AI-assisted study scaffold for knowledge distillation, from temperature-scaled soft targets to sequence-level and on-policy distillation for autoregressive language models.",
+    "type": "learning",
+    "typeLabel": "Learning note",
+    "status": "Draft",
+    "date": "Oct 2026",
+    "tags": [
+      "knowledge distillation",
+      "model compression",
+      "soft targets",
+      "temperature scaling",
+      "sequence-level distillation",
+      "forward KL",
+      "reverse KL",
+      "on-policy distillation"
+    ],
+    "url": "course-notes/lecture-14.html",
+    "disclaimer": "AI-assisted · in progress"
+  },
+  {
     "title": "Lecture 13 — Reinforcement Learning with Verifiable Rewards",
     "question": "An AI-assisted reconstruction of RLVR from REINFORCE and PPO through RLOO, Dr. GRPO, GRPO, and MaxRL, with explicit derivations of their baselines, biases, normalization effects, and implicit objectives.",
     "type": "learning",
@@ -20,6 +60,25 @@
     "disclaimer": "AI-assisted · in progress"
   },
   {
+    "title": "Lecture 12 — SFT, RLHF, and DPO",
+    "question": "A detailed AI-assisted study scaffold for supervised fine-tuning, reward modeling, PPO-based RLHF, and the derivation and implementation of direct preference optimization.",
+    "type": "learning",
+    "typeLabel": "Learning note",
+    "status": "Draft",
+    "date": "Oct 2026",
+    "tags": [
+      "supervised fine-tuning",
+      "preference learning",
+      "reward modeling",
+      "RLHF",
+      "DPO",
+      "KL regularization",
+      "post-training"
+    ],
+    "url": "course-notes/lecture-12.html",
+    "disclaimer": "AI-assisted · in progress"
+  },
+  {
     "title": "Lecture 10 — GPUs, FlashAttention, and Inference",
     "question": "An AI-assisted first reconstruction of GPU memory hierarchy, roofline analysis, FlashAttention's online softmax and IO complexity, KV caching, and the different bottlenecks of prefill and generation.",
     "type": "learning",
@@ -35,6 +94,26 @@
       "arithmetic intensity"
     ],
     "url": "course-notes/lecture-10.html",
+    "disclaimer": "AI-assisted · in progress"
+  },
+  {
+    "title": "Lecture 11 — Policy Gradients, TRPO, and PPO",
+    "question": "A detailed AI-assisted reconstruction of finite-horizon policy gradients, REINFORCE, the performance-difference lemma, trust-region guarantees, TRPO, PPO clipping, value learning, entropy regularization, and GAE.",
+    "type": "learning",
+    "typeLabel": "Learning note",
+    "status": "Draft",
+    "date": "Sep 2026",
+    "tags": [
+      "reinforcement learning",
+      "policy gradients",
+      "REINFORCE",
+      "performance difference lemma",
+      "TRPO",
+      "PPO",
+      "GAE",
+      "RLHF"
+    ],
+    "url": "course-notes/lecture-11.html",
     "disclaimer": "AI-assisted · in progress"
   },
   {
@@ -153,6 +232,44 @@
       "speculative decoding"
     ],
     "url": "course-notes/lecture-09.html",
+    "disclaimer": "AI-assisted · in progress"
+  },
+  {
+    "title": "Lecture 02 — Deep Learning Before Transformers",
+    "question": "An AI-assisted reconstruction of pre-Transformer deep learning, from convolutional vision and VAEs/GANs through recurrent language models, attention, and adversarial robustness.",
+    "type": "learning",
+    "typeLabel": "Learning note",
+    "status": "Draft",
+    "date": "Aug 2026",
+    "tags": [
+      "convolutional networks",
+      "image generation",
+      "VAE",
+      "GAN",
+      "recurrent neural networks",
+      "LSTM",
+      "attention",
+      "adversarial examples"
+    ],
+    "url": "course-notes/lecture-02.html",
+    "disclaimer": "AI-assisted · in progress"
+  },
+  {
+    "title": "Lecture 01 — From Perceptrons to Backpropagation",
+    "question": "An AI-assisted reconstruction of Lecture 1, covering perceptrons, margin-based mistake bounds, MLP expressivity, approximation limits, depth separation, SGD, and backpropagation as dynamic programming.",
+    "type": "learning",
+    "typeLabel": "Learning note",
+    "status": "Draft",
+    "date": "Aug 2026",
+    "tags": [
+      "perceptron",
+      "multi-layer perceptron",
+      "universal approximation",
+      "depth separation",
+      "stochastic gradient descent",
+      "backpropagation"
+    ],
+    "url": "course-notes/lecture-01.html",
     "disclaimer": "AI-assisted · in progress"
   },
   {

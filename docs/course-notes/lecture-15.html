@@ -1,0 +1,800 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A detailed AI-assisted study scaffold connecting low-rank adaptation, catastrophic forgetting, replay and regularization, and test-time parameter updates under distribution shift.">
+  <title>Lecture 15 — LoRA, Continual Learning, and Test-Time Training — CS 395T</title>
+  <link rel="stylesheet" href="../assets/styles.css">
+  <script>
+    window.MathJax = {
+      tex: {
+        processEscapes: true
+      },
+      svg: { fontCache: 'global' }
+    };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js" defer></script>
+  <script src="../assets/app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header">
+    <a class="wordmark" href="../index.html"><span>CS 395T</span><small>Learning &amp; research notebook</small></a>
+    <button class="menu-button" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button>
+    <nav id="site-nav" class="site-nav" aria-label="Primary navigation">
+      <a href="../structure.html">Structure</a>
+      <a href="../index.html#notes">Index</a>
+      <a href="../method.html">Writing guide</a>
+      <a href="../index.html#about">About</a>
+    </nav>
+  </header>
+
+  <main id="main" class="note-shell">
+    <header class="note-hero">
+      <div class="template-banner learning-banner">
+        <strong>LEARNING NOTE · DRAFT</strong>
+        <span>Work in progress</span>
+      </div>
+      <p class="eyebrow">14 OCT 2026 · DRAFT</p>
+      <h1>Lecture 15 — LoRA, Continual Learning, and Test-Time Training</h1>
+      <p class="note-abstract">A detailed AI-assisted study scaffold connecting low-rank adaptation, catastrophic forgetting, replay and regularization, and test-time parameter updates under distribution shift.</p>
+      <ul class="tag-list" aria-label="Topics"><li>LoRA</li><li>parameter-efficient fine-tuning</li><li>continual learning</li><li>catastrophic forgetting</li><li>experience replay</li><li>elastic weight consolidation</li><li>test-time training</li><li>test-time adaptation</li></ul>
+    </header>
+
+    <div class="note-layout">
+      <aside class="note-toc" aria-label="On this page">
+        <p class="aside-label">ON THIS PAGE</p>
+        <div class="toc">
+<ul>
+<li><a href="#source-boundary">Source boundary</a></li>
+<li><a href="#reading-map">Reading map</a></li>
+<li><a href="#1-a-common-mathematical-frame">1. A common mathematical frame</a><ul>
+<li><a href="#11-local-quadratic-view">1.1 Local quadratic view</a></li>
+</ul>
+</li>
+<li><a href="#2-lora-low-rank-parameter-updates">2. LoRA: low-rank parameter updates</a><ul>
+<li><a href="#21-from-full-fine-tuning-to-a-structured-update">2.1 From full fine-tuning to a structured update</a></li>
+<li><a href="#22-why-the-update-is-low-rank">2.2 Why the update is low rank</a></li>
+<li><a href="#23-parameter-count">2.3 Parameter count</a></li>
+<li><a href="#24-scaling-and-initialization">2.4 Scaling and initialization</a></li>
+<li><a href="#25-lora-as-a-constrained-update-space">2.5 LoRA as a constrained update space</a></li>
+<li><a href="#26-merging-at-inference">2.6 Merging at inference</a></li>
+<li><a href="#27-minimal-implementation">2.7 Minimal implementation</a></li>
+</ul>
+</li>
+<li><a href="#3-what-lora-does-not-solve-by-itself">3. What LoRA does not solve by itself</a></li>
+<li><a href="#4-continual-learning-learning-from-a-stream">4. Continual learning: learning from a stream</a><ul>
+<li><a href="#41-problem-setup">4.1 Problem setup</a></li>
+<li><a href="#42-task-settings-matter">4.2 Task settings matter</a></li>
+</ul>
+</li>
+<li><a href="#5-why-catastrophic-forgetting-occurs">5. Why catastrophic forgetting occurs</a><ul>
+<li><a href="#51-gradient-interference">5.1 Gradient interference</a></li>
+<li><a href="#52-stabilityplasticity-tradeoff">5.2 Stability–plasticity tradeoff</a></li>
+</ul>
+</li>
+<li><a href="#6-replay-keep-some-old-evidence">6. Replay: keep some old evidence</a><ul>
+<li><a href="#61-basic-replay-objective">6.1 Basic replay objective</a></li>
+<li><a href="#62-reservoir-sampling-for-a-bounded-buffer">6.2 Reservoir sampling for a bounded buffer</a></li>
+<li><a href="#63-what-replay-buys-and-costs">6.3 What replay buys and costs</a></li>
+</ul>
+</li>
+<li><a href="#7-functional-regularization-preserve-outputs">7. Functional regularization: preserve outputs</a><ul>
+<li><a href="#71-learning-without-forgetting">7.1 Learning without Forgetting</a></li>
+</ul>
+</li>
+<li><a href="#8-parameter-regularization-elastic-weight-consolidation">8. Parameter regularization: Elastic Weight Consolidation</a><ul>
+<li><a href="#81-bayesian-starting-point">8.1 Bayesian starting point</a></li>
+<li><a href="#82-laplace-approximation">8.2 Laplace approximation</a></li>
+<li><a href="#83-two-parameter-example">8.3 Two-parameter example</a></li>
+<li><a href="#84-limits-of-the-approximation">8.4 Limits of the approximation</a></li>
+</ul>
+</li>
+<li><a href="#9-gradient-constraints-gem">9. Gradient constraints: GEM</a></li>
+<li><a href="#10-three-families-of-continual-learning-defenses">10. Three families of continual-learning defenses</a></li>
+<li><a href="#11-test-time-training-and-adaptation">11. Test-time training and adaptation</a><ul>
+<li><a href="#111-the-deployment-setting">11.1 The deployment setting</a></li>
+<li><a href="#112-one-step-test-time-update">11.2 One-step test-time update</a></li>
+<li><a href="#113-episodic-and-online-protocols">11.3 Episodic and online protocols</a></li>
+</ul>
+</li>
+<li><a href="#12-test-time-training-with-self-supervision">12. Test-Time Training with self-supervision</a><ul>
+<li><a href="#121-one-step-meta-gradient-intuition">12.1 One-step meta-gradient intuition</a></li>
+</ul>
+</li>
+<li><a href="#13-tent-entropy-minimization-adaptation">13. Tent: entropy-minimization adaptation</a><ul>
+<li><a href="#131-why-entropy-supplies-a-gradient-without-labels">13.1 Why entropy supplies a gradient without labels</a></li>
+<li><a href="#132-restricting-which-parameters-move">13.2 Restricting which parameters move</a></li>
+<li><a href="#133-minimal-adaptation-loop">13.3 Minimal adaptation loop</a></li>
+</ul>
+</li>
+<li><a href="#14-lora-at-test-time">14. LoRA at test time</a></li>
+<li><a href="#15-a-toy-gradient-conflict-example">15. A toy gradient-conflict example</a></li>
+<li><a href="#16-comparing-the-mechanisms">16. Comparing the mechanisms</a></li>
+<li><a href="#17-failure-modes-and-diagnostics">17. Failure modes and diagnostics</a><ul>
+<li><a href="#171-lora-rank-is-too-small-or-placed-poorly">17.1 LoRA rank is too small or placed poorly</a></li>
+<li><a href="#172-lora-overfits-despite-few-parameters">17.2 LoRA overfits despite few parameters</a></li>
+<li><a href="#173-continual-learner-protects-the-past-by-refusing-the-future">17.3 Continual learner protects the past by refusing the future</a></li>
+<li><a href="#174-replay-buffer-is-unrepresentative">17.4 Replay buffer is unrepresentative</a></li>
+<li><a href="#175-test-time-objective-is-misaligned">17.5 Test-time objective is misaligned</a></li>
+<li><a href="#176-online-adaptation-drifts">17.6 Online adaptation drifts</a></li>
+<li><a href="#177-evaluation-leaks-labels-or-future-data">17.7 Evaluation leaks labels or future data</a></li>
+</ul>
+</li>
+<li><a href="#18-a-practical-experiment-matrix">18. A practical experiment matrix</a></li>
+<li><a href="#19-connections-to-earlier-lectures">19. Connections to earlier lectures</a></li>
+<li><a href="#20-open-questions">20. Open questions</a></li>
+<li><a href="#21-what-to-verify-manually">21. What to verify manually</a></li>
+<li><a href="#source-trail">Source trail</a></li>
+</ul>
+</div>
+
+      </aside>
+      <article class="prose note-prose markdown-body">
+        <blockquote>
+<p><strong>AI-assisted study scaffold, not a lecture transcript.</strong> The official course schedule lists Lecture 15 as a student-presentation session on LoRA, continual learning, and test-time training, but it does not publish a unified handout or slide deck. This note therefore does not claim to reconstruct what the presenters said. It develops the named topics from the primary papers listed below and marks derivations and synthesis explicitly. It has not yet been manually verified or rewritten by the author.</p>
+</blockquote>
+<h2 id="source-boundary">Source boundary</h2>
+<p><code>[DIRECT · COURSE SCHEDULE]</code> The official schedule names the October 14 session <strong>“Post-training IV (Student Presentations #3): LoRA, continual learning, &amp; test-time training.”</strong> It does not link lecture notes or slides for this session: <a href="https://noahgol.github.io/teaching/cs395t-f26/">https://noahgol.github.io/teaching/cs395t-f26/</a>.</p>
+<p><code>[DIRECT · PRIMARY SOURCES]</code> The main technical sources used here are:</p>
+<ol>
+<li>Hu et al. (2021), <a href="https://arxiv.org/abs/2106.09685">LoRA: Low-Rank Adaptation of Large Language Models</a>.</li>
+<li>Kirkpatrick et al. (2017), <a href="https://arxiv.org/abs/1612.00796">Overcoming catastrophic forgetting in neural networks</a>.</li>
+<li>Lopez-Paz and Ranzato (2017), <a href="https://arxiv.org/abs/1706.08840">Gradient Episodic Memory for Continual Learning</a>.</li>
+<li>Li and Hoiem (2016), <a href="https://arxiv.org/abs/1606.09282">Learning without Forgetting</a>.</li>
+<li>Sun et al. (2019), <a href="https://arxiv.org/abs/1909.13231">Test-Time Training with Self-Supervision for Generalization under Distribution Shifts</a>.</li>
+<li>Wang et al. (2020), <a href="https://arxiv.org/abs/2006.10726">Tent: Fully Test-Time Adaptation by Entropy Minimization</a>.</li>
+</ol>
+<p><code>[SOURCE BOUNDARY]</code> Statements labeled <code>[DIRECT]</code> are attributable to these papers or to the course schedule. <code>[DERIVATION]</code> lines work through the mathematics. <code>[EXPLANATION]</code> and <code>[SYNTHESIS]</code> organize the material but are not reported classroom claims.</p>
+<p><code>[SYNTHESIS]</code> The three topics share one question:</p>
+<blockquote>
+<p>When the task or input distribution changes, which parts of a pretrained model should be allowed to move, what signal should move them, and what prevents useful old behavior from being destroyed?</p>
+</blockquote>
+<ul>
+<li><strong>LoRA</strong> restricts the <em>parameterization</em> of the update.</li>
+<li><strong>Continual learning</strong> restricts the <em>damage to earlier tasks</em> while learning a stream of new ones.</li>
+<li><strong>Test-time training</strong> changes parameters <em>during deployment</em> using information available on test inputs.</li>
+</ul>
+<p>These are related tools, but they are not interchangeable.</p>
+<h2 id="reading-map">Reading map</h2>
+<table>
+<thead>
+<tr>
+<th>Part</th>
+<th>What changes?</th>
+<th>Available signal</th>
+<th>Main risk</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Full fine-tuning</td>
+<td>All selected parameters</td>
+<td>Labeled or preference data</td>
+<td>Cost and interference</td>
+</tr>
+<tr>
+<td>LoRA</td>
+<td>Low-rank update matrices</td>
+<td>Ordinary fine-tuning loss</td>
+<td>Rank or placement may be insufficient</td>
+</tr>
+<tr>
+<td>Continual learning</td>
+<td>Shared parameters across a task stream</td>
+<td>New data plus memory/constraints</td>
+<td>Catastrophic forgetting</td>
+</tr>
+<tr>
+<td>Test-time training</td>
+<td>Some parameters at deployment</td>
+<td>Unlabeled auxiliary signal</td>
+<td>Drift, collapse, and latency</td>
+</tr>
+</tbody>
+</table>
+<h2 id="1-a-common-mathematical-frame">1. A common mathematical frame</h2>
+<p>Let a pretrained model have parameters <span class="math-inline">\(\theta_0\)</span>. Adaptation produces</p>
+<div class="math-display">\[\theta&#x27; = \theta_0 + \Delta\theta.\]</div>
+<p>Every adaptation method implicitly chooses:</p>
+<ol>
+<li>an allowed update set <span class="math-inline">\(\Delta\theta\in\mathcal U\)</span>;</li>
+<li>an adaptation loss <span class="math-inline">\(\mathcal L_{\mathrm{adapt}}\)</span>;</li>
+<li>data or observations on which that loss is computed;</li>
+<li>a rule for preserving previous behavior;</li>
+<li>a moment at which the update occurs.</li>
+</ol>
+<p><code>[SYNTHESIS]</code> LoRA primarily changes <span class="math-inline">\(\mathcal U\)</span>. Continual learning changes the objective and data retained across time. Test-time training changes when and from which distribution the update is computed.</p>
+<h3 id="11-local-quadratic-view">1.1 Local quadratic view</h3>
+<p>Near <span class="math-inline">\(\theta_0\)</span>, a loss can be approximated by</p>
+<div class="math-display">\[\mathcal L(\theta_0+\Delta\theta)
+\approx
+\mathcal L(\theta_0)
++g^\top\Delta\theta
++\frac12\Delta\theta^\top H\Delta\theta,\]</div>
+<p>where <span class="math-inline">\(g=\nabla\mathcal L(\theta_0)\)</span> and <span class="math-inline">\(H\)</span> is the Hessian.</p>
+<p><code>[EXPLANATION]</code> Adaptation asks for a direction that reduces the new loss. Preservation asks whether that same direction increases an old loss. Parameter-efficient methods restrict which directions are available.</p>
+<h2 id="2-lora-low-rank-parameter-updates">2. LoRA: low-rank parameter updates</h2>
+<h3 id="21-from-full-fine-tuning-to-a-structured-update">2.1 From full fine-tuning to a structured update</h3>
+<p>Consider a pretrained linear transformation</p>
+<div class="math-display">\[h = W_0x,
+\qquad
+W_0\in\mathbb R^{d_{\mathrm{out}}\times d_{\mathrm{in}}}.\]</div>
+<p>Full fine-tuning learns an unrestricted update <span class="math-inline">\(\Delta W\)</span>:</p>
+<div class="math-display">\[h=(W_0+\Delta W)x.\]</div>
+<p><code>[DIRECT · LORA]</code> LoRA freezes <span class="math-inline">\(W_0\)</span> and parameterizes the update as a product of two thin matrices:</p>
+<div class="math-display">\[\boxed{
+\Delta W = \frac{\alpha}{r}BA,
+}\]</div>
+<p>with</p>
+<div class="math-display">\[A\in\mathbb R^{r\times d_{\mathrm{in}}},
+\qquad
+B\in\mathbb R^{d_{\mathrm{out}}\times r},
+\qquad
+r\ll \min(d_{\mathrm{in}},d_{\mathrm{out}}).\]</div>
+<p>The adapted layer is</p>
+<div class="math-display">\[h=W_0x+\frac{\alpha}{r}B(Ax).\]</div>
+<h3 id="22-why-the-update-is-low-rank">2.2 Why the update is low rank</h3>
+<p>By the rank inequality,</p>
+<div class="math-display">\[\operatorname{rank}(BA)
+\le
+\min(\operatorname{rank}(B),\operatorname{rank}(A))
+\le r.\]</div>
+<p><code>[EXPLANATION]</code> LoRA does not make the pretrained weight matrix low rank. It makes the <em>change to that matrix</em> have rank at most <span class="math-inline">\(r\)</span>.</p>
+<h3 id="23-parameter-count">2.3 Parameter count</h3>
+<p>Full fine-tuning stores</p>
+<div class="math-display">\[d_{\mathrm{out}}d_{\mathrm{in}}\]</div>
+<p>trainable parameters for this matrix. LoRA stores</p>
+<div class="math-display">\[r(d_{\mathrm{in}}+d_{\mathrm{out}}).\]</div>
+<p>The ratio is</p>
+<div class="math-display">\[\frac{r(d_{\mathrm{in}}+d_{\mathrm{out}})}
+{d_{\mathrm{out}}d_{\mathrm{in}}}.\]</div>
+<p>For a square <span class="math-inline">\(4096\times4096\)</span> matrix with <span class="math-inline">\(r=8\)</span>:</p>
+<div class="math-display">\[4096^2=16{,}777{,}216\]</div>
+<p>full-update parameters, versus</p>
+<div class="math-display">\[8(4096+4096)=65{,}536\]</div>
+<p>LoRA parameters—a factor of <span class="math-inline">\(256\)</span> fewer for that matrix.</p>
+<p><code>[CHECK]</code> This is a trainable-parameter comparison, not automatically the total training-memory ratio. Activations, frozen weights, gradients for other modules, optimizer choices, and sequence length still matter.</p>
+<h3 id="24-scaling-and-initialization">2.4 Scaling and initialization</h3>
+<p>The factor <span class="math-inline">\(\alpha/r\)</span> separates the nominal rank from the update scale:</p>
+<div class="math-display">\[\Delta W = sBA,
+\qquad s=\alpha/r.\]</div>
+<p><code>[DIRECT · LORA]</code> A common initialization makes one factor random and the other zero, so that</p>
+<div class="math-display">\[BA=0\]</div>
+<p>at initialization and the adapted model initially equals the base model.</p>
+<p><code>[DERIVATION]</code> If <span class="math-inline">\(B=0\)</span> initially, then for a scalar loss <span class="math-inline">\(L\)</span> and upstream gradient <span class="math-inline">\(g_h=\partial L/\partial h\)</span>,</p>
+<div class="math-display">\[\frac{\partial L}{\partial B}
+=s\,g_h(Ax)^\top,\]</div>
+<p>while</p>
+<div class="math-display">\[\frac{\partial L}{\partial A}
+=s\,B^\top g_hx^\top=0\]</div>
+<p>on the first step. <span class="math-inline">\(B\)</span> moves first; after <span class="math-inline">\(B\)</span> becomes nonzero, <span class="math-inline">\(A\)</span> also receives gradients.</p>
+<h3 id="25-lora-as-a-constrained-update-space">2.5 LoRA as a constrained update space</h3>
+<p>If the best unrestricted update has singular-value decomposition</p>
+<div class="math-display">\[\Delta W^*=U\Sigma V^\top,\]</div>
+<p>the best rank-<span class="math-inline">\(r\)</span> approximation in Frobenius norm keeps the largest <span class="math-inline">\(r\)</span> singular components:</p>
+<div class="math-display">\[\Delta W_r^*=U_r\Sigma_rV_r^\top.\]</div>
+<p><code>[SYNTHESIS]</code> This does not prove that learned LoRA recovers the truncated SVD of a full fine-tuning update. It explains the inductive bias: LoRA assumes the useful update lies near a low-dimensional matrix subspace.</p>
+<h3 id="26-merging-at-inference">2.6 Merging at inference</h3>
+<p>After training, define</p>
+<div class="math-display">\[W_{\mathrm{merged}}
+=W_0+\frac{\alpha}{r}BA.\]</div>
+<p>Then inference uses</p>
+<div class="math-display">\[h=W_{\mathrm{merged}}x\]</div>
+<p>with no separate adapter branch.</p>
+<p><code>[EXPLANATION]</code> This is why LoRA can add no extra inference-layer depth after merging. Multiple task-specific adapters can instead remain separate and be selected dynamically.</p>
+<p><code>[LIMIT]</code> Merging several adapters by simply adding their updates is not guaranteed to preserve each adapter's behavior; update directions can interfere.</p>
+<h3 id="27-minimal-implementation">2.7 Minimal implementation</h3>
+<pre><code class="language-python">class LoRALinear(Module):
+    def __init__(self, frozen_weight, rank, alpha):
+        self.weight = frozen_weight          # requires_grad = False
+        self.A = Parameter(randn(rank, frozen_weight.in_features) * 0.01)
+        self.B = Parameter(zeros(frozen_weight.out_features, rank))
+        self.scale = alpha / rank
+
+    def forward(self, x):
+        base = linear(x, self.weight)
+        update = (x @ self.A.T) @ self.B.T
+        return base + self.scale * update
+</code></pre>
+<p><code>[CHECK]</code> Applying LoRA to “the model” is underspecified. One must state which projections receive adapters—for example, attention query/value matrices, all attention projections, or feed-forward matrices.</p>
+<h2 id="3-what-lora-does-not-solve-by-itself">3. What LoRA does not solve by itself</h2>
+<p><code>[SYNTHESIS]</code> LoRA reduces the trainable update space and the number of optimizer states, but it does not itself specify:</p>
+<ul>
+<li>which data should be remembered;</li>
+<li>how to detect task boundaries;</li>
+<li>how to prevent forgetting if the same adapter is trained sequentially;</li>
+<li>how to select or compose task-specific adapters;</li>
+<li>what to do under unlabeled test-time shift.</li>
+</ul>
+<p>If one LoRA adapter is updated on tasks <span class="math-inline">\(1,2,\ldots,K\)</span>, it can still catastrophically forget earlier tasks. If one adapter is stored per task, forgetting may be reduced by isolation, but task identification and storage grow with the number of tasks.</p>
+<h2 id="4-continual-learning-learning-from-a-stream">4. Continual learning: learning from a stream</h2>
+<h3 id="41-problem-setup">4.1 Problem setup</h3>
+<p>Suppose data arrive from a sequence of distributions</p>
+<div class="math-display">\[\mathcal D_1,\mathcal D_2,\ldots,\mathcal D_K.\]</div>
+<p>After training through task <span class="math-inline">\(k\)</span>, the model should perform well not only on <span class="math-inline">\(\mathcal D_k\)</span> but also on earlier tasks.</p>
+<p>Let <span class="math-inline">\(R_{k,j}\)</span> be performance on task <span class="math-inline">\(j\)</span> after training through task <span class="math-inline">\(k\)</span>.</p>
+<p>One simple average final performance is</p>
+<div class="math-display">\[A_K=\frac1K\sum_{j=1}^{K}R_{K,j}.\]</div>
+<p>A forgetting measure for task <span class="math-inline">\(j\)</span> is</p>
+<div class="math-display">\[F_j
+=\max_{\ell\in\{j,\ldots,K-1\}}R_{\ell,j}
+-R_{K,j}.\]</div>
+<p><code>[EXPLANATION]</code> A method can have strong accuracy on the newest task while having large forgetting on old tasks. Reporting only current-task accuracy hides the central continual-learning failure.</p>
+<h3 id="42-task-settings-matter">4.2 Task settings matter</h3>
+<p><code>[DEFINITION]</code></p>
+<ul>
+<li><strong>Task-incremental:</strong> the task identity is known at inference and may select a head or adapter.</li>
+<li><strong>Domain-incremental:</strong> the output space stays fixed while the input distribution changes.</li>
+<li><strong>Class-incremental:</strong> new classes arrive and inference must distinguish all classes without a task label.</li>
+</ul>
+<p><code>[CHECK]</code> Results from these settings are not directly interchangeable. Task identity can make routing substantially easier.</p>
+<h2 id="5-why-catastrophic-forgetting-occurs">5. Why catastrophic forgetting occurs</h2>
+<h3 id="51-gradient-interference">5.1 Gradient interference</h3>
+<p>Let <span class="math-inline">\(L_A(\theta)\)</span> be an old-task loss and <span class="math-inline">\(L_B(\theta)\)</span> a new-task loss. A new-task gradient step is</p>
+<div class="math-display">\[\theta&#x27; = \theta-\eta g_B,
+\qquad
+g_B=\nabla L_B(\theta).\]</div>
+<p><code>[DERIVATION]</code> First-order Taylor expansion of the old loss gives</p>
+<div class="math-display">\[\begin{aligned}
+L_A(\theta&#x27;)
+&amp;\approx L_A(\theta)
++\nabla L_A(\theta)^\top(\theta&#x27;-\theta)\\
+&amp;=L_A(\theta)-\eta g_A^\top g_B.
+\end{aligned}\]</div>
+<p>Therefore:</p>
+<ul>
+<li>if <span class="math-inline">\(g_A^\top g_B&gt;0\)</span>, the new step also decreases the old loss locally;</li>
+<li>if <span class="math-inline">\(g_A^\top g_B&lt;0\)</span>, the new step increases the old loss locally;</li>
+<li>if the dot product is near zero, the tasks are locally non-interfering.</li>
+</ul>
+<p><code>[SYNTHESIS]</code> Catastrophic forgetting is not only about parameter distance. It is about movement in directions important for old behavior.</p>
+<h3 id="52-stabilityplasticity-tradeoff">5.2 Stability–plasticity tradeoff</h3>
+<ul>
+<li><strong>Plasticity:</strong> change enough to learn the new task.</li>
+<li><strong>Stability:</strong> avoid changing behavior needed by old tasks.</li>
+</ul>
+<p>Too much stability prevents learning; too much plasticity destroys prior behavior. Continual-learning algorithms choose different mechanisms for navigating this tradeoff.</p>
+<h2 id="6-replay-keep-some-old-evidence">6. Replay: keep some old evidence</h2>
+<h3 id="61-basic-replay-objective">6.1 Basic replay objective</h3>
+<p>Maintain a memory buffer <span class="math-inline">\(\mathcal M\)</span> containing old examples. On task <span class="math-inline">\(k\)</span>, optimize</p>
+<div class="math-display">\[\mathcal L_{\mathrm{replay}}(\theta)
+=
+\mathbb E_{z\sim\mathcal D_k}[\ell(\theta;z)]
++\lambda
+\mathbb E_{z\sim\mathcal M}[\ell(\theta;z)].\]</div>
+<p><code>[EXPLANATION]</code> Replay turns preservation into ordinary training on a mixture of new and remembered data.</p>
+<h3 id="62-reservoir-sampling-for-a-bounded-buffer">6.2 Reservoir sampling for a bounded buffer</h3>
+<p>Suppose the stream has seen <span class="math-inline">\(t\)</span> examples and the buffer holds <span class="math-inline">\(M\)</span> items.</p>
+<p>For the <span class="math-inline">\(t\)</span>-th example:</p>
+<ol>
+<li>if <span class="math-inline">\(t\le M\)</span>, insert it;</li>
+<li>otherwise, retain it with probability <span class="math-inline">\(M/t\)</span>;</li>
+<li>if retained, replace a uniformly chosen buffer item.</li>
+</ol>
+<p><code>[DERIVATION]</code> After processing <span class="math-inline">\(t\)</span> items, each past item has probability <span class="math-inline">\(M/t\)</span> of being in the buffer. Thus the buffer is a uniform sample of the observed stream.</p>
+<h3 id="63-what-replay-buys-and-costs">6.3 What replay buys and costs</h3>
+<p><code>[SYNTHESIS]</code></p>
+<ul>
+<li>It directly represents old data and often gives a strong baseline.</li>
+<li>It consumes storage and may create privacy or licensing constraints.</li>
+<li>A small buffer may underrepresent rare behaviors.</li>
+<li>Replaying model-generated approximations avoids raw storage but introduces generator error.</li>
+</ul>
+<h2 id="7-functional-regularization-preserve-outputs">7. Functional regularization: preserve outputs</h2>
+<h3 id="71-learning-without-forgetting">7.1 Learning without Forgetting</h3>
+<p><code>[DIRECT · LWF]</code> Learning without Forgetting uses the old model's outputs on new-task inputs as targets for preserving old capabilities when old data are unavailable.</p>
+<p>Let <span class="math-inline">\(f_{\theta^-}\)</span> be the frozen pre-update model and <span class="math-inline">\(f_\theta\)</span> the model being adapted. A schematic objective is</p>
+<div class="math-display">\[\mathcal L(\theta)
+=\mathcal L_{\mathrm{new}}(\theta)
++\lambda T^2
+D_{\mathrm{KL}}
+\left(
+p_{\theta^-}^{(T)}(\cdot\mid x)
+\,\|\,
+p_\theta^{(T)}(\cdot\mid x)
+\right).\]</div>
+<p><code>[CONNECTION TO LECTURE 14]</code> This is distillation used as an anti-forgetting constraint: the previous model is the teacher and the updated model is the student.</p>
+<p><code>[LIMIT]</code> If new-task inputs do not activate old-task behavior, matching outputs only on those inputs may not preserve the old function where it matters.</p>
+<h2 id="8-parameter-regularization-elastic-weight-consolidation">8. Parameter regularization: Elastic Weight Consolidation</h2>
+<h3 id="81-bayesian-starting-point">8.1 Bayesian starting point</h3>
+<p>After task <span class="math-inline">\(A\)</span> and before task <span class="math-inline">\(B\)</span>, Bayes' rule gives</p>
+<div class="math-display">\[p(\theta\mid D_A,D_B)
+\propto
+p(D_B\mid\theta)p(\theta\mid D_A).\]</div>
+<p>Taking negative logs:</p>
+<div class="math-display">\[-\log p(\theta\mid D_A,D_B)
+=
+-\log p(D_B\mid\theta)
+-\log p(\theta\mid D_A)
++C.\]</div>
+<p>The first term is the new-task loss. The second is a prior supplied by the old-task posterior.</p>
+<h3 id="82-laplace-approximation">8.2 Laplace approximation</h3>
+<p>Approximate the old posterior near its optimum <span class="math-inline">\(\theta_A^*\)</span> by a Gaussian:</p>
+<div class="math-display">\[-\log p(\theta\mid D_A)
+\approx
+\frac12
+(\theta-\theta_A^*)^\top
+F_A
+(\theta-\theta_A^*),\]</div>
+<p>where <span class="math-inline">\(F_A\)</span> is approximated by a Fisher-information matrix.</p>
+<p>Using a diagonal approximation yields the EWC objective:</p>
+<div class="math-display">\[\boxed{
+\mathcal L_{\mathrm{EWC}}(\theta)
+=\mathcal L_B(\theta)
++\frac{\lambda}{2}
+\sum_i F_{A,i}
+(\theta_i-\theta_{A,i}^*)^2.
+}\]</div>
+<p><code>[EXPLANATION]</code> A parameter with large <span class="math-inline">\(F_{A,i}\)</span> is treated as important for task <span class="math-inline">\(A\)</span> and is strongly pulled toward its old value. A low-importance parameter is freer to move.</p>
+<h3 id="83-two-parameter-example">8.3 Two-parameter example</h3>
+<p>Suppose</p>
+<div class="math-display">\[\theta_A^*=(0,0),
+\qquad
+F_A=(10,1).\]</div>
+<p>Moving to <span class="math-inline">\(\theta=(1,1)\)</span> incurs</p>
+<div class="math-display">\[\frac{\lambda}{2}
+\left(10\cdot1^2+1\cdot1^2\right)
+=\frac{11\lambda}{2}.\]</div>
+<p>Moving to <span class="math-inline">\(\theta=(0,1)\)</span> costs only</p>
+<div class="math-display">\[\frac{\lambda}{2}.\]</div>
+<p><code>[EXPLANATION]</code> EWC prefers adapting through the second coordinate because the first was estimated to be more important to the old task.</p>
+<h3 id="84-limits-of-the-approximation">8.4 Limits of the approximation</h3>
+<p><code>[LIMIT]</code></p>
+<ul>
+<li>A diagonal Fisher ignores interactions between parameters.</li>
+<li>The old posterior may be far from Gaussian.</li>
+<li>Importance estimates depend on the data used to compute them.</li>
+<li>Repeated tasks require combining or updating multiple constraints.</li>
+<li>A very large <span class="math-inline">\(\lambda\)</span> protects the past by preventing useful new learning.</li>
+</ul>
+<h2 id="9-gradient-constraints-gem">9. Gradient constraints: GEM</h2>
+<p><code>[DIRECT · GEM]</code> Gradient Episodic Memory stores examples from previous tasks and constrains the new update so it does not increase their losses locally.</p>
+<p>Let <span class="math-inline">\(g\)</span> be the gradient on current data and <span class="math-inline">\(g_j\)</span> the gradient on memory from old task <span class="math-inline">\(j\)</span>. We seek an adjusted gradient <span class="math-inline">\(\tilde g\)</span> satisfying</p>
+<div class="math-display">\[\tilde g^\top g_j\ge0
+\qquad\text{for every old task }j.\]</div>
+<p>Why this sign? A step <span class="math-inline">\(\theta&#x27; = \theta-\eta\tilde g\)</span> changes old loss <span class="math-inline">\(L_j\)</span> by</p>
+<div class="math-display">\[L_j(\theta&#x27;)-L_j(\theta)
+\approx
+-\eta g_j^\top\tilde g.\]</div>
+<p>Thus <span class="math-inline">\(g_j^\top\tilde g\ge0\)</span> implies a non-increasing old loss to first order.</p>
+<p>If the raw gradient violates a constraint, solve</p>
+<div class="math-display">\[\boxed{
+\min_{\tilde g}
+\frac12\|\tilde g-g\|_2^2
+\quad\text{subject to}\quad
+\tilde g^\top g_j\ge0
+\ \forall j.
+}\]</div>
+<p><code>[SYNTHESIS]</code> Replay adds old examples to the objective. GEM additionally reasons about the geometry of old and new gradients.</p>
+<h2 id="10-three-families-of-continual-learning-defenses">10. Three families of continual-learning defenses</h2>
+<table>
+<thead>
+<tr>
+<th>Family</th>
+<th>Core mechanism</th>
+<th>Representative example</th>
+<th>Main cost</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Replay</td>
+<td>Train again on remembered old evidence</td>
+<td>Experience replay</td>
+<td>Storage and extra compute</td>
+</tr>
+<tr>
+<td>Regularization</td>
+<td>Penalize changes important to old behavior</td>
+<td>EWC, output distillation</td>
+<td>Approximate importance or coverage</td>
+</tr>
+<tr>
+<td>Isolation/expansion</td>
+<td>Give tasks separate parameters or routes</td>
+<td>Task-specific LoRA adapters</td>
+<td>Routing and growing storage</td>
+</tr>
+</tbody>
+</table>
+<p><code>[SYNTHESIS]</code> Hybrid methods are natural: replay can be combined with LoRA; EWC can regularize adapter parameters; task-specific adapters can share a common base.</p>
+<h2 id="11-test-time-training-and-adaptation">11. Test-time training and adaptation</h2>
+<h3 id="111-the-deployment-setting">11.1 The deployment setting</h3>
+<p>Training data follow <span class="math-inline">\(P_{\mathrm{train}}(x,y)\)</span>, while deployment data may follow</p>
+<div class="math-display">\[P_{\mathrm{test}}(x,y)
+\neq
+P_{\mathrm{train}}(x,y).\]</div>
+<p>At test time, labels <span class="math-inline">\(y\)</span> are usually unavailable. Adaptation therefore needs an auxiliary signal computed from <span class="math-inline">\(x\)</span> or from the model's predictions.</p>
+<p><code>[DEFINITION]</code></p>
+<ul>
+<li><strong>Test-time training (TTT):</strong> train the model so that an auxiliary self-supervised update on a test example improves the main prediction.</li>
+<li><strong>Test-time adaptation (TTA):</strong> a broader family of methods that updates a pretrained model during testing, possibly without joint training of the auxiliary task.</li>
+</ul>
+<p>The literature sometimes uses these names less strictly; the update signal and protocol should always be stated.</p>
+<h3 id="112-one-step-test-time-update">11.2 One-step test-time update</h3>
+<p>Let <span class="math-inline">\(L_{\mathrm{aux}}(x;\theta)\)</span> be a label-free auxiliary loss. For a test input <span class="math-inline">\(x\)</span>:</p>
+<div class="math-display">\[\theta&#x27;(x)
+=\theta-\eta
+\nabla_\theta L_{\mathrm{aux}}(x;\theta).\]</div>
+<p>Then predict</p>
+<div class="math-display">\[\hat y
+=f_{\theta&#x27;(x)}(x).\]</div>
+<p><code>[EXPLANATION]</code> The model does not merely run inference. It first performs learning on the test input, then predicts with the adapted parameters.</p>
+<h3 id="113-episodic-and-online-protocols">11.3 Episodic and online protocols</h3>
+<ul>
+<li><strong>Episodic:</strong> reset to <span class="math-inline">\(\theta_0\)</span> before every example or batch.</li>
+<li><strong>Online:</strong> carry the adapted parameters into the next batch.</li>
+</ul>
+<p><code>[SYNTHESIS]</code> Episodic adaptation isolates examples but repeats work. Online adaptation can exploit persistent shifts but can accumulate errors and become order-dependent.</p>
+<h2 id="12-test-time-training-with-self-supervision">12. Test-Time Training with self-supervision</h2>
+<p><code>[DIRECT · SUN ET AL.]</code> Test-Time Training uses a self-supervised auxiliary task on an unlabeled test example, updates shared features, and then makes the main prediction.</p>
+<p>During source training, one can optimize</p>
+<div class="math-display">\[L_{\mathrm{train}}(\theta)
+=L_{\mathrm{main}}(x,y;\theta)
++\lambda L_{\mathrm{aux}}(x;\theta).\]</div>
+<p>At test time, only <span class="math-inline">\(L_{\mathrm{aux}}\)</span> is available.</p>
+<h3 id="121-one-step-meta-gradient-intuition">12.1 One-step meta-gradient intuition</h3>
+<p>An even more explicit objective asks whether the auxiliary update helps the main task:</p>
+<div class="math-display">\[\theta&#x27;(x)=\theta-\eta\nabla_\theta L_{\mathrm{aux}}(x;\theta),\]</div>
+<p>then minimizes</p>
+<div class="math-display">\[L_{\mathrm{main}}(x,y;\theta&#x27;(x)).\]</div>
+<p><code>[DERIVATION]</code> Differentiating through the update gives</p>
+<div class="math-display">\[\nabla_\theta L_{\mathrm{main}}(\theta&#x27;)
+=
+\left(I-\eta H_{\mathrm{aux}}(\theta)\right)^\top
+\nabla_{\theta&#x27;}L_{\mathrm{main}}(\theta&#x27;),\]</div>
+<p>where</p>
+<div class="math-display">\[H_{\mathrm{aux}}(\theta)
+=\nabla_\theta^2L_{\mathrm{aux}}(x;\theta).\]</div>
+<p><code>[EXPLANATION]</code> The training process can shape the representation so that an auxiliary gradient at test time points toward parameters useful for the main task.</p>
+<p><code>[CHECK]</code> Jointly training an auxiliary loss is not enough to guarantee that its test-time gradient improves the main task under every shift.</p>
+<h2 id="13-tent-entropy-minimization-adaptation">13. Tent: entropy-minimization adaptation</h2>
+<p><code>[DIRECT · TENT]</code> Tent adapts at test time by minimizing prediction entropy and updating normalization statistics plus selected affine normalization parameters.</p>
+<p>For class probabilities <span class="math-inline">\(p_\theta(c\mid x)\)</span>, predictive entropy is</p>
+<div class="math-display">\[H_\theta(Y\mid x)
+=-
+\sum_{c=1}^{C}
+p_\theta(c\mid x)
+\log p_\theta(c\mid x).\]</div>
+<p>The batch objective is</p>
+<div class="math-display">\[L_{\mathrm{Tent}}(\theta)
+=\frac1B\sum_{i=1}^{B}
+H_\theta(Y\mid x_i).\]</div>
+<h3 id="131-why-entropy-supplies-a-gradient-without-labels">13.1 Why entropy supplies a gradient without labels</h3>
+<p>If a prediction is uncertain, probability is spread across classes and entropy is high. Gradient descent on entropy pushes the distribution toward greater confidence.</p>
+<p><code>[SYNTHESIS]</code> This can help when the model's decision boundary is approximately correct but predictions become uncertain under a covariate shift.</p>
+<p><code>[LIMIT]</code> Confidence is not correctness. If the initial prediction is wrong, entropy minimization can make it confidently wrong. Unconstrained minimization can also encourage collapse toward a narrow set of outputs.</p>
+<h3 id="132-restricting-which-parameters-move">13.2 Restricting which parameters move</h3>
+<p>Tent updates a small selected subset rather than every model parameter.</p>
+<p><code>[SYNTHESIS]</code> This is the same structural instinct as parameter-efficient fine-tuning: adaptation becomes safer and cheaper when the update space is deliberately restricted. The exact parameter subset is nevertheless part of the algorithm, not an implementation footnote.</p>
+<h3 id="133-minimal-adaptation-loop">13.3 Minimal adaptation loop</h3>
+<pre><code class="language-python">adapt_params = select_adaptation_parameters(model)
+optimizer = Adam(adapt_params, lr=test_lr)
+
+for test_batch in stream:
+    probabilities = softmax(model(test_batch), dim=-1)
+    entropy = -(probabilities * log(probabilities + 1e-8)).sum(dim=-1)
+    loss = entropy.mean()
+
+    optimizer.zero_grad()
+    loss.backward()
+    optimizer.step()
+
+    with no_grad():
+        predictions = model(test_batch).argmax(dim=-1)
+</code></pre>
+<p><code>[CHECK]</code> This code predicts after the update. Some protocols predict before updating or reuse the same forward pass; these choices change evaluation and latency.</p>
+<h2 id="14-lora-at-test-time">14. LoRA at test time</h2>
+<p>One can freeze the base model and update only LoRA parameters during deployment:</p>
+<div class="math-display">\[\theta_{\mathrm{base}}&#x27;=\theta_{\mathrm{base}},
+\qquad
+(A&#x27;,B&#x27;)=(A,B)-\eta\nabla_{A,B}L_{\mathrm{aux}}.\]</div>
+<p>Potential advantages:</p>
+<ul>
+<li>fewer trainable parameters and optimizer states;</li>
+<li>the base model remains recoverable;</li>
+<li>episodic reset means restoring a small adapter;</li>
+<li>separate adapters can represent different environments.</li>
+</ul>
+<p>Potential limitations:</p>
+<ul>
+<li>the useful test-time correction may not lie in the chosen low-rank subspace;</li>
+<li>online adapters can still drift or forget;</li>
+<li>selecting the correct adapter may require domain detection;</li>
+<li>generation-time auxiliary objectives for LLMs may be expensive or poorly aligned.</li>
+</ul>
+<p><code>[SYNTHESIS]</code> “LoRA + test-time training” is a composition: LoRA specifies the update coordinates, while test-time training specifies the signal and timing.</p>
+<h2 id="15-a-toy-gradient-conflict-example">15. A toy gradient-conflict example</h2>
+<p>Let</p>
+<div class="math-display">\[g_A=(1,0),
+\qquad
+g_B=(-1,1).\]</div>
+<p>Their dot product is</p>
+<div class="math-display">\[g_A^\top g_B=-1.\]</div>
+<p>A gradient step on task <span class="math-inline">\(B\)</span> therefore increases task <span class="math-inline">\(A\)</span>'s loss to first order.</p>
+<p>GEM seeks the nearest <span class="math-inline">\(\tilde g\)</span> to <span class="math-inline">\(g_B\)</span> satisfying</p>
+<div class="math-display">\[g_A^\top\tilde g\ge0.\]</div>
+<p>The violated component is the negative first coordinate. Projecting onto the boundary gives</p>
+<div class="math-display">\[\tilde g=(0,1).\]</div>
+<p>Now</p>
+<div class="math-display">\[g_A^\top\tilde g=0,\]</div>
+<p>so the step is locally neutral for task <span class="math-inline">\(A\)</span> while retaining the non-conflicting part of the task-<span class="math-inline">\(B\)</span> gradient.</p>
+<h2 id="16-comparing-the-mechanisms">16. Comparing the mechanisms</h2>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Update restriction</th>
+<th>Preservation mechanism</th>
+<th>Requires old data?</th>
+<th>Test-time updates?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>LoRA</td>
+<td>Low-rank matrix updates</td>
+<td>None by itself</td>
+<td>No</td>
+<td>Optional</td>
+</tr>
+<tr>
+<td>Replay</td>
+<td>Usually unrestricted</td>
+<td>Rehearse remembered examples</td>
+<td>Yes, or generated replay</td>
+<td>Usually no</td>
+</tr>
+<tr>
+<td>LwF</td>
+<td>Usually unrestricted</td>
+<td>Match old model outputs</td>
+<td>No old labels/data, but uses old model</td>
+<td>Usually no</td>
+</tr>
+<tr>
+<td>EWC</td>
+<td>Soft parameter penalty</td>
+<td>Protect high-importance weights</td>
+<td>No raw old data</td>
+<td>Usually no</td>
+</tr>
+<tr>
+<td>GEM</td>
+<td>Gradient projection</td>
+<td>Prevent local old-loss increase</td>
+<td>Yes, episodic memory</td>
+<td>Usually no</td>
+</tr>
+<tr>
+<td>TTT/Tent</td>
+<td>Selected deployment parameters</td>
+<td>Reset, restriction, or stream protocol</td>
+<td>No old training data</td>
+<td>Yes</td>
+</tr>
+</tbody>
+</table>
+<h2 id="17-failure-modes-and-diagnostics">17. Failure modes and diagnostics</h2>
+<h3 id="171-lora-rank-is-too-small-or-placed-poorly">17.1 LoRA rank is too small or placed poorly</h3>
+<p><strong>Symptom:</strong> training loss plateaus above full fine-tuning.</p>
+<p><strong>Diagnostic:</strong> vary rank and target modules separately; compare trainable parameter counts and validation quality.</p>
+<h3 id="172-lora-overfits-despite-few-parameters">17.2 LoRA overfits despite few parameters</h3>
+<p><strong>Symptom:</strong> training quality rises while held-out behavior degrades.</p>
+<p><strong>Diagnostic:</strong> remember that fewer parameters are not an automatic generalization guarantee; inspect data size, learning rate, adapter scaling, and regularization.</p>
+<h3 id="173-continual-learner-protects-the-past-by-refusing-the-future">17.3 Continual learner protects the past by refusing the future</h3>
+<p><strong>Symptom:</strong> old-task retention is high but new-task acquisition is weak.</p>
+<p><strong>Diagnostic:</strong> report both final average accuracy and current-task learning curves; sweep the replay or regularization strength.</p>
+<h3 id="174-replay-buffer-is-unrepresentative">17.4 Replay buffer is unrepresentative</h3>
+<p><strong>Symptom:</strong> common old cases survive while rare skills disappear.</p>
+<p><strong>Diagnostic:</strong> evaluate per domain/class and compare random reservoir sampling with stratified or importance-aware selection.</p>
+<h3 id="175-test-time-objective-is-misaligned">17.5 Test-time objective is misaligned</h3>
+<p><strong>Symptom:</strong> auxiliary loss decreases but task accuracy falls.</p>
+<p><strong>Diagnostic:</strong> on source validation data, measure the correlation between one-step auxiliary-loss improvement and main-task improvement under simulated shifts.</p>
+<h3 id="176-online-adaptation-drifts">17.6 Online adaptation drifts</h3>
+<p><strong>Symptom:</strong> results depend strongly on test-example order or collapse late in the stream.</p>
+<p><strong>Diagnostic:</strong> compare episodic reset, periodic reset, sliding-window adaptation, and frozen-source anchors.</p>
+<h3 id="177-evaluation-leaks-labels-or-future-data">17.7 Evaluation leaks labels or future data</h3>
+<p><strong>Symptom:</strong> adaptation uses information unavailable at the moment a prediction should be made.</p>
+<p><strong>Diagnostic:</strong> write the temporal protocol explicitly: what is observed, when the update occurs, and when the prediction is scored.</p>
+<h2 id="18-a-practical-experiment-matrix">18. A practical experiment matrix</h2>
+<p>Hold constant:</p>
+<ul>
+<li>the pretrained checkpoint;</li>
+<li>task order and data budget;</li>
+<li>optimizer step budget;</li>
+<li>evaluation prompts/examples;</li>
+<li>model-selection information allowed at each time.</li>
+</ul>
+<p>Compare:</p>
+<ol>
+<li>sequential full fine-tuning;</li>
+<li>one shared sequential LoRA adapter;</li>
+<li>one LoRA adapter per task;</li>
+<li>shared LoRA plus replay;</li>
+<li>shared LoRA plus EWC;</li>
+<li>episodic test-time adaptation;</li>
+<li>online test-time adaptation.</li>
+</ol>
+<p>Measure:</p>
+<table>
+<thead>
+<tr>
+<th>Axis</th>
+<th>Metrics</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>New learning</td>
+<td>current-task accuracy/loss, adaptation speed</td>
+</tr>
+<tr>
+<td>Retention</td>
+<td>old-task accuracy, average forgetting</td>
+</tr>
+<tr>
+<td>Transfer</td>
+<td>forward and backward transfer</td>
+</tr>
+<tr>
+<td>Efficiency</td>
+<td>trainable parameters, optimizer memory, update latency</td>
+</tr>
+<tr>
+<td>Deployment stability</td>
+<td>order sensitivity, reset frequency, collapse rate</td>
+</tr>
+</tbody>
+</table>
+<h2 id="19-connections-to-earlier-lectures">19. Connections to earlier lectures</h2>
+<p><code>[CONNECTION TO LECTURE 3]</code> LoRA is inserted into Transformer linear maps such as attention and feed-forward projections. Its effect depends on where those matrices participate in the architecture.</p>
+<p><code>[CONNECTION TO LECTURE 7]</code> Low-rank parameterization changes optimization geometry. The gradients of <span class="math-inline">\(A\)</span> and <span class="math-inline">\(B\)</span> are not the same as projecting a full <span class="math-inline">\(\Delta W\)</span> gradient after every step.</p>
+<p><code>[CONNECTION TO LECTURE 12]</code> SFT, DPO, and RLHF can all optimize LoRA parameters instead of the full model. LoRA changes the parameterization, not the semantic meaning of those objectives.</p>
+<p><code>[CONNECTION TO LECTURE 14]</code> Learning without Forgetting uses distillation from the previous model. Continual learning converts teacher–student matching into a preservation mechanism over time.</p>
+<h2 id="20-open-questions">20. Open questions</h2>
+<ol>
+<li>When does the useful adaptation update actually have low rank, and how should rank vary by layer?</li>
+<li>Can multiple LoRA adapters be composed without destructive interference?</li>
+<li>How should a system detect that a new domain deserves a new adapter rather than an update to an existing one?</li>
+<li>What old examples are most valuable per byte of replay memory?</li>
+<li>Can parameter importance be estimated reliably for generative behavior rather than classification accuracy?</li>
+<li>Which label-free test-time objectives correlate with correctness for language generation?</li>
+<li>How can online test-time adaptation distinguish persistent shift from a transient or adversarial batch?</li>
+<li>Should test-time updates be rolled back after each user, session, domain, or confidence failure?</li>
+<li>How do privacy constraints alter the choice between replay, output distillation, and task-specific adapters?</li>
+<li>Can a model retain plasticity over a long task stream without continually expanding memory or parameters?</li>
+</ol>
+<h2 id="21-what-to-verify-manually">21. What to verify manually</h2>
+<ul>
+<li>Confirm which LoRA target modules and continual-learning methods the student presenters actually emphasized.</li>
+<li>Reproduce the LoRA parameter-count calculation for the dimensions of a model you use.</li>
+<li>Check the initial gradients when one LoRA factor is zero.</li>
+<li>Derive the EWC objective from a diagonal Laplace approximation in your own notation.</li>
+<li>Implement the two-dimensional GEM projection example.</li>
+<li>Compare episodic and online test-time adaptation on a controlled distribution shift.</li>
+<li>Replace broad synthesis statements with your own conclusions after reading the primary papers.</li>
+</ul>
+<h2 id="source-trail">Source trail</h2>
+<ul>
+<li>CS 395T course schedule: <a href="https://noahgol.github.io/teaching/cs395t-f26/">https://noahgol.github.io/teaching/cs395t-f26/</a></li>
+<li>Hu et al., <em>LoRA</em>: <a href="https://arxiv.org/abs/2106.09685">https://arxiv.org/abs/2106.09685</a></li>
+<li>Kirkpatrick et al., <em>Overcoming catastrophic forgetting</em>: <a href="https://arxiv.org/abs/1612.00796">https://arxiv.org/abs/1612.00796</a></li>
+<li>Lopez-Paz and Ranzato, <em>Gradient Episodic Memory</em>: <a href="https://arxiv.org/abs/1706.08840">https://arxiv.org/abs/1706.08840</a></li>
+<li>Li and Hoiem, <em>Learning without Forgetting</em>: <a href="https://arxiv.org/abs/1606.09282">https://arxiv.org/abs/1606.09282</a></li>
+<li>Sun et al., <em>Test-Time Training with Self-Supervision</em>: <a href="https://arxiv.org/abs/1909.13231">https://arxiv.org/abs/1909.13231</a></li>
+<li>Wang et al., <em>Tent</em>: <a href="https://arxiv.org/abs/2006.10726">https://arxiv.org/abs/2006.10726</a></li>
+</ul>
+      </article>
+    </div>
+  </main>
+
+  <footer class="site-footer section-shell">
+    <div><strong>CS 395T</strong><span>Learning note</span></div>
+    <p>Markdown source · draft</p>
+    <a href="../index.html#notes">Return to index ←</a>
+  </footer>
+</body>
+</html>

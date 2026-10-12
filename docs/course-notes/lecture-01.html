@@ -1,0 +1,527 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="An AI-assisted reconstruction of Lecture 1, covering perceptrons, margin-based mistake bounds, MLP expressivity, approximation limits, depth separation, SGD, and backpropagation as dynamic programming.">
+  <title>Lecture 01 — From Perceptrons to Backpropagation — CS 395T</title>
+  <link rel="stylesheet" href="../assets/styles.css">
+  <script>
+    window.MathJax = {
+      tex: {
+        processEscapes: true
+      },
+      svg: { fontCache: 'global' }
+    };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js" defer></script>
+  <script src="../assets/app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header">
+    <a class="wordmark" href="../index.html"><span>CS 395T</span><small>Learning &amp; research notebook</small></a>
+    <button class="menu-button" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button>
+    <nav id="site-nav" class="site-nav" aria-label="Primary navigation">
+      <a href="../structure.html">Structure</a>
+      <a href="../index.html#notes">Index</a>
+      <a href="../method.html">Writing guide</a>
+      <a href="../index.html#about">About</a>
+    </nav>
+  </header>
+
+  <main id="main" class="note-shell">
+    <header class="note-hero">
+      <div class="template-banner learning-banner">
+        <strong>LEARNING NOTE · DRAFT</strong>
+        <span>Work in progress</span>
+      </div>
+      <p class="eyebrow">24 AUG 2026 · DRAFT</p>
+      <h1>Lecture 01 — From Perceptrons to Backpropagation</h1>
+      <p class="note-abstract">An AI-assisted reconstruction of Lecture 1, covering perceptrons, margin-based mistake bounds, MLP expressivity, approximation limits, depth separation, SGD, and backpropagation as dynamic programming.</p>
+      <ul class="tag-list" aria-label="Topics"><li>perceptron</li><li>multi-layer perceptron</li><li>universal approximation</li><li>depth separation</li><li>stochastic gradient descent</li><li>backpropagation</li></ul>
+    </header>
+
+    <div class="note-layout">
+      <aside class="note-toc" aria-label="On this page">
+        <p class="aside-label">ON THIS PAGE</p>
+        <div class="toc">
+<ul>
+<li><a href="#source-boundary">Source boundary</a></li>
+<li><a href="#reading-map">Reading map</a></li>
+<li><a href="#1-from-a-logical-neuron-to-a-learned-separator">1. From a logical neuron to a learned separator</a><ul>
+<li><a href="#11-mcculloch-pitts-neuron">1.1 McCulloch-Pitts neuron</a></li>
+<li><a href="#12-perceptron-prediction-rule">1.2 Perceptron prediction rule</a></li>
+<li><a href="#13-online-perceptron-update">1.3 Online perceptron update</a></li>
+<li><a href="#14-the-update-as-a-loss-subgradient">1.4 The update as a loss subgradient</a></li>
+</ul>
+</li>
+<li><a href="#2-perceptron-mistake-bound">2. Perceptron mistake bound</a><ul>
+<li><a href="#21-assumptions">2.1 Assumptions</a></li>
+<li><a href="#22-why-two-inequalities-are-enough">2.2 Why two inequalities are enough</a></li>
+<li><a href="#23-progress-toward-the-target-separator">2.3 Progress toward the target separator</a></li>
+<li><a href="#24-norm-growth-is-slow">2.4 Norm growth is slow</a></li>
+<li><a href="#25-combine-progress-and-norm">2.5 Combine progress and norm</a></li>
+<li><a href="#26-what-the-theorem-does-not-say">2.6 What the theorem does not say</a></li>
+</ul>
+</li>
+<li><a href="#3-multi-layer-perceptrons">3. Multi-layer perceptrons</a><ul>
+<li><a href="#31-layer-equations">3.1 Layer equations</a></li>
+</ul>
+</li>
+<li><a href="#4-boolean-universality">4. Boolean universality</a><ul>
+<li><a href="#41-detect-one-binary-pattern">4.1 Detect one binary pattern</a></li>
+<li><a href="#42-or-the-satisfying-patterns">4.2 OR the satisfying patterns</a></li>
+</ul>
+</li>
+<li><a href="#5-universal-approximation-with-relu">5. Universal approximation with ReLU</a><ul>
+<li><a href="#51-statement-and-interpretation">5.1 Statement and interpretation</a></li>
+<li><a href="#52-proof-architecture">5.2 Proof architecture</a></li>
+</ul>
+</li>
+<li><a href="#6-approximation-rate-and-the-curse-of-dimensionality">6. Approximation rate and the curse of dimensionality</a></li>
+<li><a href="#7-why-depth-can-matter">7. Why depth can matter</a><ul>
+<li><a href="#71-composition-intuition">7.1 Composition intuition</a></li>
+</ul>
+</li>
+<li><a href="#8-empirical-risk-and-stochastic-gradient-descent">8. Empirical risk and stochastic gradient descent</a></li>
+<li><a href="#9-backpropagation-on-a-computational-graph">9. Backpropagation on a computational graph</a><ul>
+<li><a href="#91-scalar-dag">9.1 Scalar DAG</a></li>
+<li><a href="#92-local-chain-rule-recurrence">9.2 Local chain-rule recurrence</a></li>
+<li><a href="#93-why-naive-recursion-can-be-exponential">9.3 Why naive recursion can be exponential</a></li>
+<li><a href="#94-dynamic-programming-solution">9.4 Dynamic programming solution</a></li>
+</ul>
+</li>
+<li><a href="#10-worked-one-hidden-layer-gradients">10. Worked one-hidden-layer gradients</a><ul>
+<li><a href="#101-output-layer">10.1 Output layer</a></li>
+<li><a href="#102-hidden-activation-and-preactivation">10.2 Hidden activation and preactivation</a></li>
+<li><a href="#103-affine-layer">10.3 Affine layer</a></li>
+</ul>
+</li>
+<li><a href="#11-conceptual-connections">11. Conceptual connections</a></li>
+<li><a href="#12-common-confusions">12. Common confusions</a><ul>
+<li><a href="#universality-does-not-imply-trainability">Universality does not imply trainability</a></li>
+<li><a href="#backpropagation-is-not-an-optimizer">Backpropagation is not an optimizer</a></li>
+<li><a href="#depth-is-not-automatically-useful">Depth is not automatically useful</a></li>
+<li><a href="#zero-training-loss-is-not-generalization">Zero training loss is not generalization</a></li>
+</ul>
+</li>
+<li><a href="#13-open-questions">13. Open questions</a></li>
+<li><a href="#14-what-to-verify-manually">14. What to verify manually</a></li>
+<li><a href="#source-trail">Source trail</a></li>
+</ul>
+</div>
+
+      </aside>
+      <article class="prose note-prose markdown-body">
+        <blockquote>
+<p><strong>AI-assisted first draft.</strong> This note reconstructs the official nine-page Lecture 1 handout and expands its arguments into step-by-step derivations and examples. It is not a transcript and has not yet been manually verified or rewritten by the author. Statements tagged <code>[DIRECT]</code> follow the handout; <code>[DERIVATION]</code>, <code>[EXPLANATION]</code>, and <code>[SYNTHESIS]</code> make the reasoning explicit.</p>
+</blockquote>
+<h2 id="source-boundary">Source boundary</h2>
+<p><code>[DIRECT]</code> Official handout: <a href="https://noahgol.github.io/teaching/cs395t-f26/lecture1.pdf">https://noahgol.github.io/teaching/cs395t-f26/lecture1.pdf</a>.</p>
+<p><code>[DIRECT]</code> The handout has three substantive parts:</p>
+<ol>
+<li>threshold neurons, the perceptron, and multi-layer perceptrons;</li>
+<li>expressivity, including Boolean universality, universal approximation, approximation rates, and a depth-separation statement;</li>
+<li>empirical risk, stochastic gradient descent, and backpropagation on a computational graph.</li>
+</ol>
+<p><code>[SOURCE BOUNDARY]</code> The historical and theorem statements labeled <code>[DIRECT]</code> come from the handout. The examples, intermediate algebra, and interpretations below are reconstructions rather than reported classroom wording.</p>
+<h2 id="reading-map">Reading map</h2>
+<table>
+<thead>
+<tr>
+<th>Part</th>
+<th>Question</th>
+<th>Main idea</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>MCP neuron</td>
+<td>How can a logical neuron be modeled?</td>
+<td>Threshold a weighted sum, with special inhibition.</td>
+</tr>
+<tr>
+<td>Perceptron</td>
+<td>How can a linear threshold be learned online?</td>
+<td>Correct mistakes by adding the signed input.</td>
+</tr>
+<tr>
+<td>Mistake bound</td>
+<td>Why does margin make learning finite?</td>
+<td>Alignment grows linearly while norm grows only as a square root.</td>
+</tr>
+<tr>
+<td>MLP expressivity</td>
+<td>What functions can layered neurons represent?</td>
+<td>Width and depth expand the available function class.</td>
+</tr>
+<tr>
+<td>Universal approximation</td>
+<td>Is one hidden layer theoretically enough?</td>
+<td>Dense representability does not imply efficient representability.</td>
+</tr>
+<tr>
+<td>Backpropagation</td>
+<td>How are all parameter derivatives computed efficiently?</td>
+<td>Cache a forward pass and reuse adjoints in reverse topological order.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="1-from-a-logical-neuron-to-a-learned-separator">1. From a logical neuron to a learned separator</h2>
+<h3 id="11-mcculloch-pitts-neuron">1.1 McCulloch-Pitts neuron</h3>
+<p><code>[DIRECT]</code> An MCP neuron receives excitatory binary inputs <span class="math-inline">\(x_1,\ldots,x_m\)</span>, real weights <span class="math-inline">\(w_1,\ldots,w_m\)</span>, inhibitory binary inputs <span class="math-inline">\(z_1,\ldots,z_r\)</span>, and a threshold <span class="math-inline">\(\vartheta\)</span>.</p>
+<p>Its output is</p>
+<div class="math-display">\[y=
+\begin{cases}
+1,
+&amp;\sum_{i=1}^{m}w_ix_i\ge\vartheta
+\text{ and }z_j=0\text{ for all }j,\\
+0,&amp;\text{otherwise.}
+\end{cases}\]</div>
+<p><code>[EXPLANATION]</code> The excitatory inputs accumulate evidence. Any active inhibitory input vetoes the output. The important limitation is that the model specifies no learning rule: the weights are chosen rather than learned.</p>
+<h3 id="12-perceptron-prediction-rule">1.2 Perceptron prediction rule</h3>
+<p>Suppress the special inhibitory inputs and use labels in <span class="math-inline">\(\{-1,+1\}\)</span>. A homogeneous linear classifier predicts</p>
+<div class="math-display">\[\hat y_t=
+\begin{cases}
++1,&amp;\langle w_t,x_t\rangle&gt;0,\\
+-1,&amp;\langle w_t,x_t\rangle\le0.
+\end{cases}\]</div>
+<p><code>[EXPLANATION]</code> A nonzero threshold can be absorbed into the weight vector. Append a constant coordinate to the input:</p>
+<div class="math-display">\[\tilde x=(x,1),
+\qquad
+\tilde w=(w,-\vartheta).\]</div>
+<p>Then</p>
+<div class="math-display">\[\langle\tilde w,\tilde x\rangle
+=\langle w,x\rangle-\vartheta.\]</div>
+<p>The affine separator in the original space becomes a homogeneous separator in the augmented space.</p>
+<h3 id="13-online-perceptron-update">1.3 Online perceptron update</h3>
+<p>Initialize <span class="math-inline">\(w_1=0\)</span>. After predicting on <span class="math-inline">\((x_t,y_t)\)</span>, update only after a mistake:</p>
+<div class="math-display">\[w_{t+1}=
+\begin{cases}
+w_t+y_tx_t,&amp;\hat y_t\ne y_t,\\
+w_t,&amp;\hat y_t=y_t.
+\end{cases}\]</div>
+<p><code>[EXPLANATION]</code></p>
+<ul>
+<li>If <span class="math-inline">\(y_t=+1\)</span> was predicted negative, add <span class="math-inline">\(x_t\)</span> and increase its score.</li>
+<li>If <span class="math-inline">\(y_t=-1\)</span> was predicted positive, subtract <span class="math-inline">\(x_t\)</span> and decrease its score.</li>
+<li>Correct examples cause no update.</li>
+</ul>
+<h3 id="14-the-update-as-a-loss-subgradient">1.4 The update as a loss subgradient</h3>
+<p>Define perceptron loss</p>
+<div class="math-display">\[\ell_t(w)=\max\{0,-y_t\langle w,x_t\rangle\}.\]</div>
+<p>When the signed score is negative,</p>
+<div class="math-display">\[\nabla_w\ell_t(w)=-y_tx_t.\]</div>
+<p>A unit subgradient step is therefore</p>
+<div class="math-display">\[w\leftarrow w-\nabla\ell_t(w)=w+y_tx_t.\]</div>
+<p><code>[SYNTHESIS]</code> The perceptron can be viewed historically as a learning rule and mathematically as online subgradient descent on a piecewise-linear loss.</p>
+<h2 id="2-perceptron-mistake-bound">2. Perceptron mistake bound</h2>
+<h3 id="21-assumptions">2.1 Assumptions</h3>
+<p><code>[DIRECT]</code> Suppose each input satisfies</p>
+<div class="math-display">\[\|x_t\|_2=1,\]</div>
+<p>and there exists a unit vector <span class="math-inline">\(u\)</span> with positive margin</p>
+<div class="math-display">\[\gamma
+:=
+\min_{1\le t\le T}
+y_t\langle u,x_t\rangle
+&gt;0.\]</div>
+<p>Then the perceptron makes at most</p>
+<div class="math-display">\[\boxed{M\le\frac1{\gamma^2}}\]</div>
+<p>mistakes.</p>
+<h3 id="22-why-two-inequalities-are-enough">2.2 Why two inequalities are enough</h3>
+<p>Let <span class="math-inline">\((\tilde x_s,\tilde y_s)\)</span> be the example causing the <span class="math-inline">\(s\)</span>-th mistake, and let <span class="math-inline">\(v_s\)</span> be the weight vector immediately after that update:</p>
+<div class="math-display">\[v_s=v_{s-1}+\tilde y_s\tilde x_s,
+\qquad v_0=0.\]</div>
+<p>The proof tracks two quantities:</p>
+<ol>
+<li>progress along the target direction <span class="math-inline">\(u\)</span>;</li>
+<li>growth of the total norm <span class="math-inline">\(\|v_s\|\)</span>.</li>
+</ol>
+<h3 id="23-progress-toward-the-target-separator">2.3 Progress toward the target separator</h3>
+<p><code>[DERIVATION · Step 1]</code> Take an inner product with <span class="math-inline">\(u\)</span>:</p>
+<div class="math-display">\[\langle v_s,u\rangle
+=\langle v_{s-1},u\rangle
++\tilde y_s\langle\tilde x_s,u\rangle.\]</div>
+<p>By the margin assumption,</p>
+<div class="math-display">\[\tilde y_s\langle\tilde x_s,u\rangle\ge\gamma.\]</div>
+<p>Thus</p>
+<div class="math-display">\[\langle v_s,u\rangle
+\ge
+\langle v_{s-1},u\rangle+\gamma.\]</div>
+<p>After <span class="math-inline">\(M\)</span> mistakes,</p>
+<div class="math-display">\[\boxed{\langle v_M,u\rangle\ge M\gamma.}\]</div>
+<p><code>[EXPLANATION]</code> Every mistake update moves the weight vector at least <span class="math-inline">\(\gamma\)</span> forward in the target direction.</p>
+<h3 id="24-norm-growth-is-slow">2.4 Norm growth is slow</h3>
+<p><code>[DERIVATION · Step 2]</code> Expand the squared norm:</p>
+<div class="math-display">\[\begin{aligned}
+\|v_s\|^2
+&amp;=\|v_{s-1}+\tilde y_s\tilde x_s\|^2\\
+&amp;=\|v_{s-1}\|^2
++2\tilde y_s\langle v_{s-1},\tilde x_s\rangle
++\|\tilde x_s\|^2.
+\end{aligned}\]</div>
+<p>Because this example was misclassified,</p>
+<div class="math-display">\[\tilde y_s\langle v_{s-1},\tilde x_s\rangle\le0.\]</div>
+<p>Since <span class="math-inline">\(\|\tilde x_s\|=1\)</span>,</p>
+<div class="math-display">\[\|v_s\|^2\le\|v_{s-1}\|^2+1.\]</div>
+<p>Induction gives</p>
+<div class="math-display">\[\boxed{\|v_M\|^2\le M,\qquad\|v_M\|\le\sqrt M.}\]</div>
+<h3 id="25-combine-progress-and-norm">2.5 Combine progress and norm</h3>
+<p>By Cauchy-Schwarz and <span class="math-inline">\(\|u\|=1\)</span>,</p>
+<div class="math-display">\[\langle v_M,u\rangle
+\le\|v_M\|.\]</div>
+<p>Therefore</p>
+<div class="math-display">\[M\gamma
+\le
+\langle v_M,u\rangle
+\le
+\|v_M\|
+\le
+\sqrt M.\]</div>
+<p>For <span class="math-inline">\(M&gt;0\)</span>, divide by <span class="math-inline">\(\sqrt M\)</span>:</p>
+<div class="math-display">\[\sqrt M\,\gamma\le1.\]</div>
+<p>Squaring yields</p>
+<div class="math-display">\[M\le\frac1{\gamma^2}.\]</div>
+<p><code>[SYNTHESIS]</code> The proof works because useful alignment accumulates linearly in the number of mistakes, while the vector norm grows at most like the square root. A positive margin makes indefinite mistakes geometrically impossible.</p>
+<h3 id="26-what-the-theorem-does-not-say">2.6 What the theorem does not say</h3>
+<ul>
+<li>It assumes linear separability with positive margin.</li>
+<li>The bound concerns mistakes, not probabilistic calibration or test error.</li>
+<li>A small margin gives a weak bound.</li>
+<li>The result is independent of dimension only after inputs and the separator are normalized.</li>
+</ul>
+<h2 id="3-multi-layer-perceptrons">3. Multi-layer perceptrons</h2>
+<h3 id="31-layer-equations">3.1 Layer equations</h3>
+<p>Let <span class="math-inline">\(h^{(0)}(x)=x\)</span>. For layers <span class="math-inline">\(\ell=1,\ldots,L\)</span>,</p>
+<div class="math-display">\[z^{(\ell)}(x)
+=W^{(\ell)}h^{(\ell-1)}(x)+b^{(\ell)},\]</div>
+<div class="math-display">\[h^{(\ell)}(x)
+=\sigma_\ell(z^{(\ell)}(x)),\]</div>
+<p>where the activation is applied coordinatewise.</p>
+<p>A scalar output may be</p>
+<div class="math-display">\[f_\theta(x)=a^\top h^{(L)}(x)+c.\]</div>
+<p><code>[EXPLANATION]</code> Without a nonlinear activation, stacked affine maps collapse into one affine map. For example,</p>
+<div class="math-display">\[W_2(W_1x+b_1)+b_2
+=(W_2W_1)x+(W_2b_1+b_2).\]</div>
+<p>The nonlinearity is what prevents depth from being algebraically redundant.</p>
+<h2 id="4-boolean-universality">4. Boolean universality</h2>
+<p><code>[DIRECT]</code> Every function</p>
+<div class="math-display">\[F:\{0,1\}^d\to\{0,1\}\]</div>
+<p>can be represented exactly by a one-hidden-layer network with threshold activations.</p>
+<h3 id="41-detect-one-binary-pattern">4.1 Detect one binary pattern</h3>
+<p>Fix <span class="math-inline">\(a\in\{0,1\}^d\)</span>. Define the number of matching coordinates</p>
+<div class="math-display">\[s_a(x)
+=
+\sum_{i:a_i=1}x_i
++\sum_{i:a_i=0}(1-x_i).\]</div>
+<p>Then</p>
+<div class="math-display">\[s_a(x)=d
+\quad\Longleftrightarrow\quad
+x=a.\]</div>
+<p>A threshold at <span class="math-inline">\(d-\tfrac12\)</span> produces</p>
+<div class="math-display">\[I_a(x)=\mathbf 1\{x=a\}.\]</div>
+<h3 id="42-or-the-satisfying-patterns">4.2 OR the satisfying patterns</h3>
+<p>Let</p>
+<div class="math-display">\[S=\{a\in\{0,1\}^d:F(a)=1\}.\]</div>
+<p>Create one hidden unit <span class="math-inline">\(I_a\)</span> for every <span class="math-inline">\(a\in S\)</span> and threshold their sum:</p>
+<div class="math-display">\[F(x)=
+\mathbf 1
+\left\{
+\sum_{a\in S}I_a(x)\ge\frac12
+\right\}.\]</div>
+<p><code>[SYNTHESIS]</code> This is disjunctive normal form implemented as a network: each hidden unit is an AND-like exact-match test, and the output is an OR.</p>
+<p><code>[LIMIT]</code> The construction may require one hidden unit per satisfying input—up to <span class="math-inline">\(2^d\)</span>. Expressibility alone says nothing about parameter efficiency or learnability.</p>
+<h2 id="5-universal-approximation-with-relu">5. Universal approximation with ReLU</h2>
+<h3 id="51-statement-and-interpretation">5.1 Statement and interpretation</h3>
+<p><code>[DIRECT]</code> On a compact set <span class="math-inline">\(K\subset\mathbb R^d\)</span>, finite sums of ReLU ridge functions can uniformly approximate every continuous function. For every <span class="math-inline">\(f\in C(K)\)</span> and <span class="math-inline">\(\varepsilon&gt;0\)</span>, there exist <span class="math-inline">\(N\)</span>, <span class="math-inline">\(a_j\)</span>, <span class="math-inline">\(w_j\)</span>, and <span class="math-inline">\(b_j\)</span> such that</p>
+<div class="math-display">\[\sup_{x\in K}
+\left|
+f(x)-
+\sum_{j=1}^{N}
+a_j\rho(\langle w_j,x\rangle+b_j)
+\right|
+&lt;\varepsilon,\]</div>
+<p>where <span class="math-inline">\(\rho(t)=\max\{0,t\}\)</span>.</p>
+<p><code>[EXPLANATION]</code> The theorem is an existence statement. It does not provide the weights, guarantee that gradient descent finds them, or guarantee a small width.</p>
+<h3 id="52-proof-architecture">5.2 Proof architecture</h3>
+<p>Let <span class="math-inline">\(H_K\)</span> be the linear span of all ReLU ridge functions restricted to <span class="math-inline">\(K\)</span>.</p>
+<p><code>[DERIVATION · Step 1]</code> Suppose the closure <span class="math-inline">\(\overline{H_K}\)</span> were a proper subspace of <span class="math-inline">\(C(K)\)</span>.</p>
+<p><code>[DERIVATION · Step 2]</code> Hahn-Banach separation gives a nonzero continuous linear functional <span class="math-inline">\(\Lambda\)</span> that annihilates <span class="math-inline">\(H_K\)</span>:</p>
+<div class="math-display">\[\Lambda(h)=0
+\quad\forall h\in H_K,\]</div>
+<p>but <span class="math-inline">\(\Lambda(f_0)=1\)</span> for some <span class="math-inline">\(f_0\notin\overline{H_K}\)</span>.</p>
+<p><code>[DERIVATION · Step 3]</code> By Riesz representation, there is a finite signed measure <span class="math-inline">\(\mu\)</span> on <span class="math-inline">\(K\)</span> with</p>
+<div class="math-display">\[\Lambda(g)=\int_Kg(x)\,d\mu(x).\]</div>
+<p>Because every ridge function lies in <span class="math-inline">\(H_K\)</span>,</p>
+<div class="math-display">\[\int_K
+\rho(\langle w,x\rangle+b)
+\,d\mu(x)=0\]</div>
+<p>for all <span class="math-inline">\(w,b\)</span>.</p>
+<p><code>[DERIVATION · Step 4]</code> Push <span class="math-inline">\(\mu\)</span> forward along each one-dimensional projection <span class="math-inline">\(x\mapsto\langle w,x\rangle\)</span>. ReLU translates generate continuous piecewise-linear functions on the resulting compact interval, so the pushforward measure integrates every continuous function to zero.</p>
+<p><code>[DERIVATION · Step 5]</code> All one-dimensional projections vanish. Equivalently, the Fourier transform of <span class="math-inline">\(\mu\)</span> vanishes everywhere, forcing <span class="math-inline">\(\mu=0\)</span>.</p>
+<p>This contradicts <span class="math-inline">\(\Lambda(f_0)=1\)</span>. Therefore</p>
+<div class="math-display">\[\overline{H_K}=C(K).\]</div>
+<p><code>[SYNTHESIS]</code> The proof is indirect: if ridge functions failed to be dense, a nonzero signed measure would distinguish the missing function while being invisible to every ReLU ridge function. The projection argument shows that no such measure exists.</p>
+<h2 id="6-approximation-rate-and-the-curse-of-dimensionality">6. Approximation rate and the curse of dimensionality</h2>
+<p><code>[DIRECT]</code> The handout gives a representative smooth-function approximation rate of the form</p>
+<div class="math-display">\[N\le C\varepsilon^{-d/n}\]</div>
+<p>for functions with <span class="math-inline">\(n\)</span> derivatives controlled in a Sobolev norm.</p>
+<p>Solving for the error gives the equivalent scaling</p>
+<div class="math-display">\[\varepsilon
+\lesssim
+N^{-n/d}.\]</div>
+<p><code>[EXPLANATION]</code> Greater smoothness <span class="math-inline">\(n\)</span> improves the rate. Greater dimension <span class="math-inline">\(d\)</span> makes the exponent worse. To hold error fixed while dimension increases, the required width can grow exponentially.</p>
+<p><code>[SYNTHESIS]</code> Universal approximation says approximation is possible; a rate asks whether it is affordable. These are different questions.</p>
+<h2 id="7-why-depth-can-matter">7. Why depth can matter</h2>
+<p><code>[DIRECT]</code> The handout states a depth-separation result: certain functions represented by a sufficiently deep ReLU network of polynomial size require exponentially many nodes for substantially shallower networks to achieve even fixed constant error.</p>
+<p><code>[EXPLANATION]</code> The point is not that every deep network beats every shallow one. It is that repeated composition can represent some functions much more economically than a shallow expansion.</p>
+<h3 id="71-composition-intuition">7.1 Composition intuition</h3>
+<p>If a small module <span class="math-inline">\(g\)</span> creates several oscillations, composing it repeatedly,</p>
+<div class="math-display">\[g^{\circ L}=g\circ g\circ\cdots\circ g,\]</div>
+<p>can multiply the number of oscillatory regions with depth. A shallow network must reproduce all regions in one layer and may need exponentially more units.</p>
+<p><code>[LIMIT]</code> A separation theorem concerns a constructed worst-case function and a specified approximation norm. It is not by itself an explanation of why a particular trained model generalizes.</p>
+<h2 id="8-empirical-risk-and-stochastic-gradient-descent">8. Empirical risk and stochastic gradient descent</h2>
+<p>Given data</p>
+<div class="math-display">\[S=\{(x_i,y_i):i=1,\ldots,n\},\]</div>
+<p>model <span class="math-inline">\(f_\theta\)</span>, and loss <span class="math-inline">\(\ell\)</span>, empirical risk is</p>
+<div class="math-display">\[L(\theta)
+=\frac1n\sum_{i=1}^{n}
+\ell(f_\theta(x_i),y_i).\]</div>
+<p>For mini-batch <span class="math-inline">\(B_t\)</span>, SGD updates</p>
+<div class="math-display">\[\theta_{t+1}
+=\theta_t
+-\eta_t
+\frac1{|B_t|}
+\sum_{i\in B_t}
+\nabla_\theta
+\ell(f_{\theta_t}(x_i),y_i).\]</div>
+<p>If the batch is sampled uniformly under the appropriate convention,</p>
+<div class="math-display">\[\mathbb E[\widehat g_t\mid\theta_t]
+=\nabla L(\theta_t).\]</div>
+<p><code>[EXPLANATION]</code> The remaining computational problem is how to evaluate every component of <span class="math-inline">\(\nabla_\theta L\)</span> without separately expanding every chain-rule path.</p>
+<h2 id="9-backpropagation-on-a-computational-graph">9. Backpropagation on a computational graph</h2>
+<h3 id="91-scalar-dag">9.1 Scalar DAG</h3>
+<p>Let a directed acyclic graph contain scalar nodes</p>
+<div class="math-display">\[u^{(1)},\ldots,u^{(m)}\]</div>
+<p>in topological order. For <span class="math-inline">\(i&gt;m_0\)</span>,</p>
+<div class="math-display">\[u^{(i)}
+=\phi_i\left((u^{(j)})_{j\in\operatorname{Pa}(i)}\right).\]</div>
+<p>Let the final scalar loss be</p>
+<div class="math-display">\[J=u^{(m)}.\]</div>
+<p>Define the adjoint</p>
+<div class="math-display">\[\bar u^{(j)}
+:=\frac{\partial J}{\partial u^{(j)}}.\]</div>
+<h3 id="92-local-chain-rule-recurrence">9.2 Local chain-rule recurrence</h3>
+<p><code>[DIRECT]</code> The chain rule gives</p>
+<div class="math-display">\[\boxed{
+\bar u^{(j)}
+=
+\sum_{i:j\in\operatorname{Pa}(i)}
+\bar u^{(i)}
+\frac{\partial u^{(i)}}{\partial u^{(j)}}.
+}\]</div>
+<p><code>[EXPLANATION]</code> A node can influence the loss through several children, so its derivative is the sum of contributions over all outgoing edges.</p>
+<h3 id="93-why-naive-recursion-can-be-exponential">9.3 Why naive recursion can be exponential</h3>
+<p>A purely recursive derivative routine can recompute the same downstream derivative once for every path from a node to the loss. A graph can contain only <span class="math-inline">\(O(L)\)</span> nodes and edges but exponentially many distinct directed paths.</p>
+<p><code>[SYNTHESIS]</code> The expensive object is the unfolded recursion tree, not the original computational graph.</p>
+<h3 id="94-dynamic-programming-solution">9.4 Dynamic programming solution</h3>
+<p>Backpropagation performs:</p>
+<ol>
+<li>a forward topological pass that computes and stores every node value;</li>
+<li>initialization <span class="math-inline">\(\bar u^{(m)}=1\)</span> and all other adjoints to zero;</li>
+<li>one reverse-topological pass;</li>
+<li>for every edge <span class="math-inline">\(j\to i\)</span>, the accumulation</li>
+</ol>
+<div class="math-display">\[\bar u^{(j)}
+\mathrel{+}=
+\bar u^{(i)}
+\frac{\partial u^{(i)}}{\partial u^{(j)}}.\]</div>
+<p>If every local derivative is constant-time, forward and backward passes each take</p>
+<div class="math-display">\[O(|E|)\]</div>
+<p>time.</p>
+<p><code>[CONCLUSION]</code> Backpropagation is reverse-mode automatic differentiation implemented as dynamic programming on a DAG.</p>
+<h2 id="10-worked-one-hidden-layer-gradients">10. Worked one-hidden-layer gradients</h2>
+<p>Consider</p>
+<div class="math-display">\[z=Wx+b,
+\qquad
+h=\rho(z),\]</div>
+<div class="math-display">\[s=v^\top h+c,
+\qquad
+J=\ell(s,y).\]</div>
+<p>Let</p>
+<div class="math-display">\[\delta=\frac{\partial\ell(s,y)}{\partial s},\]</div>
+<p>and define the ReLU mask</p>
+<div class="math-display">\[r_j=\mathbf1\{z_j&gt;0\}.\]</div>
+<h3 id="101-output-layer">10.1 Output layer</h3>
+<p>Since <span class="math-inline">\(s=v^\top h+c\)</span>,</p>
+<div class="math-display">\[\nabla_vJ=\delta h,
+\qquad
+\frac{\partial J}{\partial c}=\delta.\]</div>
+<h3 id="102-hidden-activation-and-preactivation">10.2 Hidden activation and preactivation</h3>
+<div class="math-display">\[\nabla_hJ=\delta v.\]</div>
+<p>Because <span class="math-inline">\(h=\rho(z)\)</span> coordinatewise,</p>
+<div class="math-display">\[\nabla_zJ
+=(\delta v)\odot r.\]</div>
+<h3 id="103-affine-layer">10.3 Affine layer</h3>
+<p>From <span class="math-inline">\(z=Wx+b\)</span>,</p>
+<div class="math-display">\[\nabla_bJ=\nabla_zJ,\]</div>
+<div class="math-display">\[\boxed{
+\nabla_WJ
+=(\nabla_zJ)x^\top.
+}\]</div>
+<p><code>[SHAPE CHECK]</code></p>
+<ul>
+<li><span class="math-inline">\(\nabla_zJ\in\mathbb R^q\)</span>;</li>
+<li><span class="math-inline">\(x\in\mathbb R^d\)</span>;</li>
+<li><span class="math-inline">\((\nabla_zJ)x^\top\in\mathbb R^{q\times d}\)</span>, matching <span class="math-inline">\(W\)</span>.</li>
+</ul>
+<p><code>[EXPLANATION]</code> The gradient of a dense layer weight matrix is an outer product: error arriving at the layer times input entering the layer.</p>
+<h2 id="11-conceptual-connections">11. Conceptual connections</h2>
+<p><code>[CONNECTION TO LECTURE 3]</code> Transformer blocks remain computational graphs trained by the same reverse-mode principle. Attention changes the local operations, not the chain rule.</p>
+<p><code>[CONNECTION TO OPTIMIZATION LECTURES]</code> Backpropagation produces a gradient. SGD, Adam, Muon, and other optimizers decide how that gradient changes parameters.</p>
+<p><code>[CONNECTION TO LORA]</code> If <span class="math-inline">\(W=W_0+BA\)</span>, backpropagation sends gradients through the product into <span class="math-inline">\(A\)</span> and <span class="math-inline">\(B\)</span> while <span class="math-inline">\(W_0\)</span> remains frozen.</p>
+<h2 id="12-common-confusions">12. Common confusions</h2>
+<h3 id="universality-does-not-imply-trainability">Universality does not imply trainability</h3>
+<p>An architecture can contain a good approximation while optimization fails to find it.</p>
+<h3 id="backpropagation-is-not-an-optimizer">Backpropagation is not an optimizer</h3>
+<p>Backpropagation computes derivatives. SGD or Adam uses those derivatives to update parameters.</p>
+<h3 id="depth-is-not-automatically-useful">Depth is not automatically useful</h3>
+<p>Depth increases compositional capacity but may make optimization harder without suitable parameterization, normalization, or residual structure.</p>
+<h3 id="zero-training-loss-is-not-generalization">Zero training loss is not generalization</h3>
+<p>Empirical risk only measures the observed sample. Statistical assumptions are needed to connect it to new data.</p>
+<h2 id="13-open-questions">13. Open questions</h2>
+<ol>
+<li>Which real data distributions avoid the worst-case curse of dimensionality?</li>
+<li>When does a learned representation enlarge the effective margin of a simple classifier?</li>
+<li>Which useful functions are represented exponentially more efficiently by depth?</li>
+<li>How does backpropagation interact with parameter symmetries and flat directions?</li>
+<li>What information must be stored in the forward pass, and what can be recomputed to save memory?</li>
+<li>Why do highly overparameterized networks often optimize more easily than smaller ones?</li>
+</ol>
+<h2 id="14-what-to-verify-manually">14. What to verify manually</h2>
+<ul>
+<li>Reproduce the perceptron mistake proof without looking at the handout.</li>
+<li>Build the exact-match threshold unit for a three-bit pattern.</li>
+<li>Distinguish universal approximation from approximation rate.</li>
+<li>Draw a DAG with two paths to one node and show where naive recursion repeats work.</li>
+<li>Check every shape in the one-hidden-layer gradient derivation.</li>
+<li>Replace the synthesis paragraphs with your own explanations after studying the handout.</li>
+</ul>
+<h2 id="source-trail">Source trail</h2>
+<ul>
+<li>Official Lecture 1 handout: <a href="https://noahgol.github.io/teaching/cs395t-f26/lecture1.pdf">https://noahgol.github.io/teaching/cs395t-f26/lecture1.pdf</a></li>
+<li>Official Lecture 1 slides: <a href="https://noahgol.github.io/teaching/cs395t-f26/lecture-01-slides.pdf">https://noahgol.github.io/teaching/cs395t-f26/lecture-01-slides.pdf</a></li>
+<li>Course schedule and suggested readings: <a href="https://noahgol.github.io/teaching/cs395t-f26/">https://noahgol.github.io/teaching/cs395t-f26/</a></li>
+</ul>
+      </article>
+    </div>
+  </main>
+
+  <footer class="site-footer section-shell">
+    <div><strong>CS 395T</strong><span>Learning note</span></div>
+    <p>Markdown source · draft</p>
+    <a href="../index.html#notes">Return to index ←</a>
+  </footer>
+</body>
+</html>
