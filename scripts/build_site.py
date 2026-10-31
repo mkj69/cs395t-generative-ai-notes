@@ -239,7 +239,7 @@ def render_note(path: Path, metadata: dict[str, Any], body: str) -> dict[str, An
     if "transformer" in components:
         component_script += '  <script src="../assets/transformer-lab.js" defer></script>\n'
     page = f"""<!doctype html>
-<html lang="en">
+<html lang="{plain(str(metadata.get('language') or 'en'))}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">

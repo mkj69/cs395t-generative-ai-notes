@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="从贝叶斯公式推导条件 score，解释 CFG 的两种强度记法、训练中的条件丢弃，以及引导强度放大误差的原因。">
+  <title>Lecture 19: Diffusion III: Conditional Generation and Classifier-Free Guidance — CS 395T</title>
+  <link rel="stylesheet" href="../assets/styles.css">
+  <script>
+    window.MathJax = {
+      tex: {
+        processEscapes: true
+      },
+      svg: { fontCache: 'global' }
+    };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js" defer></script>
+  <script src="../assets/app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header">
+    <a class="wordmark" href="../index.html"><span>CS 395T</span><small>Learning &amp; research notebook</small></a>
+    <button class="menu-button" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button>
+    <nav id="site-nav" class="site-nav" aria-label="Primary navigation">
+      <a href="../structure.html">Structure</a>
+      <a href="../index.html#notes">Index</a>
+      <a href="../method.html">Writing guide</a>
+      <a href="../index.html#about">About</a>
+    </nav>
+  </header>
+
+  <main id="main" class="note-shell">
+    <header class="note-hero">
+      <div class="template-banner learning-banner">
+        <strong>LEARNING NOTE · DRAFT</strong>
+        <span>Work in progress</span>
+      </div>
+      <p class="eyebrow">28 OCT 2026 · DRAFT</p>
+      <h1>Lecture 19: Diffusion III: Conditional Generation and Classifier-Free Guidance</h1>
+      <p class="note-abstract">从贝叶斯公式推导条件 score，解释 CFG 的两种强度记法、训练中的条件丢弃，以及引导强度放大误差的原因。</p>
+      <ul class="tag-list" aria-label="Topics"><li>Diffusion</li><li>conditional generation</li><li>classifier-free guidance</li></ul>
+    </header>
+
+    <div class="note-layout">
+      <aside class="note-toc" aria-label="On this page">
+        <p class="aside-label">ON THIS PAGE</p>
+        <div class="toc">
+<ul>
+<li><a href="#_1">从“生成一张图”到“按条件生成”</a></li>
+<li><a href="#_2">贝叶斯公式给出条件方向</a></li>
+<li><a href="#cfg-1">CFG 的两个公式其实差一个1</a></li>
+<li><a href="#_3">为什么噪声预测可以使用同一个组合</a></li>
+<li><a href="#_4">训练为何要随机丢弃条件</a></li>
+<li><a href="#_5">引导对应什么分布：一个容易过度推论的地方</a></li>
+<li><a href="#_6">为什么越强不一定越好</a></li>
+<li><a href="#_7">自测与词义</a></li>
+</ul>
+</div>
+
+      </aside>
+      <article class="prose note-prose markdown-body">
+        <blockquote>
+<p><strong>AI 辅助主题学习笔记，待课堂资料补充。</strong> 截至 2026-10-31，课程表只有本课主题，没有公开课件。本篇依据公开原始论文与独立推导编写，不能视为课堂记录；所列论文是补充参考，不声称是教师指定阅读。页面日期为课程安排日期。</p>
+</blockquote>
+<p><code>[DIRECT]</code> 标明来源直接支持的简述；<code>[DERIVATION]</code> 标明数学推导；<code>[SYNTHESIS]</code> 标明概念连接与解释。自行构造的数值例子不代表论文实验。</p>
+<p><a href="diffusion-unit.html">返回 Diffusion 单元导读</a></p>
+<h2 id="_1">从“生成一张图”到“按条件生成”</h2>
+<p><code>[SYNTHESIS]</code> 无条件模型希望生成符合总体数据规律的样本；条件模型还接收条件 <span class="math-inline">\(c\)</span>，例如类别或文本。输入同一个噪声种子并改变条件，应当改变样本落入的语义区域。条件不是训练标签旁边的备注，它改变了目标分布 <span class="math-inline">\(p_t(x\mid c)\)</span>。</p>
+<p>这一讲的关键不是记住一个相减公式，而是理解：为什么两个去噪预测之差含有条件信息，为什么放大这个差会改变生成行为，以及这种放大为什么有代价。</p>
+<h2 id="_2">贝叶斯公式给出条件方向</h2>
+<p><code>[DERIVATION]</code> 在密度为正、可微的区域，由</p>
+<div class="math-display">\[p_t(x\mid c)=\frac{p_t(c\mid x)p_t(x)}{p(c)}\]</div>
+<p>对 <span class="math-inline">\(x\)</span> 取对数再求梯度。<span class="math-inline">\(p(c)\)</span> 不依赖 <span class="math-inline">\(x\)</span>，所以</p>
+<div class="math-display">\[s_c(x,t)=s_u(x,t)+\nabla_x\log p_t(c\mid x),\]</div>
+<p>其中 <span class="math-inline">\(s_c=\nabla_x\log p_t(x\mid c)\)</span> 是条件 score，<span class="math-inline">\(s_u=\nabla_x\log p_t(x)\)</span> 是无条件 score。因此</p>
+<div class="math-display">\[s_c-s_u=\nabla_x\log p_t(c\mid x).\]</div>
+<p>右边回答的不是“哪里更像所有真实图片”，而是“当前位置朝哪个方向变化，会让条件 <span class="math-inline">\(c\)</span> 更可信”。分类器引导需要估计右边；CFG 则用左边的两个生成模型预测来近似。</p>
+<p>这里的分类器必须理解噪声层级 <span class="math-inline">\(t\)</span>。只会识别干净图片的分类器，其梯度未必适合高度加噪的 <span class="math-inline">\(x_t\)</span>。贝叶斯等式是精确数学关系，但两个神经网络预测之差仍有估计误差。</p>
+<h2 id="cfg-1">CFG 的两个公式其实差一个1</h2>
+<p><code>[DIRECT]</code> Ho 与 Salimans 的方法联合训练有条件和无条件的去噪预测，并在采样时线性组合。原论文的强度记法是 <span class="math-inline">\((1+w)\epsilon_c-w\epsilon_u\)</span>。来源：<a href="https://arxiv.org/html/2207.12598v1">Classifier-Free Diffusion Guidance，v1，§3.2</a>。</p>
+<p><code>[DERIVATION]</code> 本笔记采用更方便讨论基线的 <span class="math-inline">\(\gamma\)</span>：</p>
+<div class="math-display">\[\widehat s_\gamma=\widehat s_u+\gamma(\widehat s_c-\widehat s_u).\]</div>
+<table>
+<thead>
+<tr>
+<th>数值</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><span class="math-inline">\(\gamma=0\)</span></td>
+<td>无条件预测</td>
+</tr>
+<tr>
+<td><span class="math-inline">\(\gamma=1\)</span></td>
+<td>普通条件预测</td>
+</tr>
+<tr>
+<td><span class="math-inline">\(\gamma&gt;1\)</span></td>
+<td>超出普通条件预测的外推</td>
+</tr>
+</tbody>
+</table>
+<p>两种记法关系是 <span class="math-inline">\(\gamma=1+w\)</span>。看到代码中“guidance scale=0”时，必须先看公式；有时它表示无条件，有时表示不加额外引导。不能只根据数值判断。</p>
+<p>设无条件预测为2、条件预测为5，这只是一个人为构造的一维输出。<span class="math-inline">\(\gamma=1\)</span> 得5，<span class="math-inline">\(\gamma=2\)</span> 得8。CFG 把条件差从3放大为6，不是在两个输出之间取概率平均。<span class="math-inline">\(\gamma&gt;1\)</span> 时，无条件项的系数 <span class="math-inline">\(1-\gamma\)</span> 为负。</p>
+<h2 id="_3">为什么噪声预测可以使用同一个组合</h2>
+<p><code>[DERIVATION]</code> 对高斯扰动，条件和无条件分支都满足 <span class="math-inline">\(s=-\epsilon/\sigma_t\)</span>，且共享同一个 <span class="math-inline">\(\sigma_t\)</span>。因此</p>
+<div class="math-display">\[\widehat\epsilon_\gamma=\widehat\epsilon_u+\gamma(\widehat\epsilon_c-\widehat\epsilon_u)\]</div>
+<p>映射回 score 后，恰好得到上式。负号不会改变引导强度，因为它同时作用于两项。</p>
+<p>如果换成其他预测参数化，需要先核对两个分支是否通过同一个仿射变换转换到速度或 score。不能混合一个分支的噪声预测和另一个分支的干净样本预测。采样器也必须知道网络实际输出什么。</p>
+<h2 id="_4">训练为何要随机丢弃条件</h2>
+<p><code>[SYNTHESIS]</code> 设训练样本为 <span class="math-inline">\((x_0,c)\)</span>，随机取 <span class="math-inline">\(t,\epsilon\)</span>，构造 <span class="math-inline">\(x_t=\alpha_tx_0+\sigma_t\epsilon\)</span>。再独立抛一枚概率为 <span class="math-inline">\(p_{\mathrm{drop}}\)</span> 的硬币，将部分条件替换成空条件 <span class="math-inline">\(\varnothing\)</span>。网络学习</p>
+<div class="math-display">\[\mathbb E\|\epsilon_\theta(x_t,t,\widetilde c)-\epsilon\|^2.\]</div>
+<p>同一网络因而见过有条件和空条件两类输入。采样时，在同一个 <span class="math-inline">\(x_t,t\)</span> 上调用两次或合并成一个批次，然后组合输出。“classifier-free”省掉的是额外的分类器，不代表省掉条件，也不代表每一步一定只做一次样本量意义上的网络计算。</p>
+<p>空条件是模型训练时规定的表示，不能随意假设全零向量就等价。负面提示词也不严格等同于无条件分布；把一个指定负面条件放进基线分支，会改变这套解释的对象。</p>
+<h2 id="_5">引导对应什么分布：一个容易过度推论的地方</h2>
+<p><code>[DERIVATION]</code> 若两个 score 都精确，固定一个时间 <span class="math-inline">\(t\)</span>，且归一化常数有限，则</p>
+<div class="math-display">\[s_\gamma=\nabla_x\log\left[p_t(x\mid c)^\gamma p_t(x)^{1-\gamma}\right].\]</div>
+<p>这说明瞬时向量场偏向什么区域。但逐时定义这些密度，不保证它们共同构成原加噪过程的有效边缘分布族。因此，仅靠这个等式，不能断言整个反向采样器的终点密度就严格等于 <span class="math-inline">\(p_0(x\mid c)^\gamma p_0(x)^{1-\gamma}\)</span>。这里还涉及时间一致性和采样动力学。</p>
+<p>一个可计算的诊断例子：只考虑某一固定时刻的两个高斯密度，<span class="math-inline">\(p_u=\mathcal N(0,4)\)</span>、<span class="math-inline">\(p_c=\mathcal N(1,1)\)</span>。它们的 score 分别是 <span class="math-inline">\(-x/4\)</span> 与 <span class="math-inline">\(1-x\)</span>。于是</p>
+<div class="math-display">\[s_\gamma(x)=\gamma-\frac{1+3\gamma}{4}x.\]</div>
+<p>当 <span class="math-inline">\(\gamma\ge0\)</span> 时，这个瞬时场对应均值 <span class="math-inline">\(4\gamma/(1+3\gamma)\)</span>、方差 <span class="math-inline">\(4/(1+3\gamma)\)</span> 的高斯。<span class="math-inline">\(\gamma=1\)</span> 时均值1、方差1；<span class="math-inline">\(\gamma=3\)</span> 时均值1.2、方差0.4。这个例子只演示组合的数学作用，不是某数据集实验，也不是对完整生成过程的精确预测。</p>
+<h2 id="_6">为什么越强不一定越好</h2>
+<p><code>[DERIVATION]</code> 记条件、无条件估计误差为 <span class="math-inline">\(e_c,e_u\)</span>。引导后的误差为</p>
+<div class="math-display">\[e_\gamma=\gamma e_c+(1-\gamma)e_u.\]</div>
+<p>所以 <span class="math-inline">\(\gamma\ge1\)</span> 时，<span class="math-inline">\(\|e_\gamma\|\le\gamma\|e_c\|+(\gamma-1)\|e_u\|\)</span>。这只是上界，不说明每个样本误差必然单调增大，但说明大引导会放大两个分支的不一致。</p>
+<p><code>[SYNTHESIS]</code> 评价时应同时看条件符合度、样本多样性、明显伪影和计算预算。仅展示最符合提示词的一张图，不能说明整体分布变得更好。固定种子与求解器可以帮助比较引导参数，但仍需多个种子估计稳定性。</p>
+<h2 id="_7">自测与词义</h2>
+<ul>
+<li>如果条件分支和无条件分支完全相同，引导强度再大也不改变结果。</li>
+<li>如果代码采用 <span class="math-inline">\((1+w)\epsilon_c-w\epsilon_u\)</span>，普通条件采样对应 <span class="math-inline">\(w=0\)</span>。</li>
+<li>概率密度可以随 <span class="math-inline">\(t\)</span> 变化，条件 <span class="math-inline">\(c\)</span> 本身并不因此成为被加噪的随机状态。</li>
+</ul>
+<p><strong>conditioning</strong>：将指定信息作为生成条件。<strong>unconditional</strong>：未附加该条件。<strong>guidance</strong>：在采样时改变预测方向的引导。<strong>extrapolation</strong>：超出两点之间范围的外推。<strong>fidelity</strong>：样本与目标特征的符合程度。<strong>mode coverage</strong>：覆盖不同数据模式的程度。</p>
+<p>下一篇 <a href="lecture-20.html">Rectified Flows</a> 继续讨论速度场，但问题转向路径、耦合和数值步数。CFG 与路径设计是不同维度的选择，可以同时存在。</p>
+      </article>
+    </div>
+  </main>
+
+  <footer class="site-footer section-shell">
+    <div><strong>CS 395T</strong><span>Learning note</span></div>
+    <p>Markdown source · draft</p>
+    <a href="../index.html#notes">Return to index ←</a>
+  </footer>
+</body>
+</html>

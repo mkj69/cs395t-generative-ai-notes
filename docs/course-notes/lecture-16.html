@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="从随机步长、Itô 修正和概率守恒推导 SDE 的密度演化，用布朗运动与 OU 算例核对时间尺度。">
+  <title>Lecture 16: Diffusion Preparation: Stochastic Calculus — CS 395T</title>
+  <link rel="stylesheet" href="../assets/styles.css">
+  <script>
+    window.MathJax = {
+      tex: {
+        processEscapes: true
+      },
+      svg: { fontCache: 'global' }
+    };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js" defer></script>
+  <script src="../assets/app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header">
+    <a class="wordmark" href="../index.html"><span>CS 395T</span><small>Learning &amp; research notebook</small></a>
+    <button class="menu-button" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button>
+    <nav id="site-nav" class="site-nav" aria-label="Primary navigation">
+      <a href="../structure.html">Structure</a>
+      <a href="../index.html#notes">Index</a>
+      <a href="../method.html">Writing guide</a>
+      <a href="../index.html#about">About</a>
+    </nav>
+  </header>
+
+  <main id="main" class="note-shell">
+    <header class="note-hero">
+      <div class="template-banner learning-banner">
+        <strong>LEARNING NOTE · CHECKED</strong>
+        <span>Source-checked reconstruction</span>
+      </div>
+      <p class="eyebrow">19 OCT 2026 · CHECKED</p>
+      <h1>Lecture 16: Diffusion Preparation: Stochastic Calculus</h1>
+      <p class="note-abstract">从随机步长、Itô 修正和概率守恒推导 SDE 的密度演化，用布朗运动与 OU 算例核对时间尺度。</p>
+      <ul class="tag-list" aria-label="Topics"><li>Diffusion</li><li>Brownian motion</li><li>Ito calculus</li><li>Fokker-Planck</li></ul>
+    </header>
+
+    <div class="note-layout">
+      <aside class="note-toc" aria-label="On this page">
+        <p class="aside-label">ON THIS PAGE</p>
+        <div class="toc">
+<ul>
+<li><a href="#_1">阅读起点：一条随机路径和一群粒子的分布</a></li>
+<li><a href="#_2">为什么随机项乘的是平方根步长</a></li>
+<li><a href="#sde">SDE 是局部更新规则，不是普通可导路径</a></li>
+<li><a href="#ito">Itô 公式中多出来的一项从哪里来</a></li>
+<li><a href="#_3">从测试函数推到整个密度</a></li>
+<li><a href="#ou">一个可手算的 OU 检查</a></li>
+<li><a href="#_4">常见误解与自检</a></li>
+<li><a href="#_5">词汇与来源</a></li>
+</ul>
+</div>
+
+      </aside>
+      <article class="prose note-prose markdown-body">
+        <blockquote>
+<p><strong>AI 辅助学习笔记。</strong> 本文是独立讲解与推导，不是讲义全文译文，也不代表作者已经完成个人复习。讲义来源：<a href="https://noahgol.github.io/teaching/cs395t-f26/lecture16-17-v2.pdf">课程原始 PDF</a>。第 16、17 课共用一份讲义。公式已与相应来源核对，未做人工终审。</p>
+</blockquote>
+<p><code>[DIRECT]</code> 标明来源直接支持的简述；<code>[DERIVATION]</code> 标明数学推导；<code>[SYNTHESIS]</code> 标明概念连接与解释。自行构造的数值例子不代表论文实验。</p>
+<p><a href="diffusion-unit.html">返回 Diffusion 单元导读</a></p>
+<h2 id="_1">阅读起点：一条随机路径和一群粒子的分布</h2>
+<p><code>[SYNTHESIS]</code> 本篇从一个问题出发：当每一步都有随机扰动时，怎样区分“一个样本如何运动”和“所有样本的分布如何变化”？学习目标是能亲手写出一步更新，并检查它产生的均值、方差和概率流。以下解释和算例是独立的学习辅助，不是讲义逐句译文。</p>
+<p>先固定符号。<span class="math-inline">\(X_t\in\mathbb R^d\)</span> 是随机位置，<span class="math-inline">\(p_t(x)\)</span> 是在时间 <span class="math-inline">\(t\)</span> 的密度，<span class="math-inline">\(f(t,x)\)</span> 是漂移，<span class="math-inline">\(g(t)\)</span> 是与位置无关的标量噪声系数。<span class="math-inline">\(B_t\)</span> 是标准布朗运动。本文只讨论这种各向同性、状态无关的扩散系数；矩阵系数或依赖 <span class="math-inline">\(x\)</span> 的噪声需要改写公式。</p>
+<h2 id="_2">为什么随机项乘的是平方根步长</h2>
+<p><code>[DERIVATION]</code> 把长度为 <span class="math-inline">\(T\)</span> 的时间分成 <span class="math-inline">\(n=T/h\)</span> 段。若一步噪声为 <span class="math-inline">\(\sqrt h Z_k\)</span>，其中 <span class="math-inline">\(Z_k\)</span> 独立且服从标准高斯，那么总增量的方差为</p>
+<div class="math-display">\[\operatorname{Var}\left(\sum_{k=1}^{T/h}\sqrt h Z_k\right)=\frac{T}{h}h=T.\]</div>
+<p>若误写为 <span class="math-inline">\(hZ_k\)</span>，总方差就变成 <span class="math-inline">\(Th\)</span>，在步长趋于零时消失。布朗运动的增量应满足 <span class="math-inline">\(B_{t+h}-B_t\sim\mathcal N(0,hI)\)</span>，相邻不重叠时间区间的增量独立。</p>
+<p><code>[DERIVATION · 算例]</code> 取 <span class="math-inline">\(T=1,h=0.01\)</span>。100 次、每次标准差为 <span class="math-inline">\(0.1\)</span> 的独立增量，最后方差为1；每次标准差若误用0.01，最后方差只有0.01。更多小步不应让固定时长内的总随机性凭空消失。</p>
+<h2 id="sde">SDE 是局部更新规则，不是普通可导路径</h2>
+<div class="math-display">\[dX_t=f(t,X_t)dt+g(t)dB_t.\]</div>
+<p><code>[DERIVATION]</code> Euler–Maruyama 一步为</p>
+<div class="math-display">\[X_{t+h}\approx X_t+h f(t,X_t)+g(t)\sqrt h Z.\]</div>
+<p>条件均值增量是 <span class="math-inline">\(hf\)</span>，条件协方差增量是 <span class="math-inline">\(hg^2I\)</span>。布朗路径几乎必然处处不可导，不能把 <span class="math-inline">\(dB_t/dt\)</span> 当作普通光滑函数直接操作。SDE 的精确含义来自积分式及随机积分；数值更新是近似，不是它的定义所允许的任意替代品。</p>
+<p>对于确定性的 <span class="math-inline">\(g\)</span>，随机积分的协方差为 <span class="math-inline">\(\int_0^t g(s)^2ds\,I\)</span>，不是 <span class="math-inline">\((\int_0^t g(s)ds)^2I\)</span>。后者错误地把不同时刻的独立增量当成完全相关。</p>
+<h2 id="ito">Itô 公式中多出来的一项从哪里来</h2>
+<p><code>[DERIVATION]</code> 用一维 <span class="math-inline">\(F(x)=x^2\)</span> 做检查。普通链式法则会漏掉平方噪声的贡献。因为一步的 <span class="math-inline">\((\Delta B)^2\)</span> 在累积意义下贡献 <span class="math-inline">\(dt\)</span>，所以</p>
+<div class="math-display">\[d(X_t^2)=2X_t f(t,X_t)dt+2X_tg(t)dB_t+g(t)^2dt.\]</div>
+<p>纯布朗运动 <span class="math-inline">\(X_t=B_t\)</span> 时，取期望得到 <span class="math-inline">\(\frac{d}{dt}\mathbb E[B_t^2]=1\)</span>，于是 <span class="math-inline">\(\mathbb E[B_t^2]=t\)</span>。如果没有最后一项，就会错误得到方差不增长。</p>
+<p>一般的光滑 <span class="math-inline">\(F(t,x)\)</span> 满足</p>
+<div class="math-display">\[dF=\left(\partial_tF+f\cdot\nabla F+\frac{g^2}{2}\Delta F\right)dt+g\nabla F\cdot dB_t.\]</div>
+<p>此处的 <span class="math-inline">\(\nabla\)</span> 与 <span class="math-inline">\(\Delta\)</span> 对空间求导。<span class="math-inline">\(\Delta F\)</span> 是各坐标二阶导数之和。应用公式和交换期望、积分需要相应可积性；随机积分均值为零也需要条件，不能对任意爆炸过程直接套用。</p>
+<h2 id="_3">从测试函数推到整个密度</h2>
+<p><code>[DERIVATION]</code> 取光滑且紧支撑的测试函数 <span class="math-inline">\(\phi\)</span>。它可以看成在空间不同位置设置的测量权重。Itô 公式给出</p>
+<div class="math-display">\[\frac d{dt}\mathbb E[\phi(X_t)]=\int\left(f\cdot\nabla\phi+\frac{g^2}{2}\Delta\phi\right)p_t\,dx.\]</div>
+<p>将空间导数通过分部积分移到密度上，得到</p>
+<div class="math-display">\[\partial_t p_t=-\nabla\cdot(fp_t)+\frac{g^2}{2}\Delta p_t.\]</div>
+<p>这就是 Fokker–Planck 方程。它不是在预测一个粒子的轨迹，而是在预测粒子群的概率密度。需要检查边界项消失；在有边界的区域内，边界条件属于模型的一部分。</p>
+<p>定义概率流 <span class="math-inline">\(J=fp_t-\frac{g^2}{2}\nabla p_t\)</span>，同一个方程可写成 <span class="math-inline">\(\partial_t p_t=-\nabla\cdot J\)</span>。积分后，若边界没有净流出，就有 <span class="math-inline">\(\frac d{dt}\int p_tdx=0\)</span>。这是概率质量守恒的检查。</p>
+<h2 id="ou">一个可手算的 OU 检查</h2>
+<p><code>[DERIVATION]</code> 考虑 <span class="math-inline">\(dX_t=-\kappa X_tdt+\sigma dB_t\)</span>，其中 <span class="math-inline">\(\kappa&gt;0\)</span>。漂移把状态拉向0，噪声不断扩散。若初始均值为 <span class="math-inline">\(m_0\)</span>、方差为 <span class="math-inline">\(v_0\)</span>，由一阶与二阶矩方程可得</p>
+<div class="math-display">\[m_t=e^{-\kappa t}m_0,\qquad v_t=e^{-2\kappa t}v_0+\frac{\sigma^2}{2\kappa}(1-e^{-2\kappa t}).\]</div>
+<p>取 <span class="math-inline">\(\kappa=1,\sigma=\sqrt2,v_0=4\)</span>，有 <span class="math-inline">\(v_t=1+3e^{-2t}\)</span>，最终趋于1。只有初始分布本来是相应高斯等特殊情形，才能直接把整条边缘分布都说成高斯；任意初始数据通常仍是平滑后的混合分布。</p>
+<h2 id="_4">常见误解与自检</h2>
+<table>
+<thead>
+<tr>
+<th>误解</th>
+<th>检查方法</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>噪声增量的尺度是 <span class="math-inline">\(h\)</span></td>
+<td>计算固定时长内总方差是否消失</td>
+</tr>
+<tr>
+<td>单个路径的随机性等于密度不守恒</td>
+<td>对 Fokker–Planck 方程积分</td>
+</tr>
+<tr>
+<td>Brownian 增量是一条普通函数曲线</td>
+<td>检查 <span class="math-inline">\(d(B_t^2)\)</span> 是否遗漏 <span class="math-inline">\(dt\)</span></td>
+</tr>
+<tr>
+<td>一时刻分布相同意味着随机过程相同</td>
+<td>比较两个时刻的联合分布或协方差</td>
+</tr>
+</tbody>
+</table>
+<p><code>[SYNTHESIS]</code> 接下来学习逆扩散时，最有用的两样工具是概率流与密度梯度：它们会解释为什么逆向运动中必须加入 score。</p>
+<h2 id="_5">词汇与来源</h2>
+<p><strong>drift</strong>：漂移，确定性的局部变化趋势。<strong>diffusion coefficient</strong>：扩散系数，决定随机增量大小。<strong>marginal density</strong>：某个时刻的边缘密度。<strong>generator</strong>：生成算子，描述函数期望的瞬时变化，不是生成图片的神经网络。</p>
+<p><code>[DIRECT · 来源范围]</code> 课程16–17合并讲义的随机微积分部分及相关附录用于核对定义与记号。完整讲义还覆盖后续扩散内容，本篇不声称等同于整份讲义。关于数学严谨条件可继续阅读 <a href="https://arxiv.org/abs/2402.07487">Tang and Zhao 的技术教程</a>。</p>
+      </article>
+    </div>
+  </main>
+
+  <footer class="site-footer section-shell">
+    <div><strong>CS 395T</strong><span>Learning note</span></div>
+    <p>Markdown source · checked</p>
+    <a href="../index.html#notes">Return to index ←</a>
+  </footer>
+</body>
+</html>
