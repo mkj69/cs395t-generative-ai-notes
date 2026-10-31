@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="从随机步长、Itô 修正和概率守恒推导 SDE 的密度演化，用布朗运动与 OU 算例核对时间尺度。">
+  <meta name="description" content="A derivation of stochastic time scaling, the Itô correction, and density evolution, with Brownian motion and Ornstein–Uhlenbeck examples.">
   <title>Lecture 16: Diffusion Preparation: Stochastic Calculus — CS 395T</title>
   <link rel="stylesheet" href="../assets/styles.css">
   <script>
@@ -38,7 +38,7 @@
       </div>
       <p class="eyebrow">19 OCT 2026 · CHECKED</p>
       <h1>Lecture 16: Diffusion Preparation: Stochastic Calculus</h1>
-      <p class="note-abstract">从随机步长、Itô 修正和概率守恒推导 SDE 的密度演化，用布朗运动与 OU 算例核对时间尺度。</p>
+      <p class="note-abstract">A derivation of stochastic time scaling, the Itô correction, and density evolution, with Brownian motion and Ornstein–Uhlenbeck examples.</p>
       <ul class="tag-list" aria-label="Topics"><li>Diffusion</li><li>Brownian motion</li><li>Ito calculus</li><li>Fokker-Planck</li></ul>
     </header>
 
@@ -47,87 +47,87 @@
         <p class="aside-label">ON THIS PAGE</p>
         <div class="toc">
 <ul>
-<li><a href="#_1">阅读起点：一条随机路径和一群粒子的分布</a></li>
-<li><a href="#_2">为什么随机项乘的是平方根步长</a></li>
-<li><a href="#sde">SDE 是局部更新规则，不是普通可导路径</a></li>
-<li><a href="#ito">Itô 公式中多出来的一项从哪里来</a></li>
-<li><a href="#_3">从测试函数推到整个密度</a></li>
-<li><a href="#ou">一个可手算的 OU 检查</a></li>
-<li><a href="#_4">常见误解与自检</a></li>
-<li><a href="#_5">词汇与来源</a></li>
+<li><a href="#starting-question-a-random-path-and-its-distribution">Starting question: a random path and its distribution</a></li>
+<li><a href="#why-the-random-increment-scales-with-the-square-root-of-time">Why the random increment scales with the square root of time</a></li>
+<li><a href="#an-sde-specifies-local-motion-through-stochastic-integration">An SDE specifies local motion through stochastic integration</a></li>
+<li><a href="#where-the-ito-correction-comes-from">Where the Itô correction comes from</a></li>
+<li><a href="#from-test-functions-to-a-density-equation">From test functions to a density equation</a></li>
+<li><a href="#a-solvable-ornsteinuhlenbeck-example">A solvable Ornstein–Uhlenbeck example</a></li>
+<li><a href="#misconceptions-and-checks">Misconceptions and checks</a></li>
+<li><a href="#terminology-and-sources">Terminology and sources</a></li>
 </ul>
 </div>
 
       </aside>
       <article class="prose note-prose markdown-body">
         <blockquote>
-<p><strong>AI 辅助学习笔记。</strong> 本文是独立讲解与推导，不是讲义全文译文，也不代表作者已经完成个人复习。讲义来源：<a href="https://noahgol.github.io/teaching/cs395t-f26/lecture16-17-v2.pdf">课程原始 PDF</a>。第 16、17 课共用一份讲义。公式已与相应来源核对，未做人工终审。</p>
+<p><strong>AI-assisted study note.</strong> This note develops independent explanations, derivations, and worked examples. It does not record a completed personal reading pass. Definitions and formulas were checked against the relevant <a href="https://noahgol.github.io/teaching/cs395t-f26/lecture16-17-v2.pdf">course handout</a>; human review remains open.</p>
 </blockquote>
-<p><code>[DIRECT]</code> 标明来源直接支持的简述；<code>[DERIVATION]</code> 标明数学推导；<code>[SYNTHESIS]</code> 标明概念连接与解释。自行构造的数值例子不代表论文实验。</p>
-<p><a href="diffusion-unit.html">返回 Diffusion 单元导读</a></p>
-<h2 id="_1">阅读起点：一条随机路径和一群粒子的分布</h2>
-<p><code>[SYNTHESIS]</code> 本篇从一个问题出发：当每一步都有随机扰动时，怎样区分“一个样本如何运动”和“所有样本的分布如何变化”？学习目标是能亲手写出一步更新，并检查它产生的均值、方差和概率流。以下解释和算例是独立的学习辅助，不是讲义逐句译文。</p>
-<p>先固定符号。<span class="math-inline">\(X_t\in\mathbb R^d\)</span> 是随机位置，<span class="math-inline">\(p_t(x)\)</span> 是在时间 <span class="math-inline">\(t\)</span> 的密度，<span class="math-inline">\(f(t,x)\)</span> 是漂移，<span class="math-inline">\(g(t)\)</span> 是与位置无关的标量噪声系数。<span class="math-inline">\(B_t\)</span> 是标准布朗运动。本文只讨论这种各向同性、状态无关的扩散系数；矩阵系数或依赖 <span class="math-inline">\(x\)</span> 的噪声需要改写公式。</p>
-<h2 id="_2">为什么随机项乘的是平方根步长</h2>
-<p><code>[DERIVATION]</code> 把长度为 <span class="math-inline">\(T\)</span> 的时间分成 <span class="math-inline">\(n=T/h\)</span> 段。若一步噪声为 <span class="math-inline">\(\sqrt h Z_k\)</span>，其中 <span class="math-inline">\(Z_k\)</span> 独立且服从标准高斯，那么总增量的方差为</p>
+<p><code>[DIRECT]</code> identifies a source-supported statement. <code>[DERIVATION]</code> identifies mathematical reasoning. <code>[SYNTHESIS]</code> identifies an explanatory connection. Constructed numerical examples are not reported experiments.</p>
+<p><a href="diffusion-unit.html">Diffusion reading guide</a> · <a href="diffusion-unit.html#bilingual-source-readings">Separate bilingual source readings</a></p>
+<h2 id="starting-question-a-random-path-and-its-distribution">Starting question: a random path and its distribution</h2>
+<p><code>[SYNTHESIS]</code> A stochastic process has two related descriptions. One follows the motion of an individual sample. The other follows the distribution of a population of samples. The central question is how a local random update determines the evolution of that distribution.</p>
+<p>Let <span class="math-inline">\(X_t\in\mathbb R^d\)</span> be the state, <span class="math-inline">\(p_t(x)\)</span> its density, <span class="math-inline">\(f(t,x)\)</span> the drift, and <span class="math-inline">\(g(t)\)</span> a scalar noise coefficient that does not depend on position. Let <span class="math-inline">\(B_t\)</span> be standard Brownian motion. The calculations below assume isotropic, state-independent diffusion. Matrix coefficients and position-dependent noise require more general formulas.</p>
+<h2 id="why-the-random-increment-scales-with-the-square-root-of-time">Why the random increment scales with the square root of time</h2>
+<p><code>[DERIVATION]</code> Divide a time interval of length <span class="math-inline">\(T\)</span> into <span class="math-inline">\(n=T/h\)</span> steps. Suppose each step adds <span class="math-inline">\(\sqrt h Z_k\)</span>, where the <span class="math-inline">\(Z_k\)</span> are independent standard Gaussian variables. The accumulated variance is</p>
 <div class="math-display">\[\operatorname{Var}\left(\sum_{k=1}^{T/h}\sqrt h Z_k\right)=\frac{T}{h}h=T.\]</div>
-<p>若误写为 <span class="math-inline">\(hZ_k\)</span>，总方差就变成 <span class="math-inline">\(Th\)</span>，在步长趋于零时消失。布朗运动的增量应满足 <span class="math-inline">\(B_{t+h}-B_t\sim\mathcal N(0,hI)\)</span>，相邻不重叠时间区间的增量独立。</p>
-<p><code>[DERIVATION · 算例]</code> 取 <span class="math-inline">\(T=1,h=0.01\)</span>。100 次、每次标准差为 <span class="math-inline">\(0.1\)</span> 的独立增量，最后方差为1；每次标准差若误用0.01，最后方差只有0.01。更多小步不应让固定时长内的总随机性凭空消失。</p>
-<h2 id="sde">SDE 是局部更新规则，不是普通可导路径</h2>
+<p>If the increment were <span class="math-inline">\(hZ_k\)</span>, the accumulated variance would be <span class="math-inline">\(Th\)</span>. It would vanish as the step size approached zero. Brownian increments instead satisfy <span class="math-inline">\(B_{t+h}-B_t\sim\mathcal N(0,hI)\)</span>, with independent increments over disjoint intervals.</p>
+<p><code>[DERIVATION · EXAMPLE]</code> With <span class="math-inline">\(T=1\)</span> and <span class="math-inline">\(h=0.01\)</span>, there are 100 increments. A standard deviation of <span class="math-inline">\(0.1\)</span> per increment gives final variance 1. A standard deviation of <span class="math-inline">\(0.01\)</span> gives final variance only <span class="math-inline">\(0.01\)</span>. Refining the time grid should not remove the randomness accumulated over a fixed duration.</p>
+<h2 id="an-sde-specifies-local-motion-through-stochastic-integration">An SDE specifies local motion through stochastic integration</h2>
 <div class="math-display">\[dX_t=f(t,X_t)dt+g(t)dB_t.\]</div>
-<p><code>[DERIVATION]</code> Euler–Maruyama 一步为</p>
+<p><code>[DERIVATION]</code> One Euler–Maruyama step approximates this process by</p>
 <div class="math-display">\[X_{t+h}\approx X_t+h f(t,X_t)+g(t)\sqrt h Z.\]</div>
-<p>条件均值增量是 <span class="math-inline">\(hf\)</span>，条件协方差增量是 <span class="math-inline">\(hg^2I\)</span>。布朗路径几乎必然处处不可导，不能把 <span class="math-inline">\(dB_t/dt\)</span> 当作普通光滑函数直接操作。SDE 的精确含义来自积分式及随机积分；数值更新是近似，不是它的定义所允许的任意替代品。</p>
-<p>对于确定性的 <span class="math-inline">\(g\)</span>，随机积分的协方差为 <span class="math-inline">\(\int_0^t g(s)^2ds\,I\)</span>，不是 <span class="math-inline">\((\int_0^t g(s)ds)^2I\)</span>。后者错误地把不同时刻的独立增量当成完全相关。</p>
-<h2 id="ito">Itô 公式中多出来的一项从哪里来</h2>
-<p><code>[DERIVATION]</code> 用一维 <span class="math-inline">\(F(x)=x^2\)</span> 做检查。普通链式法则会漏掉平方噪声的贡献。因为一步的 <span class="math-inline">\((\Delta B)^2\)</span> 在累积意义下贡献 <span class="math-inline">\(dt\)</span>，所以</p>
+<p>The conditional mean increment is <span class="math-inline">\(hf\)</span>, and the conditional covariance increment is <span class="math-inline">\(hg^2I\)</span>. Brownian paths are almost surely nowhere differentiable. The quantity <span class="math-inline">\(dB_t/dt\)</span> cannot be treated as an ordinary smooth function. An SDE has an integral interpretation involving a stochastic integral; a numerical update approximates that process.</p>
+<p>For deterministic <span class="math-inline">\(g\)</span>, the covariance of the stochastic integral is <span class="math-inline">\(\int_0^t g(s)^2ds\,I\)</span>. It is not <span class="math-inline">\((\int_0^t g(s)ds)^2I\)</span>. The latter expression incorrectly treats independent increments at different times as perfectly correlated.</p>
+<h2 id="where-the-ito-correction-comes-from">Where the Itô correction comes from</h2>
+<p><code>[DERIVATION]</code> The one-dimensional function <span class="math-inline">\(F(x)=x^2\)</span> provides a useful check. Ordinary calculus would miss the accumulated contribution of squared noise increments. Since <span class="math-inline">\((\Delta B)^2\)</span> contributes <span class="math-inline">\(dt\)</span> in the quadratic-variation limit,</p>
 <div class="math-display">\[d(X_t^2)=2X_t f(t,X_t)dt+2X_tg(t)dB_t+g(t)^2dt.\]</div>
-<p>纯布朗运动 <span class="math-inline">\(X_t=B_t\)</span> 时，取期望得到 <span class="math-inline">\(\frac{d}{dt}\mathbb E[B_t^2]=1\)</span>，于是 <span class="math-inline">\(\mathbb E[B_t^2]=t\)</span>。如果没有最后一项，就会错误得到方差不增长。</p>
-<p>一般的光滑 <span class="math-inline">\(F(t,x)\)</span> 满足</p>
+<p>For <span class="math-inline">\(X_t=B_t\)</span>, taking expectations gives <span class="math-inline">\(\frac{d}{dt}\mathbb E[B_t^2]=1\)</span>, hence <span class="math-inline">\(\mathbb E[B_t^2]=t\)</span>. Omitting the last term would incorrectly predict that the variance does not grow.</p>
+<p>For a sufficiently smooth function <span class="math-inline">\(F(t,x)\)</span>, Itô's formula is</p>
 <div class="math-display">\[dF=\left(\partial_tF+f\cdot\nabla F+\frac{g^2}{2}\Delta F\right)dt+g\nabla F\cdot dB_t.\]</div>
-<p>此处的 <span class="math-inline">\(\nabla\)</span> 与 <span class="math-inline">\(\Delta\)</span> 对空间求导。<span class="math-inline">\(\Delta F\)</span> 是各坐标二阶导数之和。应用公式和交换期望、积分需要相应可积性；随机积分均值为零也需要条件，不能对任意爆炸过程直接套用。</p>
-<h2 id="_3">从测试函数推到整个密度</h2>
-<p><code>[DERIVATION]</code> 取光滑且紧支撑的测试函数 <span class="math-inline">\(\phi\)</span>。它可以看成在空间不同位置设置的测量权重。Itô 公式给出</p>
+<p>Both <span class="math-inline">\(\nabla\)</span> and <span class="math-inline">\(\Delta\)</span> act on spatial coordinates. The Laplacian sums the second derivatives over those coordinates. Integrability assumptions matter when expectations and integrals are exchanged. A stochastic integral has mean zero only under suitable conditions; that claim cannot be applied to an arbitrary explosive process.</p>
+<h2 id="from-test-functions-to-a-density-equation">From test functions to a density equation</h2>
+<p><code>[DERIVATION]</code> Let <span class="math-inline">\(\phi\)</span> be a smooth, compactly supported test function. It assigns a measurement weight to each location. Itô's formula implies</p>
 <div class="math-display">\[\frac d{dt}\mathbb E[\phi(X_t)]=\int\left(f\cdot\nabla\phi+\frac{g^2}{2}\Delta\phi\right)p_t\,dx.\]</div>
-<p>将空间导数通过分部积分移到密度上，得到</p>
+<p>Integration by parts transfers the spatial derivatives onto the density and yields</p>
 <div class="math-display">\[\partial_t p_t=-\nabla\cdot(fp_t)+\frac{g^2}{2}\Delta p_t.\]</div>
-<p>这就是 Fokker–Planck 方程。它不是在预测一个粒子的轨迹，而是在预测粒子群的概率密度。需要检查边界项消失；在有边界的区域内，边界条件属于模型的一部分。</p>
-<p>定义概率流 <span class="math-inline">\(J=fp_t-\frac{g^2}{2}\nabla p_t\)</span>，同一个方程可写成 <span class="math-inline">\(\partial_t p_t=-\nabla\cdot J\)</span>。积分后，若边界没有净流出，就有 <span class="math-inline">\(\frac d{dt}\int p_tdx=0\)</span>。这是概率质量守恒的检查。</p>
-<h2 id="ou">一个可手算的 OU 检查</h2>
-<p><code>[DERIVATION]</code> 考虑 <span class="math-inline">\(dX_t=-\kappa X_tdt+\sigma dB_t\)</span>，其中 <span class="math-inline">\(\kappa&gt;0\)</span>。漂移把状态拉向0，噪声不断扩散。若初始均值为 <span class="math-inline">\(m_0\)</span>、方差为 <span class="math-inline">\(v_0\)</span>，由一阶与二阶矩方程可得</p>
+<p>This is the Fokker–Planck equation. It describes the density of a population, rather than an individual trajectory. Boundary terms must vanish for this derivation. On a bounded domain, the boundary conditions are part of the model.</p>
+<p>The probability current is <span class="math-inline">\(J=fp_t-\frac{g^2}{2}\nabla p_t\)</span>, so the same equation becomes <span class="math-inline">\(\partial_t p_t=-\nabla\cdot J\)</span>. If no net probability flows across the boundary, integration gives <span class="math-inline">\(\frac d{dt}\int p_tdx=0\)</span>. This checks conservation of total probability.</p>
+<h2 id="a-solvable-ornsteinuhlenbeck-example">A solvable Ornstein–Uhlenbeck example</h2>
+<p><code>[DERIVATION]</code> Consider <span class="math-inline">\(dX_t=-\kappa X_tdt+\sigma dB_t\)</span> with <span class="math-inline">\(\kappa&gt;0\)</span>. The drift pulls the state toward zero while noise spreads it out. If the initial mean and variance are <span class="math-inline">\(m_0\)</span> and <span class="math-inline">\(v_0\)</span>, the moment equations give</p>
 <div class="math-display">\[m_t=e^{-\kappa t}m_0,\qquad v_t=e^{-2\kappa t}v_0+\frac{\sigma^2}{2\kappa}(1-e^{-2\kappa t}).\]</div>
-<p>取 <span class="math-inline">\(\kappa=1,\sigma=\sqrt2,v_0=4\)</span>，有 <span class="math-inline">\(v_t=1+3e^{-2t}\)</span>，最终趋于1。只有初始分布本来是相应高斯等特殊情形，才能直接把整条边缘分布都说成高斯；任意初始数据通常仍是平滑后的混合分布。</p>
-<h2 id="_4">常见误解与自检</h2>
+<p>For <span class="math-inline">\(\kappa=1\)</span>, <span class="math-inline">\(\sigma=\sqrt2\)</span>, and <span class="math-inline">\(v_0=4\)</span>, the variance is <span class="math-inline">\(v_t=1+3e^{-2t}\)</span> and converges to 1. These moment formulas do not imply that every marginal is Gaussian for arbitrary initial data. Gaussian initial conditions give Gaussian marginals; more general initial distributions produce smoothed mixtures.</p>
+<h2 id="misconceptions-and-checks">Misconceptions and checks</h2>
 <table>
 <thead>
 <tr>
-<th>误解</th>
-<th>检查方法</th>
+<th>Claim to examine</th>
+<th>A useful check</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>噪声增量的尺度是 <span class="math-inline">\(h\)</span></td>
-<td>计算固定时长内总方差是否消失</td>
+<td>A noise increment should scale as <span class="math-inline">\(h\)</span></td>
+<td>The total variance over a fixed duration would vanish.</td>
 </tr>
 <tr>
-<td>单个路径的随机性等于密度不守恒</td>
-<td>对 Fokker–Planck 方程积分</td>
+<td>Random individual paths prevent conservation of probability</td>
+<td>Integrating the Fokker–Planck equation checks total mass.</td>
 </tr>
 <tr>
-<td>Brownian 增量是一条普通函数曲线</td>
-<td>检查 <span class="math-inline">\(d(B_t^2)\)</span> 是否遗漏 <span class="math-inline">\(dt\)</span></td>
+<td>Brownian motion obeys the ordinary chain rule</td>
+<td>The formula for <span class="math-inline">\(d(B_t^2)\)</span> needs the extra <span class="math-inline">\(dt\)</span> term.</td>
 </tr>
 <tr>
-<td>一时刻分布相同意味着随机过程相同</td>
-<td>比较两个时刻的联合分布或协方差</td>
+<td>Equal one-time marginals imply equal stochastic processes</td>
+<td>Two-time joint distributions or covariances can differ.</td>
 </tr>
 </tbody>
 </table>
-<p><code>[SYNTHESIS]</code> 接下来学习逆扩散时，最有用的两样工具是概率流与密度梯度：它们会解释为什么逆向运动中必须加入 score。</p>
-<h2 id="_5">词汇与来源</h2>
-<p><strong>drift</strong>：漂移，确定性的局部变化趋势。<strong>diffusion coefficient</strong>：扩散系数，决定随机增量大小。<strong>marginal density</strong>：某个时刻的边缘密度。<strong>generator</strong>：生成算子，描述函数期望的瞬时变化，不是生成图片的神经网络。</p>
-<p><code>[DIRECT · 来源范围]</code> 课程16–17合并讲义的随机微积分部分及相关附录用于核对定义与记号。完整讲义还覆盖后续扩散内容，本篇不声称等同于整份讲义。关于数学严谨条件可继续阅读 <a href="https://arxiv.org/abs/2402.07487">Tang and Zhao 的技术教程</a>。</p>
+<p><code>[SYNTHESIS]</code> Probability current and the density gradient are the main tools carried into reverse diffusion. They explain why reversing the process requires a score correction.</p>
+<h2 id="terminology-and-sources">Terminology and sources</h2>
+<p><strong>Drift</strong> is the deterministic component of local motion. The <strong>diffusion coefficient</strong> controls the scale of random increments. A <strong>marginal density</strong> describes the state at one time. The <strong>generator</strong> describes the instantaneous change of function expectations; here it is an operator, not an image-generating neural network.</p>
+<p><code>[DIRECT · SOURCE SCOPE]</code> The stochastic-calculus sections and related appendices of the combined Lecture 16 and 17 handout support the definitions and notation. That handout also contains later diffusion material. This note does not cover every section of it. <a href="https://arxiv.org/abs/2402.07487">Tang and Zhao's technical tutorial</a> is a supplementary reference for mathematical conditions.</p>
       </article>
     </div>
   </main>

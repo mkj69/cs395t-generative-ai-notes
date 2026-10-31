@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="从贝叶斯公式推导条件 score，解释 CFG 的两种强度记法、训练中的条件丢弃，以及引导强度放大误差的原因。">
+  <meta name="description" content="Bayes’ rule explains the conditional score direction. Worked examples clarify guidance conventions, condition dropout, and amplification of prediction errors.">
   <title>Lecture 19: Diffusion III: Conditional Generation and Classifier-Free Guidance — CS 395T</title>
   <link rel="stylesheet" href="../assets/styles.css">
   <script>
@@ -38,7 +38,7 @@
       </div>
       <p class="eyebrow">28 OCT 2026 · DRAFT</p>
       <h1>Lecture 19: Diffusion III: Conditional Generation and Classifier-Free Guidance</h1>
-      <p class="note-abstract">从贝叶斯公式推导条件 score，解释 CFG 的两种强度记法、训练中的条件丢弃，以及引导强度放大误差的原因。</p>
+      <p class="note-abstract">Bayes’ rule explains the conditional score direction. Worked examples clarify guidance conventions, condition dropout, and amplification of prediction errors.</p>
       <ul class="tag-list" aria-label="Topics"><li>Diffusion</li><li>conditional generation</li><li>classifier-free guidance</li></ul>
     </header>
 
@@ -47,94 +47,94 @@
         <p class="aside-label">ON THIS PAGE</p>
         <div class="toc">
 <ul>
-<li><a href="#_1">从“生成一张图”到“按条件生成”</a></li>
-<li><a href="#_2">贝叶斯公式给出条件方向</a></li>
-<li><a href="#cfg-1">CFG 的两个公式其实差一个1</a></li>
-<li><a href="#_3">为什么噪声预测可以使用同一个组合</a></li>
-<li><a href="#_4">训练为何要随机丢弃条件</a></li>
-<li><a href="#_5">引导对应什么分布：一个容易过度推论的地方</a></li>
-<li><a href="#_6">为什么越强不一定越好</a></li>
-<li><a href="#_7">自测与词义</a></li>
+<li><a href="#from-unconditional-generation-to-generation-with-a-condition">From unconditional generation to generation with a condition</a></li>
+<li><a href="#bayes-rule-identifies-a-conditional-direction">Bayes' rule identifies a conditional direction</a></li>
+<li><a href="#two-guidance-conventions-differ-by-one">Two guidance conventions differ by one</a></li>
+<li><a href="#why-noise-predictions-use-the-same-combination">Why noise predictions use the same combination</a></li>
+<li><a href="#why-training-randomly-drops-the-condition">Why training randomly drops the condition</a></li>
+<li><a href="#what-distribution-does-guidance-imply">What distribution does guidance imply?</a></li>
+<li><a href="#stronger-guidance-can-amplify-errors">Stronger guidance can amplify errors</a></li>
+<li><a href="#checks-and-terminology">Checks and terminology</a></li>
 </ul>
 </div>
 
       </aside>
       <article class="prose note-prose markdown-body">
         <blockquote>
-<p><strong>AI 辅助主题学习笔记，待课堂资料补充。</strong> 截至 2026-10-31，课程表只有本课主题，没有公开课件。本篇依据公开原始论文与独立推导编写，不能视为课堂记录；所列论文是补充参考，不声称是教师指定阅读。页面日期为课程安排日期。</p>
+<p><strong>AI-assisted study note awaiting classroom materials.</strong> As of October 31, 2026, the course schedule lists the topic without a public slide deck or handout. This note develops the topic from public primary sources and independent derivations. It does not reconstruct the student presentation. References are supplementary sources, not a confirmed assigned reading list. The page date is the scheduled class date.</p>
 </blockquote>
-<p><code>[DIRECT]</code> 标明来源直接支持的简述；<code>[DERIVATION]</code> 标明数学推导；<code>[SYNTHESIS]</code> 标明概念连接与解释。自行构造的数值例子不代表论文实验。</p>
-<p><a href="diffusion-unit.html">返回 Diffusion 单元导读</a></p>
-<h2 id="_1">从“生成一张图”到“按条件生成”</h2>
-<p><code>[SYNTHESIS]</code> 无条件模型希望生成符合总体数据规律的样本；条件模型还接收条件 <span class="math-inline">\(c\)</span>，例如类别或文本。输入同一个噪声种子并改变条件，应当改变样本落入的语义区域。条件不是训练标签旁边的备注，它改变了目标分布 <span class="math-inline">\(p_t(x\mid c)\)</span>。</p>
-<p>这一讲的关键不是记住一个相减公式，而是理解：为什么两个去噪预测之差含有条件信息，为什么放大这个差会改变生成行为，以及这种放大为什么有代价。</p>
-<h2 id="_2">贝叶斯公式给出条件方向</h2>
-<p><code>[DERIVATION]</code> 在密度为正、可微的区域，由</p>
-<div class="math-display">\[p_t(x\mid c)=\frac{p_t(c\mid x)p_t(x)}{p(c)}\]</div>
-<p>对 <span class="math-inline">\(x\)</span> 取对数再求梯度。<span class="math-inline">\(p(c)\)</span> 不依赖 <span class="math-inline">\(x\)</span>，所以</p>
+<p><code>[DIRECT]</code> identifies a source-supported statement. <code>[DERIVATION]</code> identifies mathematical reasoning. <code>[SYNTHESIS]</code> identifies an explanatory connection. Constructed numerical examples are not reported experiments.</p>
+<p><a href="diffusion-unit.html">Diffusion reading guide</a> · <a href="diffusion-unit.html#bilingual-source-readings">Separate bilingual source readings</a></p>
+<h2 id="from-unconditional-generation-to-generation-with-a-condition">From unconditional generation to generation with a condition</h2>
+<p><code>[SYNTHESIS]</code> An unconditional model generates samples from an overall data distribution. A conditional model also receives information <span class="math-inline">\(c\)</span>, such as a class label or text. With the same initial noise, changing the condition should change the semantic region reached by the sample. The target distribution becomes <span class="math-inline">\(p_t(x\mid c)\)</span>.</p>
+<p>The central questions concern the difference between two denoising predictions. Why does that difference encode condition-specific information? Why does amplifying it change generation? What errors can amplification introduce?</p>
+<h2 id="bayes-rule-identifies-a-conditional-direction">Bayes' rule identifies a conditional direction</h2>
+<p><code>[DERIVATION]</code> Where the densities are positive and differentiable,</p>
+<div class="math-display">\[p_t(x\mid c)=\frac{p_t(c\mid x)p_t(x)}{p(c)}.\]</div>
+<p>Taking logarithms and differentiating with respect to <span class="math-inline">\(x\)</span> removes <span class="math-inline">\(p(c)\)</span>, which does not depend on <span class="math-inline">\(x\)</span>:</p>
 <div class="math-display">\[s_c(x,t)=s_u(x,t)+\nabla_x\log p_t(c\mid x),\]</div>
-<p>其中 <span class="math-inline">\(s_c=\nabla_x\log p_t(x\mid c)\)</span> 是条件 score，<span class="math-inline">\(s_u=\nabla_x\log p_t(x)\)</span> 是无条件 score。因此</p>
+<p>where <span class="math-inline">\(s_c=\nabla_x\log p_t(x\mid c)\)</span> and <span class="math-inline">\(s_u=\nabla_x\log p_t(x)\)</span>. Therefore,</p>
 <div class="math-display">\[s_c-s_u=\nabla_x\log p_t(c\mid x).\]</div>
-<p>右边回答的不是“哪里更像所有真实图片”，而是“当前位置朝哪个方向变化，会让条件 <span class="math-inline">\(c\)</span> 更可信”。分类器引导需要估计右边；CFG 则用左边的两个生成模型预测来近似。</p>
-<p>这里的分类器必须理解噪声层级 <span class="math-inline">\(t\)</span>。只会识别干净图片的分类器，其梯度未必适合高度加噪的 <span class="math-inline">\(x_t\)</span>。贝叶斯等式是精确数学关系，但两个神经网络预测之差仍有估计误差。</p>
-<h2 id="cfg-1">CFG 的两个公式其实差一个1</h2>
-<p><code>[DIRECT]</code> Ho 与 Salimans 的方法联合训练有条件和无条件的去噪预测，并在采样时线性组合。原论文的强度记法是 <span class="math-inline">\((1+w)\epsilon_c-w\epsilon_u\)</span>。来源：<a href="https://arxiv.org/html/2207.12598v1">Classifier-Free Diffusion Guidance，v1，§3.2</a>。</p>
-<p><code>[DERIVATION]</code> 本笔记采用更方便讨论基线的 <span class="math-inline">\(\gamma\)</span>：</p>
+<p>The right-hand side points toward increasing confidence in condition <span class="math-inline">\(c\)</span> at the current noisy state. Classifier guidance estimates that direction with a classifier. Classifier-free guidance approximates it through the difference between conditional and unconditional generative predictions.</p>
+<p>A classifier used this way must account for the noise level <span class="math-inline">\(t\)</span>. A classifier trained only on clean images may provide unsuitable gradients on highly perturbed states. Bayes' identity is exact, while the difference between neural predictions still contains estimation error.</p>
+<h2 id="two-guidance-conventions-differ-by-one">Two guidance conventions differ by one</h2>
+<p><code>[DIRECT]</code> Ho and Salimans jointly train conditional and unconditional denoising predictions and combine them during sampling. Their notation uses <span class="math-inline">\((1+w)\epsilon_c-w\epsilon_u\)</span>. Source: <a href="https://arxiv.org/html/2207.12598v1">Classifier-Free Diffusion Guidance, v1, Section 3.2</a>.</p>
+<p><code>[DERIVATION]</code> This note uses <span class="math-inline">\(\gamma\)</span> to make the unconditional baseline explicit:</p>
 <div class="math-display">\[\widehat s_\gamma=\widehat s_u+\gamma(\widehat s_c-\widehat s_u).\]</div>
 <table>
 <thead>
 <tr>
-<th>数值</th>
-<th>含义</th>
+<th>Value</th>
+<th>Interpretation</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td><span class="math-inline">\(\gamma=0\)</span></td>
-<td>无条件预测</td>
+<td>Unconditional prediction</td>
 </tr>
 <tr>
 <td><span class="math-inline">\(\gamma=1\)</span></td>
-<td>普通条件预测</td>
+<td>Ordinary conditional prediction</td>
 </tr>
 <tr>
 <td><span class="math-inline">\(\gamma&gt;1\)</span></td>
-<td>超出普通条件预测的外推</td>
+<td>Extrapolation beyond the conditional prediction</td>
 </tr>
 </tbody>
 </table>
-<p>两种记法关系是 <span class="math-inline">\(\gamma=1+w\)</span>。看到代码中“guidance scale=0”时，必须先看公式；有时它表示无条件，有时表示不加额外引导。不能只根据数值判断。</p>
-<p>设无条件预测为2、条件预测为5，这只是一个人为构造的一维输出。<span class="math-inline">\(\gamma=1\)</span> 得5，<span class="math-inline">\(\gamma=2\)</span> 得8。CFG 把条件差从3放大为6，不是在两个输出之间取概率平均。<span class="math-inline">\(\gamma&gt;1\)</span> 时，无条件项的系数 <span class="math-inline">\(1-\gamma\)</span> 为负。</p>
-<h2 id="_3">为什么噪声预测可以使用同一个组合</h2>
-<p><code>[DERIVATION]</code> 对高斯扰动，条件和无条件分支都满足 <span class="math-inline">\(s=-\epsilon/\sigma_t\)</span>，且共享同一个 <span class="math-inline">\(\sigma_t\)</span>。因此</p>
+<p>The conventions satisfy <span class="math-inline">\(\gamma=1+w\)</span>. A guidance value of zero can therefore mean unconditional sampling in one implementation and ordinary conditional sampling in another. The formula determines the meaning.</p>
+<p>For a constructed one-dimensional example, let the unconditional output be 2 and the conditional output be 5. Then <span class="math-inline">\(\gamma=1\)</span> gives 5, while <span class="math-inline">\(\gamma=2\)</span> gives 8. The conditional difference of 3 has been amplified to 6. This is extrapolation; when <span class="math-inline">\(\gamma&gt;1\)</span>, the coefficient <span class="math-inline">\(1-\gamma\)</span> on the unconditional output is negative.</p>
+<h2 id="why-noise-predictions-use-the-same-combination">Why noise predictions use the same combination</h2>
+<p><code>[DERIVATION]</code> For Gaussian perturbations, both branches obey <span class="math-inline">\(s=-\epsilon/\sigma_t\)</span> with the same <span class="math-inline">\(\sigma_t\)</span>. Consequently,</p>
 <div class="math-display">\[\widehat\epsilon_\gamma=\widehat\epsilon_u+\gamma(\widehat\epsilon_c-\widehat\epsilon_u)\]</div>
-<p>映射回 score 后，恰好得到上式。负号不会改变引导强度，因为它同时作用于两项。</p>
-<p>如果换成其他预测参数化，需要先核对两个分支是否通过同一个仿射变换转换到速度或 score。不能混合一个分支的噪声预测和另一个分支的干净样本预测。采样器也必须知道网络实际输出什么。</p>
-<h2 id="_4">训练为何要随机丢弃条件</h2>
-<p><code>[SYNTHESIS]</code> 设训练样本为 <span class="math-inline">\((x_0,c)\)</span>，随机取 <span class="math-inline">\(t,\epsilon\)</span>，构造 <span class="math-inline">\(x_t=\alpha_tx_0+\sigma_t\epsilon\)</span>。再独立抛一枚概率为 <span class="math-inline">\(p_{\mathrm{drop}}\)</span> 的硬币，将部分条件替换成空条件 <span class="math-inline">\(\varnothing\)</span>。网络学习</p>
+<p>maps to the corresponding score combination. The negative sign does not change the guidance coefficient because it applies to both branches.</p>
+<p>For another prediction parameterization, the two branches must share the same affine conversion to the desired score or velocity. Mixing one branch's noise prediction with another branch's clean-sample prediction does not preserve this identity. The sampler must also interpret the output in the correct parameterization.</p>
+<h2 id="why-training-randomly-drops-the-condition">Why training randomly drops the condition</h2>
+<p><code>[SYNTHESIS]</code> Starting with a training pair <span class="math-inline">\((x_0,c)\)</span>, sample <span class="math-inline">\(t,\epsilon\)</span> and form <span class="math-inline">\(x_t=\alpha_tx_0+\sigma_t\epsilon\)</span>. Independently replace the condition with <span class="math-inline">\(\varnothing\)</span> with probability <span class="math-inline">\(p_{\mathrm{drop}}\)</span>. The denoising objective is</p>
 <div class="math-display">\[\mathbb E\|\epsilon_\theta(x_t,t,\widetilde c)-\epsilon\|^2.\]</div>
-<p>同一网络因而见过有条件和空条件两类输入。采样时，在同一个 <span class="math-inline">\(x_t,t\)</span> 上调用两次或合并成一个批次，然后组合输出。“classifier-free”省掉的是额外的分类器，不代表省掉条件，也不代表每一步一定只做一次样本量意义上的网络计算。</p>
-<p>空条件是模型训练时规定的表示，不能随意假设全零向量就等价。负面提示词也不严格等同于无条件分布；把一个指定负面条件放进基线分支，会改变这套解释的对象。</p>
-<h2 id="_5">引导对应什么分布：一个容易过度推论的地方</h2>
-<p><code>[DERIVATION]</code> 若两个 score 都精确，固定一个时间 <span class="math-inline">\(t\)</span>，且归一化常数有限，则</p>
+<p>The same network then receives both conditioned and empty-condition inputs. At sampling time, the two predictions use the same <span class="math-inline">\(x_t,t\)</span>. They can be evaluated separately or in a combined batch. Classifier-free guidance removes the extra classifier; it still uses a condition and generally requires evaluating both branches.</p>
+<p>The empty condition has the representation used during training. An arbitrary all-zero vector need not be equivalent. A negative prompt is also a specific condition, rather than a truly unconditional distribution. Replacing the baseline branch with a negative prompt changes the objects in this interpretation.</p>
+<h2 id="what-distribution-does-guidance-imply">What distribution does guidance imply?</h2>
+<p><code>[DERIVATION]</code> If both scores are exact, then at a fixed time <span class="math-inline">\(t\)</span>, assuming a finite normalization constant,</p>
 <div class="math-display">\[s_\gamma=\nabla_x\log\left[p_t(x\mid c)^\gamma p_t(x)^{1-\gamma}\right].\]</div>
-<p>这说明瞬时向量场偏向什么区域。但逐时定义这些密度，不保证它们共同构成原加噪过程的有效边缘分布族。因此，仅靠这个等式，不能断言整个反向采样器的终点密度就严格等于 <span class="math-inline">\(p_0(x\mid c)^\gamma p_0(x)^{1-\gamma}\)</span>。这里还涉及时间一致性和采样动力学。</p>
-<p>一个可计算的诊断例子：只考虑某一固定时刻的两个高斯密度，<span class="math-inline">\(p_u=\mathcal N(0,4)\)</span>、<span class="math-inline">\(p_c=\mathcal N(1,1)\)</span>。它们的 score 分别是 <span class="math-inline">\(-x/4\)</span> 与 <span class="math-inline">\(1-x\)</span>。于是</p>
+<p>This identifies a density associated with the instantaneous field. However, these separately defined densities need not form the marginals of the original forward noising process. The identity alone does not prove that the complete reverse sampler ends at exactly <span class="math-inline">\(p_0(x\mid c)^\gamma p_0(x)^{1-\gamma}\)</span>. Temporal consistency and sampling dynamics also matter.</p>
+<p>A solvable diagnostic example considers two densities at one fixed time: <span class="math-inline">\(p_u=\mathcal N(0,4)\)</span> and <span class="math-inline">\(p_c=\mathcal N(1,1)\)</span>. Their scores are <span class="math-inline">\(-x/4\)</span> and <span class="math-inline">\(1-x\)</span>. Combining them gives</p>
 <div class="math-display">\[s_\gamma(x)=\gamma-\frac{1+3\gamma}{4}x.\]</div>
-<p>当 <span class="math-inline">\(\gamma\ge0\)</span> 时，这个瞬时场对应均值 <span class="math-inline">\(4\gamma/(1+3\gamma)\)</span>、方差 <span class="math-inline">\(4/(1+3\gamma)\)</span> 的高斯。<span class="math-inline">\(\gamma=1\)</span> 时均值1、方差1；<span class="math-inline">\(\gamma=3\)</span> 时均值1.2、方差0.4。这个例子只演示组合的数学作用，不是某数据集实验，也不是对完整生成过程的精确预测。</p>
-<h2 id="_6">为什么越强不一定越好</h2>
-<p><code>[DERIVATION]</code> 记条件、无条件估计误差为 <span class="math-inline">\(e_c,e_u\)</span>。引导后的误差为</p>
+<p>For <span class="math-inline">\(\gamma\ge0\)</span>, this is the score of a Gaussian with mean <span class="math-inline">\(4\gamma/(1+3\gamma)\)</span> and variance <span class="math-inline">\(4/(1+3\gamma)\)</span>. At <span class="math-inline">\(\gamma=1\)</span>, the mean and variance are both 1. At <span class="math-inline">\(\gamma=3\)</span>, the mean is 1.2 and the variance is 0.4. This example illustrates the algebra of an instantaneous combination. It is not a dataset result or an exact prediction of a full generation process.</p>
+<h2 id="stronger-guidance-can-amplify-errors">Stronger guidance can amplify errors</h2>
+<p><code>[DERIVATION]</code> Let <span class="math-inline">\(e_c\)</span> and <span class="math-inline">\(e_u\)</span> be the conditional and unconditional estimation errors. The combined error is</p>
 <div class="math-display">\[e_\gamma=\gamma e_c+(1-\gamma)e_u.\]</div>
-<p>所以 <span class="math-inline">\(\gamma\ge1\)</span> 时，<span class="math-inline">\(\|e_\gamma\|\le\gamma\|e_c\|+(\gamma-1)\|e_u\|\)</span>。这只是上界，不说明每个样本误差必然单调增大，但说明大引导会放大两个分支的不一致。</p>
-<p><code>[SYNTHESIS]</code> 评价时应同时看条件符合度、样本多样性、明显伪影和计算预算。仅展示最符合提示词的一张图，不能说明整体分布变得更好。固定种子与求解器可以帮助比较引导参数，但仍需多个种子估计稳定性。</p>
-<h2 id="_7">自测与词义</h2>
+<p>For <span class="math-inline">\(\gamma\ge1\)</span>, the triangle inequality gives <span class="math-inline">\(\|e_\gamma\|\le\gamma\|e_c\|+(\gamma-1)\|e_u\|\)</span>. This upper bound does not prove monotonic error growth for every sample. It shows how large coefficients can amplify disagreement between the branches.</p>
+<p><code>[SYNTHESIS]</code> Evaluation should consider condition adherence, diversity, visible artifacts, and computational cost together. A single selected image that closely matches a prompt cannot establish better distributional quality. Fixed seeds and solvers help isolate the guidance parameter, while multiple seeds reveal stability.</p>
+<h2 id="checks-and-terminology">Checks and terminology</h2>
 <ul>
-<li>如果条件分支和无条件分支完全相同，引导强度再大也不改变结果。</li>
-<li>如果代码采用 <span class="math-inline">\((1+w)\epsilon_c-w\epsilon_u\)</span>，普通条件采样对应 <span class="math-inline">\(w=0\)</span>。</li>
-<li>概率密度可以随 <span class="math-inline">\(t\)</span> 变化，条件 <span class="math-inline">\(c\)</span> 本身并不因此成为被加噪的随机状态。</li>
+<li>Identical conditional and unconditional predictions make the output independent of guidance strength.</li>
+<li>Under <span class="math-inline">\((1+w)\epsilon_c-w\epsilon_u\)</span>, ordinary conditional sampling corresponds to <span class="math-inline">\(w=0\)</span>.</li>
+<li>A time-dependent density does not imply that the condition itself is being noised as part of the state.</li>
 </ul>
-<p><strong>conditioning</strong>：将指定信息作为生成条件。<strong>unconditional</strong>：未附加该条件。<strong>guidance</strong>：在采样时改变预测方向的引导。<strong>extrapolation</strong>：超出两点之间范围的外推。<strong>fidelity</strong>：样本与目标特征的符合程度。<strong>mode coverage</strong>：覆盖不同数据模式的程度。</p>
-<p>下一篇 <a href="lecture-20.html">Rectified Flows</a> 继续讨论速度场，但问题转向路径、耦合和数值步数。CFG 与路径设计是不同维度的选择，可以同时存在。</p>
+<p><strong>Conditioning</strong> supplies information that changes the target distribution. <strong>Unconditional</strong> means without that specified condition. <strong>Guidance</strong> changes a sampling prediction. <strong>Extrapolation</strong> extends beyond the interval between predictions. <strong>Fidelity</strong> describes conformity to target characteristics. <strong>Mode coverage</strong> describes how many distinct data patterns are represented.</p>
+<p>The <a href="lecture-20.html">Rectified Flows note</a> turns to paths, couplings, and integration steps. Guidance and path design address different choices and can be used together.</p>
       </article>
     </div>
   </main>

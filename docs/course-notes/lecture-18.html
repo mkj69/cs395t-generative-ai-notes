@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="用条件期望证明 FM 与 CFM 的关系，推导高斯路径速度，并区分局部速度、生成轨迹和 consistency 的终点映射。">
+  <meta name="description" content="Conditional expectations connect flow matching to tractable regression. Gaussian path examples distinguish a velocity field, its trajectories, and a consistency model that predicts endpoints.">
   <title>Lecture 18: Diffusion II: Flow Matching and Consistency Models — CS 395T</title>
   <link rel="stylesheet" href="../assets/styles.css">
   <script>
@@ -38,7 +38,7 @@
       </div>
       <p class="eyebrow">26 OCT 2026 · CHECKED</p>
       <h1>Lecture 18: Diffusion II: Flow Matching and Consistency Models</h1>
-      <p class="note-abstract">用条件期望证明 FM 与 CFM 的关系，推导高斯路径速度，并区分局部速度、生成轨迹和 consistency 的终点映射。</p>
+      <p class="note-abstract">Conditional expectations connect flow matching to tractable regression. Gaussian path examples distinguish a velocity field, its trajectories, and a consistency model that predicts endpoints.</p>
       <ul class="tag-list" aria-label="Topics"><li>Diffusion</li><li>Flow matching</li><li>Conditional expectation</li><li>Consistency models</li></ul>
     </header>
 
@@ -47,72 +47,72 @@
         <p class="aside-label">ON THIS PAGE</p>
         <div class="toc">
 <ul>
-<li><a href="#_1">阅读问题：学习局部速度，还是直接学习终点</a></li>
-<li><a href="#_2">一个连续生成器的两个视角</a></li>
-<li><a href="#_3">为何不能直接平均所有条件速度</a></li>
-<li><a href="#_4">平方误差为什么解决难算的后验平均</a></li>
-<li><a href="#_5">高斯路径速度的三步推导</a></li>
-<li><a href="#_6">直线标签与一维高斯反例</a></li>
-<li><a href="#consistency">Consistency：同一轨迹上的点共享终点</a></li>
-<li><a href="#_7">实践检查与连接</a></li>
+<li><a href="#the-question-local-velocity-or-final-destination">The question: local velocity or final destination?</a></li>
+<li><a href="#two-descriptions-of-a-continuous-generator">Two descriptions of a continuous generator</a></li>
+<li><a href="#conditional-velocities-require-posterior-weighting">Conditional velocities require posterior weighting</a></li>
+<li><a href="#squared-error-avoids-computing-the-posterior-average">Squared error avoids computing the posterior average</a></li>
+<li><a href="#deriving-the-velocity-of-a-gaussian-path">Deriving the velocity of a Gaussian path</a></li>
+<li><a href="#straight-training-paths-and-a-gaussian-counterexample">Straight training paths and a Gaussian counterexample</a></li>
+<li><a href="#consistency-states-on-one-trajectory-share-an-endpoint">Consistency: states on one trajectory share an endpoint</a></li>
+<li><a href="#practical-checks-and-connections">Practical checks and connections</a></li>
 </ul>
 </div>
 
       </aside>
       <article class="prose note-prose markdown-body">
         <blockquote>
-<p><strong>AI 辅助学习笔记。</strong> 本文是独立讲解与推导，不是讲义全文译文，也不代表作者已经完成个人复习。讲义来源：<a href="https://noahgol.github.io/teaching/cs395t-f26/lecture18-v2.pdf">课程原始 PDF</a>。第 16、17 课共用一份讲义。公式已与相应来源核对，未做人工终审。</p>
+<p><strong>AI-assisted study note.</strong> This note develops independent explanations, derivations, and worked examples. It does not record a completed personal reading pass. Definitions and formulas were checked against the relevant <a href="https://noahgol.github.io/teaching/cs395t-f26/lecture18-v2.pdf">course handout</a>; human review remains open.</p>
 </blockquote>
-<p><code>[DIRECT]</code> 标明来源直接支持的简述；<code>[DERIVATION]</code> 标明数学推导；<code>[SYNTHESIS]</code> 标明概念连接与解释。自行构造的数值例子不代表论文实验。</p>
-<p><a href="diffusion-unit.html">返回 Diffusion 单元导读</a></p>
-<h2 id="_1">阅读问题：学习局部速度，还是直接学习终点</h2>
-<p><code>[SYNTHESIS]</code> 本篇把两个学习任务放在同一张逻辑图中：Flow Matching 学“当前位置下一刻如何移动”；Consistency Model 学“沿这条轨迹最终到哪里”。二者都涉及 ODE，却预测不同对象。这里的讲解使用独立算例和推导，不是课程讲义逐句翻译。</p>
-<p>本篇流匹配部分使用课程方向：<span class="math-inline">\(t=0\)</span> 是噪声，<span class="math-inline">\(t=1\)</span> 是数据。记 <span class="math-inline">\(Z\sim\mathcal N(0,I)\)</span>，<span class="math-inline">\(X_1\sim P_{data}\)</span>。SD3 论文的主要记号恰好相反，做比较时先转换时间。</p>
-<h2 id="_2">一个连续生成器的两个视角</h2>
-<p><code>[DERIVATION]</code> 定义 <span class="math-inline">\(\dot Y_t=v_\theta(t,Y_t)\)</span>。给定初始噪声，ODE 轨迹确定；在连续、空间 Lipschitz 等适当条件下，解唯一。流映射把初始分布推送成 <span class="math-inline">\(p_t\)</span>。</p>
-<p>若密度随速度 <span class="math-inline">\(u\)</span> 运输，则 <span class="math-inline">\(\partial_tp_t=-\nabla\cdot(p_tu_t)\)</span>。沿轨迹用链式法则：</p>
+<p><code>[DIRECT]</code> identifies a source-supported statement. <code>[DERIVATION]</code> identifies mathematical reasoning. <code>[SYNTHESIS]</code> identifies an explanatory connection. Constructed numerical examples are not reported experiments.</p>
+<p><a href="diffusion-unit.html">Diffusion reading guide</a> · <a href="diffusion-unit.html#bilingual-source-readings">Separate bilingual source readings</a></p>
+<h2 id="the-question-local-velocity-or-final-destination">The question: local velocity or final destination?</h2>
+<p><code>[SYNTHESIS]</code> Flow matching learns how the current state moves at the next instant. A consistency model learns where a state on a trajectory ultimately arrives. Both involve ODEs, but the prediction targets differ.</p>
+<p>The flow-matching sections use the course convention: <span class="math-inline">\(t=0\)</span> is noise and <span class="math-inline">\(t=1\)</span> is data. Let <span class="math-inline">\(Z\sim\mathcal N(0,I)\)</span> and <span class="math-inline">\(X_1\sim P_{data}\)</span>. The main SD3 notation uses the opposite direction, so comparisons require a time-coordinate change.</p>
+<h2 id="two-descriptions-of-a-continuous-generator">Two descriptions of a continuous generator</h2>
+<p><code>[DERIVATION]</code> Define <span class="math-inline">\(\dot Y_t=v_\theta(t,Y_t)\)</span>. Given the initial noise, an ODE trajectory is deterministic. Continuity and suitable spatial Lipschitz conditions guarantee uniqueness. The flow map transports the initial distribution to <span class="math-inline">\(p_t\)</span>.</p>
+<p>If a velocity <span class="math-inline">\(u\)</span> transports the density, then <span class="math-inline">\(\partial_tp_t=-\nabla\cdot(p_tu_t)\)</span>. Applying the chain rule along a trajectory gives</p>
 <div class="math-display">\[\frac d{dt}\log p_t(Y_t)=\partial_t\log p_t(Y_t)+\nabla\log p_t(Y_t)\cdot u_t(Y_t)=-\nabla\cdot u_t(Y_t).\]</div>
-<p>最大似然路线需要积分轨迹和散度。流匹配选择另一种监督：直接回归能实现目标密度演化的速度。这里“无需模拟”专指构造训练对，不表示采样不用 ODE，也不表示没有梯度计算。</p>
-<h2 id="_3">为何不能直接平均所有条件速度</h2>
-<p>选定条件密度 <span class="math-inline">\(r_t(x\mid x_1)\)</span>，边缘密度是 <span class="math-inline">\(p_t(x)=\int r_t(x\mid x_1)P_{data}(dx_1)\)</span>。每个条件路径有自己的速度 <span class="math-inline">\(u_t(x\mid x_1)\)</span>。以下的 <span class="math-inline">\(W_t\)</span> 表示先抽取 <span class="math-inline">\(X_1\)</span>、再按 <span class="math-inline">\(r_t(\cdot\mid X_1)\)</span> 抽取的状态。</p>
-<p><code>[DERIVATION]</code> 对条件连续性方程积分：</p>
+<p>Maximum-likelihood training through a continuous normalizing flow requires integrating the trajectory and its divergence. Flow matching instead regresses a velocity that realizes a chosen density evolution. The term “simulation-free” describes the construction of training pairs. Sampling still involves an ODE, and training still involves gradients.</p>
+<h2 id="conditional-velocities-require-posterior-weighting">Conditional velocities require posterior weighting</h2>
+<p>Choose a conditional density <span class="math-inline">\(r_t(x\mid x_1)\)</span>. Its marginal is <span class="math-inline">\(p_t(x)=\int r_t(x\mid x_1)P_{data}(dx_1)\)</span>. Each conditional path has velocity <span class="math-inline">\(u_t(x\mid x_1)\)</span>. Below, <span class="math-inline">\(W_t\)</span> denotes a state obtained by first sampling <span class="math-inline">\(X_1\)</span>, then sampling from <span class="math-inline">\(r_t(\cdot\mid X_1)\)</span>.</p>
+<p><code>[DERIVATION]</code> Integrating the conditional continuity equation gives</p>
 <div class="math-display">\[\partial_tp_t=-\nabla\cdot\int r_t(x\mid x_1)u_t(x\mid x_1)P_{data}(dx_1).\]</div>
-<p>因此可以选</p>
+<p>A corresponding marginal velocity is</p>
 <div class="math-display">\[u_t(x)=\frac{\int r_t(x\mid x_1)u_t(x\mid x_1)P_{data}(dx_1)}{p_t(x)}=\mathbb E[u_t(W_t\mid X_1)\mid W_t=x,t].\]</div>
-<p>这是后验平均。只有条件路径在当前位置有概率质量，它的速度才应该参与这里的运输。简单写成 <span class="math-inline">\(\mathbb E_{X_1}u_t(x\mid X_1)\)</span> 通常错误。</p>
-<p><code>[DERIVATION · 算例]</code> 假设当前位置来自两个条件分支的后验概率为0.8和0.2，对应速度为2和−3，则整体速度是 <span class="math-inline">\(0.8(2)+0.2(-3)=1\)</span>。等权平均得到−0.5，连方向都不同。这个离散分支例子只解释加权逻辑，不是课程实验。</p>
-<h2 id="_4">平方误差为什么解决难算的后验平均</h2>
-<p>记随机标签为 <span class="math-inline">\(U\)</span>，<span class="math-inline">\(m=\mathbb E[U\mid t,W_t]\)</span>。对任何只看到 <span class="math-inline">\(t,W_t\)</span> 的网络，</p>
+<p>This is a posterior average. A conditional path contributes according to its probability mass at the current location. The unweighted expression <span class="math-inline">\(\mathbb E_{X_1}u_t(x\mid X_1)\)</span> is generally incorrect.</p>
+<p><code>[DERIVATION · EXAMPLE]</code> Suppose two conditional branches have posterior probabilities 0.8 and 0.2 at the current location, with velocities 2 and <span class="math-inline">\(-3\)</span>. The marginal velocity is <span class="math-inline">\(0.8(2)+0.2(-3)=1\)</span>. Equal weighting gives <span class="math-inline">\(-0.5\)</span>, reversing even the direction. This constructed example illustrates weighting, not a course experiment.</p>
+<h2 id="squared-error-avoids-computing-the-posterior-average">Squared error avoids computing the posterior average</h2>
+<p>Let the random target be <span class="math-inline">\(U\)</span> and let <span class="math-inline">\(m=\mathbb E[U\mid t,W_t]\)</span>. For a network that observes only <span class="math-inline">\(t,W_t\)</span>,</p>
 <div class="math-display">\[\mathbb E\|v_\theta-U\|^2=\mathbb E\|v_\theta-m\|^2+\mathbb E\|U-m\|^2.\]</div>
-<p><code>[DERIVATION]</code> 展开平方后交叉项是 <span class="math-inline">\(\mathbb E[(v_\theta-m)\cdot\mathbb E[U-m\mid t,W_t]]=0\)</span>。所以训练条件标签的 CFM 与训练边缘速度的 FM 相差一个与参数无关的常数。</p>
-<p>这个等价性在使用相同时间采样分布时适用于同一网络函数类。它不等于每个小批量梯度完全一样。额外改变时间权重，则可能改变有限容量共享模型的折中。</p>
-<h2 id="_5">高斯路径速度的三步推导</h2>
-<p>给定数据点 <span class="math-inline">\(x_1\)</span>，设 <span class="math-inline">\(\phi_t(z\mid x_1)=\mu_t(x_1)+\sigma_t(x_1)z\)</span>，<span class="math-inline">\(z\)</span> 为起点噪声。</p>
-<p><code>[DERIVATION]</code> 先固定 <span class="math-inline">\(z\)</span> 求时间导数，再反解当前状态，最后代回：</p>
+<p><code>[DERIVATION]</code> Expanding the square produces a cross term proportional to <span class="math-inline">\(\mathbb E[(v_\theta-m)\cdot\mathbb E[U-m\mid t,W_t]]=0\)</span>. Conditional flow matching and marginal flow matching therefore differ by a parameter-independent constant.</p>
+<p>The equivalence applies within the same network function class and under the same time-sampling distribution. It does not make every minibatch gradient identical. Changing the time weighting can alter the compromise made by a shared model of finite capacity.</p>
+<h2 id="deriving-the-velocity-of-a-gaussian-path">Deriving the velocity of a Gaussian path</h2>
+<p>Given a data point <span class="math-inline">\(x_1\)</span>, define <span class="math-inline">\(\phi_t(z\mid x_1)=\mu_t(x_1)+\sigma_t(x_1)z\)</span>, where <span class="math-inline">\(z\)</span> is the initial noise.</p>
+<p><code>[DERIVATION]</code> Differentiate while holding <span class="math-inline">\(z\)</span> fixed, recover <span class="math-inline">\(z\)</span> from the current position, and substitute:</p>
 <div class="math-display">\[\dot\phi_t=\dot\mu_t+\dot\sigma_tz,\qquad z=\frac{x-\mu_t}{\sigma_t},\qquad u_t(x\mid x_1)=\dot\mu_t+\frac{\dot\sigma_t}{\sigma_t}(x-\mu_t).\]</div>
-<p>需要 <span class="math-inline">\(\sigma_t&gt;0\)</span> 才能这样求逆。若 <span class="math-inline">\(\sigma_1=0\)</span>，端点可奇异，但使用已采样的 <span class="math-inline">\(Z\)</span> 构造标签 <span class="math-inline">\(\dot\mu_t+\dot\sigma_tZ\)</span> 不必除以零。数值采样和端点理论仍需分别处理。</p>
-<p>密度路径通常不唯一决定速度；若 <span class="math-inline">\(\nabla\cdot(p_tw_t)=0\)</span>，则 <span class="math-inline">\(u_t+w_t\)</span> 有相同密度演化。固定完整流映射后，才有更强的速度确定性。</p>
-<h2 id="_6">直线标签与一维高斯反例</h2>
-<p>线性选择 <span class="math-inline">\(\mu_t=tX_1,\sigma_t=1-t\)</span> 给出</p>
+<p>The inverse requires <span class="math-inline">\(\sigma_t&gt;0\)</span>. If <span class="math-inline">\(\sigma_1=0\)</span>, the endpoint may be singular. Constructing the label <span class="math-inline">\(\dot\mu_t+\dot\sigma_tZ\)</span> from already sampled noise avoids division by zero, but endpoint theory and numerical sampling still need separate treatment.</p>
+<p>A density path generally does not uniquely determine its velocity. If <span class="math-inline">\(\nabla\cdot(p_tw_t)=0\)</span>, then <span class="math-inline">\(u_t+w_t\)</span> induces the same density evolution. Specifying the entire flow map imposes a stronger constraint than specifying only its marginals.</p>
+<h2 id="straight-training-paths-and-a-gaussian-counterexample">Straight training paths and a Gaussian counterexample</h2>
+<p>The linear choice <span class="math-inline">\(\mu_t=tX_1\)</span> and <span class="math-inline">\(\sigma_t=1-t\)</span> gives</p>
 <div class="math-display">\[W_t=(1-t)Z+tX_1,\qquad U=X_1-Z.\]</div>
-<p>训练一次只需抽三个独立变量 <span class="math-inline">\(t,Z,X_1\)</span>，计算 <span class="math-inline">\(\|v_\theta(t,W_t)-(X_1-Z)\|^2\)</span>。它不能保证学到的每条 ODE 轨迹严格为直线。</p>
-<p><code>[DERIVATION · 反例]</code> 取独立 <span class="math-inline">\(Z,X_1\sim\mathcal N(0,1)\)</span>。中间方差 <span class="math-inline">\(D(t)=(1-t)^2+t^2\)</span>，由联合高斯条件均值得到</p>
+<p>A training example samples independent <span class="math-inline">\(t,Z,X_1\)</span> and evaluates <span class="math-inline">\(\|v_\theta(t,W_t)-(X_1-Z)\|^2\)</span>. Straight interpolation does not guarantee that every learned ODE trajectory is straight.</p>
+<p><code>[DERIVATION · COUNTEREXAMPLE]</code> Take independent <span class="math-inline">\(Z,X_1\sim\mathcal N(0,1)\)</span>. The intermediate variance is <span class="math-inline">\(D(t)=(1-t)^2+t^2\)</span>. Gaussian conditioning yields</p>
 <div class="math-display">\[u_t(x)=\frac{2t-1}{D(t)}x.\]</div>
-<p>解为 <span class="math-inline">\(Y_t=\sqrt{D(t)}Y_0\)</span>。轨迹先向中心收缩再展开，虽然两端分布相同而训练插值是直线。取 <span class="math-inline">\(Y_0=2\)</span>，中点为 <span class="math-inline">\(\sqrt2\)</span>，终点又回到2。路径选择和耦合决定了中间过程，端点相同不代表路径无意义。</p>
-<h2 id="consistency">Consistency：同一轨迹上的点共享终点</h2>
-<p><code>[DERIVATION]</code> 若 <span class="math-inline">\(F(t,s,x)\)</span> 表示从时间 <span class="math-inline">\(s\)</span> 的位置 <span class="math-inline">\(x\)</span> 出发，走到时间 <span class="math-inline">\(t\)</span>，则以终点1为例，<span class="math-inline">\(C(s,x)=F(1,s,x)\)</span>。对同一条轨迹，<span class="math-inline">\(C(t,Y_t)=Y_1\)</span>。边界条件是 <span class="math-inline">\(C(1,x)=x\)</span>。当文献改用前向加噪时间时，边界通常写在0或一个小正数，不能直接混用。</p>
-<p>训练可以让同一轨迹上相邻点的终点预测一致。蒸馏时，教师提供一个小步近似；常见实现还使用停止梯度和目标网络。课程讲义给出的是简化一致性目标，不能把所有工程细节都归为讲义公式本身。</p>
-<p>只有一致性而没有边界或其他约束时，常数函数也能使两边相同。边界条件不是可有可无的装饰。一步生成的质量还取决于教师误差、蒸馏误差和训练覆盖，不能由名称推出完美结果。</p>
-<h2 id="_7">实践检查与连接</h2>
+<p>The ODE solution is <span class="math-inline">\(Y_t=\sqrt{D(t)}Y_0\)</span>. Trajectories contract toward the center and then expand, although the endpoint distributions coincide and each training interpolation is linear. For <span class="math-inline">\(Y_0=2\)</span>, the midpoint is <span class="math-inline">\(\sqrt2\)</span> and the endpoint is 2 again. The coupling and path determine the intermediate process even when the endpoint distributions agree.</p>
+<h2 id="consistency-states-on-one-trajectory-share-an-endpoint">Consistency: states on one trajectory share an endpoint</h2>
+<p><code>[DERIVATION]</code> Let <span class="math-inline">\(F(t,s,x)\)</span> map position <span class="math-inline">\(x\)</span> at time <span class="math-inline">\(s\)</span> to its position at time <span class="math-inline">\(t\)</span>. For endpoint time 1, define <span class="math-inline">\(C(s,x)=F(1,s,x)\)</span>. Along one trajectory, <span class="math-inline">\(C(t,Y_t)=Y_1\)</span>, with boundary condition <span class="math-inline">\(C(1,x)=x\)</span>. Papers using forward noising time often place this boundary at zero or a small positive time instead.</p>
+<p>Training can make endpoint predictions agree at neighboring states on the same trajectory. In distillation, a teacher provides an approximate short step. Common implementations also use stopped gradients and target networks. The course handout presents a simplified consistency objective, so those engineering details should not all be attributed to its formula.</p>
+<p>Without a boundary condition or other constraints, a constant function can also satisfy agreement. The boundary condition rules out that trivial solution. One-step quality still depends on teacher error, distillation error, and training coverage.</p>
+<h2 id="practical-checks-and-connections">Practical checks and connections</h2>
 <ol>
-<li>明确时间从噪声到数据，还是从数据到噪声。</li>
-<li>每次训练固定抽到的两个端点，对时间求导时不重新抽样。</li>
-<li>分清条件速度、边缘速度与网络估计。</li>
-<li>比较计算成本时记录网络调用次数，不能只记录求解器步数。</li>
-<li>把当前时刻预测误差与最终生成误差分开评价。</li>
+<li>The direction of time determines the sign of the velocity target.</li>
+<li>The sampled endpoints remain fixed when the interpolation is differentiated with respect to time.</li>
+<li>Conditional velocity, marginal velocity, and network prediction are distinct objects.</li>
+<li>Network function evaluations measure sampling work more directly than solver steps alone.</li>
+<li>Instantaneous prediction error and final generation error require separate evaluation.</li>
 </ol>
-<p><strong>flow map</strong>：将起点映到当前时刻的变换。<strong>marginalization</strong>：对未观测变量积分。<strong>tractable</strong>：实际可计算。<strong>endpoint map</strong>：把当前状态映到轨迹终点。</p>
-<p><code>[DIRECT · 来源范围]</code> 课程18讲义用于核对流匹配的时间约定与定义；相关原始论文是 <a href="https://arxiv.org/abs/2210.02747">Flow Matching for Generative Modeling</a> 与 <a href="https://arxiv.org/abs/2303.01469">Consistency Models</a>。与 <a href="https://mkj69.github.io/writing/papers/sd3/annotated/">SD3 全文中英对照阅读页</a> 对照时，令其时间为 <span class="math-inline">\(1-t\)</span>，速度符号随之反转。</p>
+<p>A <strong>flow map</strong> transports an initial state to another time. <strong>Marginalization</strong> integrates out an unobserved variable. <strong>Tractable</strong> means practically computable in the intended setting. An <strong>endpoint map</strong> predicts the final state from a state along a trajectory.</p>
+<p><code>[DIRECT · SOURCE SCOPE]</code> Lecture 18 supports the definitions and time convention. Related primary papers are <a href="https://arxiv.org/abs/2210.02747">Flow Matching for Generative Modeling</a> and <a href="https://arxiv.org/abs/2303.01469">Consistency Models</a>. Comparison with the separate <a href="https://mkj69.github.io/writing/papers/sd3/annotated/">SD3 bilingual source edition</a> uses its time coordinate <span class="math-inline">\(1-t\)</span>, with the corresponding velocity sign change.</p>
       </article>
     </div>
   </main>

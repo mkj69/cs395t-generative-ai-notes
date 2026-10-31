@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="从高斯去噪例子理解 score、逆时间 SDE、去噪 score matching 和 probability flow ODE，逐步核对符号与二分之一系数。">
+  <meta name="description" content="How Gaussian denoising gives a trainable score objective, why reverse dynamics need a density correction, and why the probability flow ODE contains a factor of one half.">
   <title>Lecture 17: Diffusion I: Score Matching and Diffusion Models — CS 395T</title>
   <link rel="stylesheet" href="../assets/styles.css">
   <script>
@@ -38,7 +38,7 @@
       </div>
       <p class="eyebrow">21 OCT 2026 · CHECKED</p>
       <h1>Lecture 17: Diffusion I: Score Matching and Diffusion Models</h1>
-      <p class="note-abstract">从高斯去噪例子理解 score、逆时间 SDE、去噪 score matching 和 probability flow ODE，逐步核对符号与二分之一系数。</p>
+      <p class="note-abstract">How Gaussian denoising gives a trainable score objective, why reverse dynamics need a density correction, and why the probability flow ODE contains a factor of one half.</p>
       <ul class="tag-list" aria-label="Topics"><li>Diffusion</li><li>Score matching</li><li>Reverse SDE</li><li>Probability flow ODE</li></ul>
     </header>
 
@@ -47,91 +47,93 @@
         <p class="aside-label">ON THIS PAGE</p>
         <div class="toc">
 <ul>
-<li><a href="#_1">阅读问题：不知道数据密度，如何学习回到数据的方向</a></li>
-<li><a href="#score">Score 是空间导数，不是概率分数</a></li>
-<li><a href="#_2">逆向运动为什么不只是把漂移变号</a></li>
-<li><a href="#marginal-score">从未知的 marginal score 到可计算的标签</a></li>
-<li><a href="#_3">噪声预测与去噪均值</a></li>
-<li><a href="#ouve-vp">OU、VE 和 VP：比较时看系数，不只看名称</a></li>
-<li><a href="#ode">确定性 ODE 为什么出现二分之一</a></li>
-<li><a href="#_4">自检与阅读连接</a></li>
+<li><a href="#the-problem-learning-a-direction-without-knowing-the-density">The problem: learning a direction without knowing the density</a></li>
+<li><a href="#a-score-is-a-spatial-derivative">A score is a spatial derivative</a></li>
+<li><a href="#reversing-the-drift-alone-is-insufficient">Reversing the drift alone is insufficient</a></li>
+<li><a href="#a-computable-target-for-an-unknown-marginal-score">A computable target for an unknown marginal score</a></li>
+<li><a href="#noise-prediction-and-the-denoising-mean">Noise prediction and the denoising mean</a></li>
+<li><a href="#ou-ve-and-vp-processes">OU, VE, and VP processes</a></li>
+<li><a href="#why-the-probability-flow-ode-has-a-factor-of-one-half">Why the probability flow ODE has a factor of one half</a></li>
+<li><a href="#a-consistency-check-and-reading-connections">A consistency check and reading connections</a></li>
 </ul>
 </div>
 
       </aside>
       <article class="prose note-prose markdown-body">
         <blockquote>
-<p><strong>AI 辅助学习笔记。</strong> 本文是独立讲解与推导，不是讲义全文译文，也不代表作者已经完成个人复习。讲义来源：<a href="https://noahgol.github.io/teaching/cs395t-f26/lecture16-17-v2.pdf">课程原始 PDF</a>。第 16、17 课共用一份讲义。公式已与相应来源核对，未做人工终审。</p>
+<p><strong>AI-assisted study note.</strong> This note develops independent explanations, derivations, and worked examples. It does not record a completed personal reading pass. Definitions and formulas were checked against the relevant <a href="https://noahgol.github.io/teaching/cs395t-f26/lecture16-17-v2.pdf">course handout</a>; human review remains open.</p>
 </blockquote>
-<p><code>[DIRECT]</code> 标明来源直接支持的简述；<code>[DERIVATION]</code> 标明数学推导；<code>[SYNTHESIS]</code> 标明概念连接与解释。自行构造的数值例子不代表论文实验。</p>
-<p><a href="diffusion-unit.html">返回 Diffusion 单元导读</a></p>
-<h2 id="_1">阅读问题：不知道数据密度，如何学习回到数据的方向</h2>
-<p><code>[SYNTHESIS]</code> 训练集提供样本，却通常不提供密度函数。这节课的核心困难是：采样需要一个与未知分布有关的方向场，但训练标签必须能从样本算出来。下面通过高斯例子、条件期望与概率流重建这个联系，不按原讲义段落改写。</p>
-<p>采用数据到噪声的前向时间 <span class="math-inline">\(t\)</span>。<span class="math-inline">\(X_0\)</span> 是数据，<span class="math-inline">\(X_t\)</span> 是加噪状态，<span class="math-inline">\(s_*(t,x)=\nabla_x\log p_t(x)\)</span> 是真实 score，<span class="math-inline">\(s_\theta\)</span> 是估计值。为避免反向时间符号混乱，生成时单独使用 <span class="math-inline">\(r=T-t\)</span>。</p>
-<h2 id="score">Score 是空间导数，不是概率分数</h2>
-<p><code>[DERIVATION]</code> 对一维 <span class="math-inline">\(p(x)=\mathcal N(m,\sigma^2)\)</span>，</p>
+<p><code>[DIRECT]</code> identifies a source-supported statement. <code>[DERIVATION]</code> identifies mathematical reasoning. <code>[SYNTHESIS]</code> identifies an explanatory connection. Constructed numerical examples are not reported experiments.</p>
+<p><a href="diffusion-unit.html">Diffusion reading guide</a> · <a href="diffusion-unit.html#bilingual-source-readings">Separate bilingual source readings</a></p>
+<h2 id="the-problem-learning-a-direction-without-knowing-the-density">The problem: learning a direction without knowing the density</h2>
+<p><code>[SYNTHESIS]</code> A training set provides samples, but usually not a density function. Sampling requires a direction field related to that unknown distribution. Training therefore needs a target that can be computed from samples. Gaussian perturbations and conditional expectations connect these requirements.</p>
+<p>Forward time <span class="math-inline">\(t\)</span> runs from data toward noise. <span class="math-inline">\(X_0\)</span> denotes data, <span class="math-inline">\(X_t\)</span> its perturbed state, <span class="math-inline">\(s_*(t,x)=\nabla_x\log p_t(x)\)</span> the true score, and <span class="math-inline">\(s_\theta\)</span> an estimate. Reverse generation uses the separate time coordinate <span class="math-inline">\(r=T-t\)</span>.</p>
+<h2 id="a-score-is-a-spatial-derivative">A score is a spatial derivative</h2>
+<p><code>[DERIVATION]</code> For a one-dimensional Gaussian density <span class="math-inline">\(p(x)=\mathcal N(m,\sigma^2)\)</span>,</p>
 <div class="math-display">\[\log p(x)=C-\frac{(x-m)^2}{2\sigma^2},\qquad \partial_x\log p(x)=-\frac{x-m}{\sigma^2}.\]</div>
-<p>它在均值右边为负、左边为正，单位是位置单位的倒数。取 <span class="math-inline">\(m=2,\sigma^2=4,x=6\)</span>，score 等于 <span class="math-inline">\(-1\)</span>。这描述局部 log-density 上升方向，不表示“该样本质量得分为负”。混合分布的 score 不一定指向某个固定训练样本。</p>
-<h2 id="_2">逆向运动为什么不只是把漂移变号</h2>
-<p><code>[DERIVATION]</code> 对状态无关噪声的前向 SDE <span class="math-inline">\(dX_t=f(t,X_t)dt+g(t)dB_t\)</span>，在足够正则、密度为正并满足时间反演条件时，逆时间漂移为</p>
+<p>The score is negative to the right of the mean and positive to its left. Its units are the inverse of the units of position. For <span class="math-inline">\(m=2\)</span>, <span class="math-inline">\(\sigma^2=4\)</span>, and <span class="math-inline">\(x=6\)</span>, the score is <span class="math-inline">\(-1\)</span>. This describes the local direction of increasing log density. It is not a numerical rating of sample quality. For a mixture distribution, the score need not point toward a particular training example.</p>
+<h2 id="reversing-the-drift-alone-is-insufficient">Reversing the drift alone is insufficient</h2>
+<p><code>[DERIVATION]</code> Consider the forward SDE <span class="math-inline">\(dX_t=f(t,X_t)dt+g(t)dB_t\)</span> with state-independent noise. Under suitable regularity, positive-density, and time-reversal assumptions, the reverse process satisfies</p>
 <div class="math-display">\[dY_r=[-f(T-r,Y_r)+g(T-r)^2s_*(T-r,Y_r)]dr+g(T-r)d\bar B_r.\]</div>
-<p>反向布朗运动相对于反向滤过定义，不能简单解释成把训练时每一步噪声原样取负。score 修正的必要性可以通过 Fokker–Planck 检查：用 <span class="math-inline">\(p\nabla\log p=\nabla p\)</span>，新增漂移对密度贡献 <span class="math-inline">\(-g^2\Delta p\)</span>；再加上反向 SDE 自带的 <span class="math-inline">\(+g^2\Delta p/2\)</span>，合起来正好是逆向所需的 <span class="math-inline">\(-g^2\Delta p/2\)</span>。</p>
-<p>只核对每个时刻的密度不能单独证明整个时间反演过程相同，完整结论还需要转移概率与唯一性条件。该推导解释系数，不能替代全部定理假设。</p>
-<h2 id="marginal-score">从未知的 marginal score 到可计算的标签</h2>
-<p>令 <span class="math-inline">\(X_t=\alpha_tX_0+\sigma_t\epsilon\)</span>，<span class="math-inline">\(\epsilon\sim\mathcal N(0,I)\)</span> 与 <span class="math-inline">\(X_0\)</span> 独立。这里 <span class="math-inline">\(\alpha_t\)</span> 是信号系数，不是某些 DDPM 文献中另一个同名的单步参数。</p>
-<p><code>[DERIVATION]</code> 固定 <span class="math-inline">\(X_0\)</span> 后，条件密度是高斯，其 score 为</p>
+<p>The reverse Brownian motion is defined relative to the reverse filtration. It is not obtained by simply negating the particular noise increments used during training.</p>
+<p>The Fokker–Planck equation explains the score coefficient. Since <span class="math-inline">\(p\nabla\log p=\nabla p\)</span>, the added drift contributes <span class="math-inline">\(-g^2\Delta p\)</span> to density evolution. The stochastic term contributes <span class="math-inline">\(+g^2\Delta p/2\)</span>. Their sum is the required reverse diffusion contribution <span class="math-inline">\(-g^2\Delta p/2\)</span>.</p>
+<p>Matching marginal densities alone does not prove the full time-reversal theorem. Transition laws and uniqueness conditions also matter. This calculation checks the coefficient, rather than replacing those assumptions.</p>
+<h2 id="a-computable-target-for-an-unknown-marginal-score">A computable target for an unknown marginal score</h2>
+<p>Let <span class="math-inline">\(X_t=\alpha_tX_0+\sigma_t\epsilon\)</span>, where <span class="math-inline">\(\epsilon\sim\mathcal N(0,I)\)</span> is independent of <span class="math-inline">\(X_0\)</span>. Here <span class="math-inline">\(\alpha_t\)</span> is the signal coefficient. It should not be confused with a differently defined single-step parameter in some DDPM notation.</p>
+<p><code>[DERIVATION]</code> Conditional on <span class="math-inline">\(X_0\)</span>, the perturbed state is Gaussian, with score</p>
 <div class="math-display">\[\nabla_x\log p_t(x\mid X_0)=-\frac{x-\alpha_tX_0}{\sigma_t^2},\qquad U=-\frac\epsilon{\sigma_t}.\]</div>
-<p>对混合密度求导并用贝叶斯公式，可得</p>
+<p>Differentiating the mixture density and applying Bayes' rule gives</p>
 <div class="math-display">\[s_*(t,x)=\mathbb E[U\mid X_t=x,t].\]</div>
-<p>注意这里是给定当前噪声状态后的后验平均，不是用数据分布无条件平均所有标签。</p>
-<p>对任意预测 <span class="math-inline">\(s_\theta\)</span>，平方误差分解为</p>
+<p>This is a posterior average given the current noisy state. It is not an unconditional average of all targets in the dataset.</p>
+<p>For any prediction <span class="math-inline">\(s_\theta\)</span>, squared error decomposes as</p>
 <div class="math-display">\[\mathbb E\|s_\theta-U\|^2=\mathbb E\|s_\theta-s_*\|^2+\mathbb E\|U-s_*\|^2.\]</div>
-<p>最后一项与参数无关，所以可以直接使用 <span class="math-inline">\(U\)</span> 做监督。标签有随机性并不妨碍均方误差的最优解是条件均值。</p>
-<h2 id="_3">噪声预测与去噪均值</h2>
-<p><code>[DERIVATION]</code> 将 <span class="math-inline">\(s_\theta=-\epsilon_\theta/\sigma_t\)</span> 代入，若 score 损失乘以 <span class="math-inline">\(\sigma_t^2\)</span>，就得到</p>
+<p>The final term is independent of the parameters. Training against the computable label <span class="math-inline">\(U\)</span> therefore has the same population minimizer as training against the unknown marginal score. Random labels are compatible with a conditional-mean regression target.</p>
+<h2 id="noise-prediction-and-the-denoising-mean">Noise prediction and the denoising mean</h2>
+<p><code>[DERIVATION]</code> Substituting <span class="math-inline">\(s_\theta=-\epsilon_\theta/\sigma_t\)</span> and weighting the score loss by <span class="math-inline">\(\sigma_t^2\)</span> gives</p>
 <div class="math-display">\[\mathbb E\|\epsilon_\theta(t,\alpha_tX_0+\sigma_t\epsilon)-\epsilon\|^2.\]</div>
-<p>一次训练只需抽取数据、时间和噪声，直接构造带噪输入，不必模拟整条前向随机路径。训练仍需普通反向传播，生成仍需数值采样。</p>
-<p>由同一个条件均值恒等式还得到</p>
+<p>A training example requires a data sample, a time, and a noise sample. The noisy input can be constructed directly, without simulating the entire forward path. Ordinary backpropagation is still required, and generation still uses a numerical sampler.</p>
+<p>The same conditional-mean identity yields</p>
 <div class="math-display">\[\mathbb E[\alpha_tX_0\mid X_t=x]=x+\sigma_t^2s_*(t,x).\]</div>
-<p>若 <span class="math-inline">\(\alpha_t\ne0\)</span>，除以 <span class="math-inline">\(\alpha_t\)</span> 才是 <span class="math-inline">\(X_0\)</span> 的后验均值。不能在 VP 设置里直接把右边叫成原始干净样本。</p>
-<p><code>[DERIVATION · 算例]</code> 取 <span class="math-inline">\(X_0\sim\mathcal N(0,1)\)</span>，<span class="math-inline">\(X=X_0+\epsilon\)</span> 且噪声方差为1。于是 <span class="math-inline">\(X\sim\mathcal N(0,2)\)</span>，score 为 <span class="math-inline">\(-x/2\)</span>，去噪均值是 <span class="math-inline">\(x-x/2=x/2\)</span>。当观测为2时，最优均方预测是1，并不恢复某次抽样隐藏的确切 <span class="math-inline">\(X_0\)</span>。</p>
-<h2 id="ouve-vp">OU、VE 和 VP：比较时看系数，不只看名称</h2>
+<p>When <span class="math-inline">\(\alpha_t\ne0\)</span>, division by <span class="math-inline">\(\alpha_t\)</span> gives the posterior mean of <span class="math-inline">\(X_0\)</span>. In a VP model, the right-hand side alone is not generally the mean of the original clean sample.</p>
+<p><code>[DERIVATION · EXAMPLE]</code> Take <span class="math-inline">\(X_0\sim\mathcal N(0,1)\)</span> and <span class="math-inline">\(X=X_0+\epsilon\)</span> with independent unit-variance noise. Then <span class="math-inline">\(X\sim\mathcal N(0,2)\)</span>, the score is <span class="math-inline">\(-x/2\)</span>, and the denoising mean is <span class="math-inline">\(x-x/2=x/2\)</span>. For an observation of 2, the optimal squared-error prediction is 1. It does not recover the exact hidden value of <span class="math-inline">\(X_0\)</span> from that particular draw.</p>
+<h2 id="ou-ve-and-vp-processes">OU, VE, and VP processes</h2>
 <table>
 <thead>
 <tr>
-<th>过程</th>
-<th>漂移与噪声系数</th>
-<th>条件均值与方差</th>
+<th>Process</th>
+<th>Drift and noise coefficient</th>
+<th>Conditional mean and variance</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td>OU</td>
 <td><span class="math-inline">\(f=-\kappa x\)</span>, <span class="math-inline">\(g=\sigma\)</span></td>
-<td><span class="math-inline">\(e^{-\kappa t}x_0\)</span>；<span class="math-inline">\(\frac{\sigma^2}{2\kappa}(1-e^{-2\kappa t})\)</span></td>
+<td><span class="math-inline">\(e^{-\kappa t}x_0\)</span>; <span class="math-inline">\(\frac{\sigma^2}{2\kappa}(1-e^{-2\kappa t})\)</span></td>
 </tr>
 <tr>
 <td>VE</td>
 <td><span class="math-inline">\(f=0\)</span>, <span class="math-inline">\(g^2=(\sigma_t^2)&#x27;\)</span></td>
-<td><span class="math-inline">\(x_0\)</span>；<span class="math-inline">\(\sigma_t^2\)</span>，假设初始附加噪声为0</td>
+<td><span class="math-inline">\(x_0\)</span>; <span class="math-inline">\(\sigma_t^2\)</span>, assuming zero initial added noise</td>
 </tr>
 <tr>
 <td>VP</td>
 <td><span class="math-inline">\(f=-\beta(t)x/2\)</span>, <span class="math-inline">\(g=\sqrt{\beta(t)}\)</span></td>
-<td><span class="math-inline">\(\alpha_tx_0\)</span>；<span class="math-inline">\(1-\alpha_t^2\)</span></td>
+<td><span class="math-inline">\(\alpha_tx_0\)</span>; <span class="math-inline">\(1-\alpha_t^2\)</span></td>
 </tr>
 </tbody>
 </table>
-<p>VP 中 <span class="math-inline">\(\alpha_t=\exp[-\frac12\int_0^t\beta(s)ds]\)</span>。“variance preserving”并不保证任意初始分布在每个时刻都有单位方差。单位协方差的初始条件才会在这一计算中保持单位协方差。</p>
-<h2 id="ode">确定性 ODE 为什么出现二分之一</h2>
-<p><code>[DERIVATION]</code> 将前向 SDE 的概率流除以密度，得到</p>
+<p>For VP, <span class="math-inline">\(\alpha_t=\exp[-\frac12\int_0^t\beta(s)ds]\)</span>. The name “variance preserving” does not imply unit variance for every initial distribution. An initial covariance equal to the identity is preserved by this moment calculation.</p>
+<h2 id="why-the-probability-flow-ode-has-a-factor-of-one-half">Why the probability flow ODE has a factor of one half</h2>
+<p><code>[DERIVATION]</code> Dividing the forward SDE's probability current by its density gives</p>
 <div class="math-display">\[v_{\mathrm{PF}}(t,x)=f(t,x)-\frac12g(t)^2s_*(t,x).\]</div>
-<p>ODE <span class="math-inline">\(\dot X_t=v_{\mathrm{PF}}(t,X_t)\)</span> 在合适唯一性条件下复现同一族边缘密度。它与 SDE 的跨时间联合分布一般不同。反向时间下速度是 <span class="math-inline">\(-f+g^2s_*/2\)</span>，不能只从反向 SDE 删去随机项而保留完整 <span class="math-inline">\(g^2s_*\)</span>。</p>
-<p>生成误差至少包括三部分：终端噪声近似误差、score 估计误差和数值离散误差。更小步长只直接处理第三部分。</p>
-<h2 id="_4">自检与阅读连接</h2>
-<p><code>[DERIVATION]</code> 对标准高斯，score 为 <span class="math-inline">\(-x\)</span>。稳态 VP 中 <span class="math-inline">\(f=-\beta x/2\)</span>，PF 速度为 <span class="math-inline">\(-\beta x/2+\beta x/2=0\)</span>。零速度可以保持高斯密度，而对应稳态 SDE 中每个粒子仍在运动。这是“相同边缘不等于相同路径”的最短检查。</p>
-<p><strong>score</strong>：log-density 的空间梯度。<strong>denoising</strong>：从带噪观测估计干净信号。<strong>posterior mean</strong>：给定观测后的条件均值。<strong>marginal</strong>：把未观测变量积分掉。</p>
-<p><code>[DIRECT · 来源范围]</code> 定义和时间方向与课程16–17合并讲义核对；上述数值例子和组织方式为独立推导。相关原始研究为 <a href="https://arxiv.org/abs/2011.13456">Score-Based Generative Modeling through SDEs</a> 和 <a href="https://arxiv.org/abs/2006.11239">DDPM</a>。本篇不提供逐页原文或完整翻译，也不声称包含所有附录证明。</p>
+<p>Under suitable uniqueness conditions, the ODE <span class="math-inline">\(\dot X_t=v_{\mathrm{PF}}(t,X_t)\)</span> reproduces the same family of marginal densities. Its joint distribution across times generally differs from the SDE's.</p>
+<p>In reverse time, its velocity is <span class="math-inline">\(-f+g^2s_*/2\)</span>. Deleting the random term from the reverse SDE while retaining the full <span class="math-inline">\(g^2s_*\)</span> correction would give a different density evolution.</p>
+<p>Generation error includes at least terminal-noise approximation, score estimation, and numerical discretization. Reducing the integration step size directly addresses only the third component.</p>
+<h2 id="a-consistency-check-and-reading-connections">A consistency check and reading connections</h2>
+<p><code>[DERIVATION]</code> The score of a standard Gaussian is <span class="math-inline">\(-x\)</span>. For stationary VP dynamics, <span class="math-inline">\(f=-\beta x/2\)</span>, so the probability flow velocity is <span class="math-inline">\(-\beta x/2+\beta x/2=0\)</span>. A zero velocity preserves the Gaussian density even though particles in the stationary SDE keep moving. This is a compact example of equal marginals with different paths.</p>
+<p><strong>Score</strong> means the spatial gradient of log density. <strong>Denoising</strong> means estimating a clean signal from a perturbed observation. A <strong>posterior mean</strong> is an expectation conditional on the observation. A <strong>marginal</strong> integrates out other variables.</p>
+<p><code>[DIRECT · SOURCE SCOPE]</code> Definitions and time conventions were checked against the combined Lecture 16 and 17 handout. The numerical examples and explanatory organization are independent derivations. Related primary research includes <a href="https://arxiv.org/abs/2011.13456">Score-Based Generative Modeling through SDEs</a> and <a href="https://arxiv.org/abs/2006.11239">DDPM</a>. The note does not reproduce all appendix proofs.</p>
       </article>
     </div>
   </main>

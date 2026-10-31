@@ -1,7 +1,7 @@
 [
   {
     "title": "Lecture 21: Diffusion V: Discrete Diffusion Models",
-    "question": "从有限状态转移矩阵出发，手算反向后验，再连接吸收态掩码、训练损失和离散文本采样的误差来源。",
+    "question": "Transition matrices make discrete noising tractable. Small examples derive reverse posteriors, absorbing masks, training losses, and the dependence errors of parallel token generation.",
     "type": "learning",
     "typeLabel": "Learning note",
     "status": "Draft",
@@ -17,7 +17,7 @@
   },
   {
     "title": "Lecture 20: Diffusion IV: Rectified Flows",
-    "question": "用条件期望、连续性方程与凸性理解 rectified flow；区分训练直线、实际轨迹、reflow 和一步蒸馏，并连接 SD3 精读页。",
+    "question": "Conditional expectations and convexity explain rectification. Worked counterexamples separate straight interpolation, ODE trajectories, reflow, and endpoint distillation.",
     "type": "learning",
     "typeLabel": "Learning note",
     "status": "Draft",
@@ -33,7 +33,7 @@
   },
   {
     "title": "Diffusion Unit: Reading Guide and Source Map",
-    "question": "六次课的中文推导笔记、英文术语与原始资料入口，覆盖随机微积分准备至离散扩散。另列逐句译文的现有覆盖与资料缺口。",
+    "question": "Six English study notes connect stochastic calculus to discrete diffusion. A separate source-reading section tracks original PDFs and bilingual annotated editions.",
     "type": "learning",
     "typeLabel": "Learning note",
     "status": "Checked",
@@ -48,7 +48,7 @@
   },
   {
     "title": "Lecture 19: Diffusion III: Conditional Generation and Classifier-Free Guidance",
-    "question": "从贝叶斯公式推导条件 score，解释 CFG 的两种强度记法、训练中的条件丢弃，以及引导强度放大误差的原因。",
+    "question": "Bayes’ rule explains the conditional score direction. Worked examples clarify guidance conventions, condition dropout, and amplification of prediction errors.",
     "type": "learning",
     "typeLabel": "Learning note",
     "status": "Draft",
@@ -63,7 +63,7 @@
   },
   {
     "title": "Lecture 18: Diffusion II: Flow Matching and Consistency Models",
-    "question": "用条件期望证明 FM 与 CFM 的关系，推导高斯路径速度，并区分局部速度、生成轨迹和 consistency 的终点映射。",
+    "question": "Conditional expectations connect flow matching to tractable regression. Gaussian path examples distinguish a velocity field, its trajectories, and a consistency model that predicts endpoints.",
     "type": "learning",
     "typeLabel": "Learning note",
     "status": "Checked",
@@ -79,7 +79,7 @@
   },
   {
     "title": "Lecture 17: Diffusion I: Score Matching and Diffusion Models",
-    "question": "从高斯去噪例子理解 score、逆时间 SDE、去噪 score matching 和 probability flow ODE，逐步核对符号与二分之一系数。",
+    "question": "How Gaussian denoising gives a trainable score objective, why reverse dynamics need a density correction, and why the probability flow ODE contains a factor of one half.",
     "type": "learning",
     "typeLabel": "Learning note",
     "status": "Checked",
@@ -95,7 +95,7 @@
   },
   {
     "title": "Lecture 16: Diffusion Preparation: Stochastic Calculus",
-    "question": "从随机步长、Itô 修正和概率守恒推导 SDE 的密度演化，用布朗运动与 OU 算例核对时间尺度。",
+    "question": "A derivation of stochastic time scaling, the Itô correction, and density evolution, with Brownian motion and Ornstein–Uhlenbeck examples.",
     "type": "learning",
     "typeLabel": "Learning note",
     "status": "Checked",

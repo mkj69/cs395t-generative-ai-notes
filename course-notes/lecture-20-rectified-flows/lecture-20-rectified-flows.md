@@ -7,9 +7,10 @@ status: draft
 type: learning-note
 course: CS 395T
 source: https://noahgol.github.io/teaching/cs395t-f26/
-summary: 用条件期望、连续性方程与凸性理解 rectified flow；区分训练直线、实际轨迹、reflow 和一步蒸馏，并连接 SD3 精读页。
+summary: Conditional expectations and convexity explain rectification. Worked counterexamples
+  separate straight interpolation, ODE trajectories, reflow, and endpoint distillation.
 public: true
-language: zh-CN
+language: en
 tags:
 - Diffusion
 - rectified flow
@@ -19,111 +20,111 @@ related_research_notes: []
 authorship: ai-assisted
 ---
 
-> **AI 辅助主题学习笔记，待课堂资料补充。** 截至 2026-10-31，课程表只有本课主题，没有公开课件。本篇依据公开原始论文与独立推导编写，不能视为课堂记录；所列论文是补充参考，不声称是教师指定阅读。页面日期为课程安排日期。
+> **AI-assisted study note awaiting classroom materials.** As of October 31, 2026, the course schedule lists the topic without a public slide deck or handout. This note develops the topic from public primary sources and independent derivations. It does not reconstruct the student presentation. References are supplementary sources, not a confirmed assigned reading list. The page date is the scheduled class date.
 
-`[DIRECT]` 标明来源直接支持的简述；`[DERIVATION]` 标明数学推导；`[SYNTHESIS]` 标明概念连接与解释。自行构造的数值例子不代表论文实验。
+`[DIRECT]` identifies a source-supported statement. `[DERIVATION]` identifies mathematical reasoning. `[SYNTHESIS]` identifies an explanatory connection. Constructed numerical examples are not reported experiments.
 
-[返回 Diffusion 单元导读](diffusion-unit.html)
+[Diffusion reading guide](diffusion-unit.html) · [Separate bilingual source readings](diffusion-unit.html#bilingual-source-readings)
 
-## 这一讲先问：谁和谁配对
+## The first question: which endpoints are paired?
 
-`[SYNTHESIS]` 已知噪声分布 $\pi_0$ 和数据分布 $\pi_1$，只能规定两个端点各自出现的频率，不能唯一规定哪一个噪声送到哪一个数据。两个端点的联合分布称为 **coupling（耦合）**。独立抽样只是耦合的一种选择，不是天然正确的配对。
+`[SYNTHESIS]` A noise distribution $\pi_0$ and a data distribution $\pi_1$ specify how often endpoints occur. They do not uniquely specify which noise sample maps to which data sample. A **coupling** is a joint distribution of the two endpoints. Independent sampling is one possible coupling.
 
-本篇固定 $t=0$ 为噪声，$t=1$ 为数据。训练用 $X_t$ 表示人为插值，生成用 $Y_t$ 表示 ODE 轨迹。使用两个字母，可以避免把训练样本与生成轨迹误当成同一对象。
+This note uses $t=0$ for noise and $t=1$ for data. $X_t$ denotes the constructed training interpolation, while $Y_t$ denotes the generated ODE trajectory. The two symbols help keep these different objects distinct.
 
-## 从直线到可执行的速度场
+## From straight interpolation to an executable velocity field
 
-`[DERIVATION]` 固定一对 $(X_0,X_1)$，定义
+`[DERIVATION]` Holding a pair $(X_0,X_1)$ fixed, define
 
 $$X_t=(1-t)X_0+tX_1,\qquad \dot X_t=X_1-X_0.$$
 
-这条直线的速度容易算，但采样时只有起点，没有提前知道的 $X_1$。我们只能学习依赖当前状态与时间的函数：
+The line's velocity is easy to compute. At generation time, however, only the starting state is known. The endpoint $X_1$ is unavailable. A model therefore learns a function of the current state and time:
 
 $$\mathcal L(\theta)=\mathbb E_{t,(X_0,X_1)}\|v_\theta(X_t,t)-(X_1-X_0)\|^2.$$
 
-平方损失的逐点最优解为
+The pointwise squared-error minimizer is
 
 $$v^*(x,t)=\mathbb E[X_1-X_0\mid X_t=x].$$
 
-这里外层期望涉及时间和端点对；条件期望则固定当前 $(x,t)$，对可能经过这里的端点对取后验平均。它不是所有训练速度的无条件平均。生成时解
+The outer training expectation averages over time and endpoint pairs. The conditional expectation fixes the current $(x,t)$ and averages over pairs that could have produced that state. It is not an unconditional average of training velocities. Generation then solves
 
 $$\frac{dY_t}{dt}=v^*(Y_t,t),\qquad Y_0\sim\pi_0.$$
 
-训练可以直接抽样 $X_t$，不需要先模拟整条 ODE；生成仍然通常需要数值积分。“simulation-free training”描述训练目标的构造，不表示生成自动变成一步。
+Training can sample $X_t$ directly without integrating an ODE. Generation generally still requires numerical integration. Simulation-free training describes how the regression examples are constructed; it does not automatically imply one-step generation.
 
-## 同时同地出现两种训练速度会怎样
+## Conflicting training velocities at one state
 
-`[DERIVATION]` 假想在某时刻附近，两类训练端点对经过同一小区域，对应速度分别为 $(2,0)$ 和 $(0,2)$，后验权重均为一半。最佳回归速度为 $(1,1)$。它沿两者的平均方向，既不等于第一条训练直线，也不等于第二条。
+`[DERIVATION]` Suppose two kinds of training pairs pass through the same small region at a given time. Their velocities are $(2,0)$ and $(0,2)$, with equal posterior weights. The best regression prediction is $(1,1)$. It follows the average direction, rather than either individual training line.
 
-如果速度场满足保证解唯一性的正则条件，同一时刻同一位置不能继续产生两种不同速度。训练插值可以交叉，生成 ODE 则必须根据当前状态选定唯一方向。这里的“不能交叉”指相同时间和相同位置；空间路径在不同时间经过同一位置，并不矛盾。
+If the velocity field satisfies conditions ensuring a unique ODE solution, one position at one time cannot continue with two different velocities. Interpolation paths can cross, while the ODE must select a unique direction from the current state. The restriction concerns the same position at the same time. Spatial paths may visit the same position at different times.
 
-这个局部例子不是带有奇点的完整生成模型。离散点碰撞可能破坏光滑密度和唯一性假设，不能用它跳过定理的条件。
+This is a local explanatory example, not a complete generative model with singular point collisions. Discrete collisions can violate smooth-density or uniqueness assumptions. They cannot be used to bypass the hypotheses of the marginal-preservation result.
 
-## 为什么换了轨迹仍可保持每个时刻的分布
+## Different trajectories can preserve every time marginal
 
-`[DERIVATION]` 对光滑测试函数 $\varphi$，在可交换微分与期望的条件下，
+`[DERIVATION]` For a smooth test function $\varphi$, assuming differentiation and expectation can be exchanged,
 
 $$\frac{d}{dt}\mathbb E\varphi(X_t)=\mathbb E[\nabla\varphi(X_t)\cdot(X_1-X_0)]$$
 
 $$=\mathbb E[\nabla\varphi(X_t)\cdot v^*(X_t,t)].$$
 
-这是速度场 $v^*$ 对应连续性方程的弱形式。若同初始条件下该方程的解唯一，ODE 的边缘分布与插值的边缘分布一致。保持的是每一时刻的分布，不是每一对训练端点的身份，也不是整个路径的联合概率律。
+This is the weak form of the continuity equation with velocity $v^*$. If the equation has a unique solution for the initial distribution, the ODE and interpolation share their marginal distribution at each time. They need not preserve the identity of each training pair or the joint law of the entire path.
 
-`[DIRECT]` Rectified Flow 原论文在相应存在性、唯一性与可积性条件下研究边缘保持、凸传输代价及重复 rectification。来源：[Liu、Gong、Liu，v1，§2–3](https://arxiv.org/html/2209.03003v1)。这些是理想精确场的性质，不能不经误差分析就移植到有限网络。
+`[DIRECT]` The Rectified Flow paper studies marginal preservation, convex transport costs, and repeated rectification under appropriate existence, uniqueness, and integrability assumptions. Source: [Liu, Gong, and Liu, v1, Sections 2 and 3](https://arxiv.org/html/2209.03003v1). These properties concern an ideal exact field. Finite networks introduce additional approximation error.
 
-## 凸传输代价为何不增加
+## Why a convex transport cost cannot increase
 
-`[DERIVATION]` 记 $D=X_1-X_0$，令 $c$ 是凸的位移代价，并假设下面期望存在。时间区间长度为1。对 ODE 位移先用 Jensen 不等式：
+`[DERIVATION]` Write $D=X_1-X_0$. Let $c$ be a convex displacement cost, and assume the expectations below exist. The time interval has length 1. Jensen's inequality first applies to the integrated ODE displacement:
 
 $$\mathbb E c(Y_1-Y_0)=\mathbb E c\left(\int_0^1v^*(Y_t,t)dt\right)\le\int_0^1\mathbb E c(v^*(Y_t,t))dt.$$
 
-再用边缘分布相同，将 $Y_t$ 换成 $X_t$；最后对条件期望再次使用 Jensen：
+Equal time marginals allow $Y_t$ to be replaced by $X_t$. Conditional Jensen then gives
 
 $$\int_0^1\mathbb E c(\mathbb E[D\mid X_t])dt\le\int_0^1\mathbb E c(D)dt=\mathbb E c(X_1-X_0).$$
 
-整个推导有两次平均：沿时间平均速度，以及在同一状态上平均端点位移。凸性使这两次平均都不会增大相应代价。
+There are two averages: a time average of velocities and a posterior average of endpoint displacements at a state. Convexity bounds the cost after each average.
 
-但“比原来的任意耦合代价更低”不等于“在全部耦合中全局最优”。全局最优还要与所有可能耦合比较。reflow 也不能仅凭这个不等式被称为任意代价下的最优传输求解器。
+A lower cost than the original coupling does not establish global optimality over all possible couplings. That stronger claim would require comparison with every admissible coupling. The inequality alone does not make reflow a general optimal-transport solver for arbitrary costs.
 
-## Reflow 重新配对，distillation 学习终点
+## Reflow changes the pairing; distillation learns the endpoint
 
-`[SYNTHESIS]` 第一次训练通常从独立的噪声与数据开始。训练完一个场后，可以抽噪声 $Y_0$，用它积分得到 $Y_1$，保存这对有确定关系的端点。再使用这些新端点间的直线训练另一个场，这就是 reflow 的基本思路。
+`[SYNTHESIS]` Initial training often uses independently sampled noise and data. After learning a field, one can sample $Y_0$, integrate to obtain $Y_1$, and save the resulting dependent pair. A new field is then trained on linear interpolations between those new endpoints. This is the basic reflow procedure.
 
-蒸馏终点映射则可直接训练 $G_\phi(Y_0)\approx Y_1$，其输出是终点而不是当前速度。两者可结合，但目标函数和输出语义不同。若教师模型的终点分布已有偏差，新配对数据也带着该偏差；不会因为叫 reflow 就自动还原真实数据分布。
+Endpoint distillation can instead train $G_\phi(Y_0)\approx Y_1$. Its output is a final state rather than an instantaneous velocity. The procedures can be combined, but their targets and output meanings differ. If the teacher's terminal distribution is biased, the newly paired dataset inherits that bias.
 
-| 对象 | 训练输入与目标 | 采样含义 |
+| Object | Training input and target | Generation |
 | --- | --- | --- |
-| 初始 rectified flow | 插值状态与端点差 | 积分速度场 |
-| Reflow | 教师生成的配对端点及其插值 | 使用重新训练的场 |
-| 终点蒸馏 | 起始噪声与教师终点 | 直接预测终点 |
+| Initial rectified flow | Interpolated states and endpoint differences | Integrates a velocity field |
+| Reflow | New paired endpoints generated by a teacher | Integrates the retrained field |
+| Endpoint distillation | Initial noise and the teacher's endpoint | Predicts the endpoint directly |
 
-## 一步 Euler 什么时候才精确
+## When is one Euler step exact?
 
-`[DERIVATION]` 光滑轨迹的 Taylor 展开为
+`[DERIVATION]` A smooth trajectory has the Taylor expansion
 
 $$Y_{t+h}=Y_t+h\,v(Y_t,t)+\frac{h^2}{2}\left(\partial_tv+(\nabla_xv)v\right)(Y_t,t)+O(h^3).$$
 
-括号内是沿轨迹的加速度。只有沿该轨迹的速度恒定，单步 Euler 才能精确跨过整段时间。几何路径看起来是一条线，还可能有不均匀的时间参数化；“直”不能省掉“匀速”这一条件。
+The expression in parentheses is acceleration along the trajectory. A constant velocity along that trajectory makes Euler integration exact across the interval. A geometrically straight path can still have a nonuniform time parameterization. Straightness alone therefore does not provide this guarantee.
 
-例如一维 $v(x,t)=2t$、$Y_0=0$，精确解是 $Y_t=t^2$。它在同一条数轴上前进，但从 $t=0$ 做一步 Euler 得到0，而真实终点为1。这个反例说明视觉上的直线路径不足以证明一步采样准确。
+For example, take $v(x,t)=2t$ in one dimension with $Y_0=0$. The exact solution is $Y_t=t^2$. It stays on the same line, but a single Euler step from $t=0$ predicts 0 while the true endpoint is 1. This counterexample isolates the importance of speed along the path.
 
-上一讲的高斯例子还说明：训练插值都是直线，边缘回归场也可能让粒子先收缩再展开。因此，少步效果应测量，不能从训练路径的表达式直接宣布。
+The preceding Gaussian example also shows that straight training interpolations can induce a field whose particles contract and then expand. Few-step accuracy requires evaluation; the interpolation formula alone does not establish it.
 
-## 与 SD3 第二部分如何对照
+## Connecting the notation to SD3 Section 2
 
-`[DERIVATION]` SD3 使用 $x$ 表示干净数据，$\epsilon$ 表示噪声，并写 $z_s=(1-s)x+s\epsilon$。本篇时间 $t=1-s$，所以同一点可以写成 $(1-t)\epsilon+tx$，速度随时间反转变号：
+`[DERIVATION]` SD3 denotes clean data by $x$, noise by $\epsilon$, and writes $z_s=(1-s)x+s\epsilon$. With this note's time coordinate $t=1-s$, the same position is $(1-t)\epsilon+tx$. Reversing time changes the derivative's sign:
 
 $$\frac{dz_s}{ds}=\epsilon-x,\qquad \frac{dz_{1-t}}{dt}=x-\epsilon.$$
 
-两种写法都正确，但不能把一种目标符号放进另一种采样方向。原文中对时间抽样和损失加权的讨论又是另一个维度：理想无限容量时的同一逐点最优解，不代表有限训练预算下的相同结果。
+Both conventions are valid. A target from one convention cannot be inserted unchanged into the other sampling direction. Time sampling and loss weighting introduce another choice. Even when ideal pointwise minimizers agree, finite training budgets can give different results.
 
-已有的 [SD3 英文原文、中文译文与词义标注页](https://mkj69.github.io/writing/papers/sd3/annotated/) 可以继续逐句阅读。这是相关论文的精读页，**不是尚未公开的 Lecture 20 讲义译文**。
+The existing [SD3 bilingual source edition](https://mkj69.github.io/writing/papers/sd3/annotated/) presents English source text, Chinese translations, and contextual vocabulary annotations on its own page. It is a related paper edition, not a translation of the unpublished Lecture 20 handout.
 
-## 自测与词义
+## Checks and terminology
 
-1. 端点边缘分布一样，耦合是否唯一？不唯一。
-2. 回归目标是一条直线的速度，实际 ODE 是否必为那条直线？不是。
-3. 凸代价下降是否等于已经解出最优传输？不是。
-4. 网络误差与求解器误差是否一回事？前者来自场估计，后者来自积分近似。
+1. Endpoint marginals do not uniquely determine a coupling.
+2. Regressing a straight-line velocity does not force each generated trajectory to follow that training line.
+3. A decrease in convex cost does not establish global optimal transport.
+4. Field-estimation error and numerical integration error have different sources.
 
-**rectify**：在这里指通过回归构造新流。**coupling**：同时规定两个端点的联合分布。**marginal**：只看单一时刻或单一变量的分布。**convex cost**：满足凸性不等式的代价函数。**reflow**：用已学流产生的新端点配对再次训练。**discretization**：把连续时间计算变成有限步计算。
+**Rectification** constructs a new flow through regression. A **coupling** specifies the joint distribution of endpoints. A **marginal** describes one variable or one time after others are integrated out. A **convex cost** satisfies the convexity inequality. **Reflow** retrains using endpoint pairs generated by a learned flow. **Discretization** approximates continuous evolution with finitely many steps.
